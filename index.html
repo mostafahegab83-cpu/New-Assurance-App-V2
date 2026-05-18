@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>IDH · Compliance &amp; Risk Tracker</title>
+<link rel="icon" href="idh-logo.png" />
+<link rel="stylesheet" href="styles.css" />
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+  <!-- ==================== LOGIN OVERLAY ==================== -->
+  <div id="loginOverlay" style="position:fixed;inset:0;background:#f5f7fa;display:flex;align-items:center;justify-content:center;z-index:9999;">
+    <form id="loginForm" style="background:#fff;padding:32px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.1);min-width:320px;max-width:90vw;">
+      <img src="idh-logo.png" alt="IDH" style="height:48px;display:block;margin:0 auto 16px;" />
+      <h2 style="margin:0 0 16px;text-align:center;font-size:18px;color:#1f2937;">Sign in</h2>
+      <input id="loginEmail" type="email" placeholder="Email" required autocomplete="username" style="width:100%;padding:10px;margin-bottom:8px;border:1px solid #e3e8ef;border-radius:6px;font-size:14px;" />
+      <input id="loginPassword" type="password" placeholder="Password" required autocomplete="current-password" style="width:100%;padding:10px;margin-bottom:12px;border:1px solid #e3e8ef;border-radius:6px;font-size:14px;" />
+      <button type="submit" style="width:100%;padding:10px;background:#d12027;color:#fff;border:none;border-radius:6px;font-weight:600;cursor:pointer;font-size:14px;">Sign in</button>
+      <p id="loginError" style="color:#dc2626;font-size:13px;margin:8px 0 0;min-height:18px;text-align:center;"></p>
+    </form>
+  </div>
+
+  <header class="app-header">
+    <div class="brand">
+      <img src="idh-logo.png" alt="IDH — Integrated Diagnostics Holdings" class="brand-logo" />
+      <div class="brand-text">
+        <h1>Compliance &amp; Risk Tracker</h1>
+        <p class="brand-sub">Integrated Diagnostics Holdings · <span id="syncStatus" style="color:#6b7280">Connecting…</span></p>
+      </div>
+    </div>
+    <nav class="tabs" role="tablist">
+      <button class="tab active" data-tab="dashboard" role="tab">Dashboard</button>
+      <button class="tab" data-tab="records" role="tab">Records</button>
+      <button class="tab" data-tab="form" role="tab">Add / Edit</button>
+      <button id="logoutBtn" class="tab" style="margin-left:auto;" title="Sign out">Logout</button>
+    </nav>
+  </header>
+
+  <main class="container">
+    <!-- ==================== DASHBOARD ==================== -->
+    <section id="dashboard" class="tab-panel active">
+      <div class="filters">
+        <input type="search" id="filterSearch" placeholder="Search…" />
+        <select id="filterDepartment"><option value="">All Departments</option></select>
+        <select id="filterProcess"><option value="">All Processes</option></select>
+        <select id="filterCompliance">
+          <option value="">All Compliance</option>
+          <option>Compliant</option>
+          <option>Non-Compliant</option>
+          <option>Partially Compliant</option>
+          <option>N/A</option>
+        </select>
+        <select id="filterRiskLevel">
+          <option value="">All Risk Levels</option>
+          <option>High</option><option>Medium</option><option>Low</option><option>N/A</option>
+        </select>
+        <select id="filterMitigation">
+          <option value="">All Mitigation</option>
+          <option>Open</option><option>Mitigated</option><option>Accepted</option>
+          <option>Closed</option><option>N/A</option>
+        </select>
+        <button id="clearFilters" class="btn ghost">Clear</button>
+        <span class="spacer"></span>
+        <select id="pdfOrientation" title="PDF orientation">
+          <option value="portrait">Portrait</option>
+          <option value="landscape" selected>Landscape</option>
+        </select>
+        <select id="pdfScope" title="Sections to export">
+          <option value="all">All sections</option>
+          <option value="kpis">KPIs only</option>
+          <option value="charts">Charts only</option>
+          <option value="table">Table only</option>
+        </select>
+        <button id="btnExportPdf" class="btn primary">Export to PDF</button>
+      </div>
+
+      <div id="dashboardCapture">
+        <div class="pdf-only" id="pdfHeader">
+          <img src="idh-logo.png" alt="IDH" />
+          <div>
+            <h2>Compliance &amp; Risk Tracker — Dashboard</h2>
+            <p id="pdfMeta"></p>
+          </div>
+        </div>
+
+        <div class="kpis" data-section="kpis">
+          <div class="kpi"><span class="kpi-label">Total Records</span><span class="kpi-value" id="kpiTotal">0</span></div>
+          <div class="kpi"><span class="kpi-label">CAPA Needed</span><span class="kpi-value" id="kpiCapaNeeded">0</span></div>
+          <div class="kpi"><span class="kpi-label">Risk Exists</span><span class="kpi-value" id="kpiRiskExists">0</span></div>
+          <div class="kpi"><span class="kpi-label">Non-Compliant</span><span class="kpi-value" id="kpiNonCompliant">0</span></div>
+        </div>
+
+        <div class="charts" data-section="charts">
+          <div class="chart-card"><h3>Risk Type Breakdown</h3><canvas id="chartRiskType"></canvas></div>
+          <div class="chart-card"><h3>Risk Mitigation Status</h3><canvas id="chartMitigation"></canvas></div>
+          <div class="chart-card"><h3>CAPA Completion</h3><canvas id="chartCapa"></canvas><div id="capaPctLabel" class="gauge-label">0%</div></div>
+          <div class="chart-card"><h3>CAPA Effectiveness</h3><canvas id="chartEffectiveness"></canvas></div>
+          <div class="chart-card"><h3>Risk Level Distribution</h3><canvas id="chartRiskLevel"></canvas></div>
+        </div>
+
+        <div class="pdf-table-wrap" data-section="table">
+          <h3 class="pdf-section-title">Records Snapshot</h3>
+          <table id="pdfTable">
+            <thead><tr>
+              <th>Process</th><th>Department</th><th>Owner</th>
+              <th>Compliance</th><th>Risk Level</th><th>Mitigation</th>
+              <th>CAPA Needed</th><th>Effectiveness</th>
+            </tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== RECORDS ==================== -->
+    <section id="records" class="tab-panel">
+      <div class="toolbar">
+        <button id="btnExport" class="btn">Export CSV</button>
+        <label class="btn">
+          Import CSV
+          <input type="file" id="fileImport" accept=".csv" hidden />
+        </label>
+        <button id="btnClearAll" class="btn danger">Clear All</button>
+        <span class="muted" id="recordsCount"></span>
+      </div>
+      <div class="table-wrap">
+        <table id="recordsTable">
+          <thead>
+            <tr>
+              <th>User</th><th>Process</th><th>Phase</th><th>Day/Week</th>
+              <th>Control / Checklist</th><th>Department</th><th>Sub-Dept</th><th>Owner</th>
+              <th>Evidence</th><th>Target SLA</th><th>Actual SLA</th>
+              <th>Compliance</th><th>NC Description</th>
+              <th>Risk Exist</th><th>Risk Type</th><th>Risk Level</th><th>Mitigation</th>
+              <th>Findings/Gaps</th><th>CAPA Needed</th><th>CAPA Type</th><th>CAPA Due</th>
+              <th>Effectiveness</th><th>Comments</th>
+              <th>Files</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ==================== FORM ==================== -->
+    <section id="form" class="tab-panel">
+      <form id="recordForm" class="record-form" autocomplete="off">
+        <input type="hidden" id="recordId" />
+
+        <h3 class="form-section">General</h3>
+        <div class="grid">
+          <label>User Name<input list="dlUser" id="userName" placeholder="N/A" /><datalist id="dlUser"></datalist></label>
+          <label>Process Name<input list="dlProcess" id="processName" placeholder="N/A" /><datalist id="dlProcess"></datalist></label>
+          <label>Process Phase<input list="dlPhase" id="processPhase" placeholder="N/A" /><datalist id="dlPhase"></datalist></label>
+          <label>Day / Week<input type="text" id="dayWeek" placeholder="N/A" /></label>
+          <label class="full">Control / Checklist Item<input type="text" id="controlItem" placeholder="N/A" /></label>
+          <label>Responsible Department<input list="dlDepartment" id="department" placeholder="N/A" /><datalist id="dlDepartment"></datalist></label>
+          <label>Sub-Department<input list="dlSubDepartment" id="subDepartment" placeholder="N/A" /><datalist id="dlSubDepartment"></datalist></label>
+          <label>Owner<input list="dlOwner" id="owner" placeholder="N/A" /><datalist id="dlOwner"></datalist></label>
+          <label class="full">Required Evidence (link)<input type="url" id="evidence" placeholder="https://… or N/A" /></label>
+        </div>
+
+        <h3 class="form-section">SLA &amp; Compliance</h3>
+        <div class="grid">
+          <label>Target SLA / Days<input type="number" id="targetSla" placeholder="N/A" min="0" /></label>
+          <label>Actual SLA<input type="number" id="actualSla" placeholder="N/A" min="0" /></label>
+          <label>Compliance Status
+            <select id="compliance">
+              <option>N/A</option><option>Compliant</option>
+              <option>Non-Compliant</option><option>Partially Compliant</option>
+            </select>
+          </label>
+          <label class="full">NC Description<textarea id="ncDescription" rows="2" placeholder="N/A"></textarea></label>
+        </div>
+
+        <h3 class="form-section">Risk</h3>
+        <div class="grid">
+          <label>Risk Exist
+            <select id="riskExist"><option>N/A</option><option>Yes</option><option>No</option></select>
+          </label>
+          <label>Risk Type
+            <select id="riskType">
+              <option>N/A</option><option>Operational</option><option>Compliance</option>
+              <option>Financial</option><option>Reputational</option>
+            </select>
+          </label>
+          <label>Risk Level
+            <select id="riskLevel">
+              <option>N/A</option><option>High</option><option>Medium</option><option>Low</option>
+            </select>
+          </label>
+          <label>Mitigation Status
+            <select id="mitigation">
+              <option>N/A</option><option>Open</option><option>Mitigated</option>
+              <option>Accepted</option><option>Closed</option>
+            </select>
+          </label>
+          <label class="full">Findings / Gaps<textarea id="findings" rows="2" placeholder="N/A"></textarea></label>
+        </div>
+
+        <h3 class="form-section">CAPA</h3>
+        <div class="grid">
+          <label>CAPA Needed
+            <select id="capaNeeded"><option>N/A</option><option>Yes</option><option>No</option></select>
+          </label>
+          <label>CAPA Type
+            <select id="capaType">
+              <option>N/A</option><option>Corrective</option><option>Preventive</option>
+            </select>
+          </label>
+          <label>CAPA Due Date<input type="date" id="capaDue" /></label>
+          <label>Effectiveness
+            <select id="effectiveness">
+              <option>N/A</option><option>Effective</option>
+              <option>Partially Effective</option><option>Ineffective</option>
+            </select>
+          </label>
+          <label class="full">Comments<textarea id="comments" rows="2" placeholder="N/A"></textarea></label>
+        </div>
+
+        <h3 class="form-section">Attachments</h3>
+        <p class="muted" style="margin:0 0 8px">
+          Allowed: .msg, .eml, .xlsx, .xls, .docx, .doc, .pdf · Max 10 MB per file.
+          Files are stored in Firebase Storage and shared across all devices.
+        </p>
+        <div id="dropzone" class="dropzone">
+          <p><strong>Drag &amp; drop</strong> files here, or
+            <label class="link-btn">browse<input type="file" id="fileAttach" multiple
+              accept=".msg,.eml,.xlsx,.xls,.docx,.doc,.pdf" hidden /></label>
+          </p>
+          <div id="uploadProgress" class="upload-progress" hidden>
+            <div class="bar"><div class="fill" id="uploadFill"></div></div>
+            <span id="uploadText" class="muted"></span>
+          </div>
+        </div>
+        <ul id="attachmentList" class="attach-list"></ul>
+
+        <div class="form-actions">
+          <button type="submit" class="btn primary">Save Record</button>
+          <button type="button" id="btnReset" class="btn ghost">Reset</button>
+        </div>
+      </form>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script type="module" src="app.js?v=20260518-admin-and-process"></script>
+</body>
+</html>
