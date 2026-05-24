@@ -1,0 +1,69 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // --- Helpers ---------------------------------------------------------
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    // Hard-coded super-admins (mirror ADMIN_EMAILS in firebase.js)
+    function isSuperAdmin() {
+      return isSignedIn()
+        && request.auth.token.email in ['mostafa.hegab83@gmail.com'];
+    }
+    function isApproved() {
+      return isSignedIn() && (
+        isSuperAdmin()
+        || exists(/databases/$(database)/documents/approved_users/$(request.auth.token.email))
+      );
+    }
+    function isAdmin() {
+      return isSuperAdmin() || (
+        isApproved()
+        && get(/databases/$(database)/documents/approved_users/$(request.auth.token.email)).data.role == 'admin'
+      );
+    }
+
+    // --- Approved users (admin-managed) ---------------------------------
+    match /approved_users/{email} {
+      allow read:  if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // --- Compliance records ---------------------------------------------
+    // App writes to "compliance_records"; older "records" kept for back-compat.
+    match /compliance_records/{id} {
+      allow read, create, update: if isApproved();
+      allow delete:               if isAdmin();
+    }
+    match /records/{id} {
+      allow read, create, update: if isApproved();
+      allow delete:               if isAdmin();
+    }
+
+    // --- CAPA Register --------------------------------------------------
+    match /capa_records/{id} {
+      allow read, create, update: if isApproved();
+      allow delete:               if isAdmin();
+    }
+
+    // --- Risk Register --------------------------------------------------
+    match /risk_register/{id} {
+      allow read, create, update: if isApproved();
+      allow delete:               if isAdmin();
+    }
+
+    // --- NC Register ----------------------------------------------------
+    match /nc_register/{id} {
+      allow read, create, update: if isApproved();
+      allow delete:               if isAdmin();
+    }
+
+    // --- Audit trail (append-only) --------------------------------------
+    match /audit_log/{id} {
+      allow read:   if isApproved();
+      allow create: if isApproved();
+      allow update, delete: if false;
+    }
+  }
+}
