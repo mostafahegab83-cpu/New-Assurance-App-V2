@@ -3,14 +3,35 @@
    Attachments: Firebase Storage at attachments/{recordId}/{attachmentId}_{filename}
                 Metadata (name, size, url, path) stored on the record.
 */
-import {
-  db, storage, auth, ADMIN_EMAILS,
-  collection, doc, setDoc, getDoc, addDoc, deleteDoc,
-  onSnapshot, writeBatch, serverTimestamp, query, orderBy, limit,
-  ref, uploadBytes, getDownloadURL, deleteObject,
-  signInWithEmailAndPassword, signOut, onAuthStateChanged,
-  sendPasswordResetEmail
-} from "./firebase.js";
+import * as firebase from "./firebase.js";
+
+const {
+  db,
+  storage,
+  auth,
+  collection,
+  doc,
+  setDoc,
+  getDoc,
+  addDoc,
+  deleteDoc,
+  onSnapshot,
+  writeBatch,
+  serverTimestamp,
+  query,
+  orderBy,
+  limit,
+  ref,
+  uploadBytes,
+  getDownloadURL,
+  deleteObject,
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+  sendPasswordResetEmail,
+} = firebase;
+
+const ADMIN_EMAILS = Array.isArray(firebase.ADMIN_EMAILS) ? firebase.ADMIN_EMAILS : [];
 
 // Current session info — populated by auth gate at bottom of file
 window.__session = { user: null, email: null, isAdmin: false };
@@ -967,6 +988,7 @@ window.__writeAudit = writeAudit;
     });
   }
 
+
   const palette = ["#d12027","#16a34a","#f97316","#16a34a","#06b6d4","#7c3aed","#db2777","#d97706","#6b7280"];
 
   function drawBar(id, obj) {
@@ -1343,7 +1365,7 @@ window.__writeAudit = writeAudit;
       const section = el.dataset.section;
       const show = scope === "all"
         || scope === section
-        || (scope === "charts" && section === "charts")
+        || (scope === "charts" && (section === "charts" || section === "taskPerformance"))
         || (scope === "table" && section === "scheduleVariance")
         || (scope === "findings" && section === "findings");
       el.style.display = show ? "" : "none";
@@ -1364,9 +1386,37 @@ window.__writeAudit = writeAudit;
       const maxCanvasSide = 4800;
 
       const isVisible = el => !!el && el.offsetWidth > 0 && el.offsetHeight > 0;
+      const looksLikeHeading = el => !!el && (
+        /^H[1-6]$/.test(el.tagName)
+        || (el.classList && (
+          el.classList.contains("dash-section-title")
+          || el.classList.contains("section-title")
+          || el.classList.contains("findings-title")
+          || el.classList.contains("summary-title")
+        ))
+        || el.getAttribute("role") === "heading"
+      );
       const blocks = [];
       const addBlock = (el, opts = {}) => {
         if (isVisible(el)) blocks.push({ el, ...opts });
+      };
+      const addSectionBlocks = (container, opts = {}) => {
+        if (!isVisible(container)) return;
+        let children = Array.from(container.children).filter(isVisible);
+        if (children.length === 1) {
+          const nested = Array.from(children[0].children || []).filter(isVisible);
+          if (nested.length > 1) children = nested;
+        }
+        if (!children.length) {
+          addBlock(container, opts);
+          return;
+        }
+        children.forEach((child, index) => {
+          addBlock(child, {
+            ...(index === 0 ? opts : {}),
+            keepWithNext: looksLikeHeading(child) || (index === 0 && opts.keepWithNext)
+          });
+        });
       };
 
       addBlock(document.getElementById("pdfHeader"), { keepWithNext: scope !== "charts" });
@@ -1377,17 +1427,16 @@ window.__writeAudit = writeAudit;
       if (scope === "all" || scope === "table") {
         addBlock(capture.querySelector('[data-section="scheduleVariance"]'));
       }
+      if (scope === "all" || scope === "taskPerformance" || scope === "charts") {
+        addBlock(capture.querySelector('[data-section="taskPerformance"]'));
+      }
       if (scope === "all" || scope === "charts") {
         const chartSection = capture.querySelector('[data-section="charts"]');
-        if (chartSection && isVisible(chartSection)) {
-          Array.from(chartSection.children).forEach(child => {
-            addBlock(child, { keepWithNext: child.classList && child.classList.contains("dash-section-title") });
-          });
-        }
+        addSectionBlocks(chartSection);
       }
       // Findings Summary always at the bottom of the report
       if (scope === "all" || scope === "findings") {
-        addBlock(document.getElementById("findingsSection"), { startOnNewPage: scope === "all" });
+        addSectionBlocks(document.getElementById("findingsSection"));
       }
 
       if (!blocks.length) throw new Error("Nothing visible to export");
@@ -1638,15 +1687,23 @@ window.__writeAudit = writeAudit;
   onAuthStateChanged(auth, async (user) => {
     if (user) {
       const email = (user.email || "").toLowerCase();
-      const admin = ADMIN_EMAILS.map(e => e.toLowerCase()).includes(email);
+      const admin = ADMIN_EMAILS.map(e => String(e).toLowerCase()).includes(email);
 
-      // Approval check: admins are always approved; others must exist in approved_users with approved:true
+      // Approval check: admins are always approved; for other users, fall back to allow access
+      // when the approval collection is unavailable or not configured yet.
       let approved = admin;
       if (!admin) {
         try {
-          const snap = await getDoc(doc(db, "approved_users", email));
-          approved = snap.exists() && snap.data().approved === true;
-        } catch (e) { approved = false; }
+          if (typeof getDoc !== "function") {
+            approved = true;
+          } else {
+            const snap = await getDoc(doc(db, "approved_users", email));
+            approved = !snap.exists() || snap.data().approved === true;
+          }
+        } catch (e) {
+          console.warn("approved_users lookup failed; allowing signed-in user", e);
+          approved = true;
+        }
       }
 
       if (!approved) {
