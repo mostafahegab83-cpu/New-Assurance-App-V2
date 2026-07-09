@@ -1,371 +1,318 @@
-:root {
-  --bg: #f5f7fa;
-  --surface: #ffffff;
-  --border: #e3e8ef;
-  --text: #1f2937;
-  --muted: #6b7280;
-  --primary: #d12027;        /* IDH red */
-  --primary-hover: #a8181e;
-  --accent: #6b7280;
-  --success: #16a34a;
-  --warning: #d97706;
-  --danger: #dc2626;
-  --radius: 8px;
-  --shadow: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
-}
-* { box-sizing: border-box; }
-body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  background: var(--bg);
-  color: var(--text);
-  font-size: 14px;
-}
-.muted { color: var(--muted); font-size: 13px; }
-.spacer { flex: 1; }
+import { createFileRoute } from "@tanstack/react-router";
+import { useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { listGaps, upsertGap, bulkImportGaps, deleteGap } from "@/lib/gap.functions";
+import { buildRowMapper, downloadXlsx, parseBool } from "@/lib/excel";
+import { ExcelImport } from "@/components/ExcelImport";
+import { KPICard } from "@/components/KPICard";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Download, Plus, Trash2, ListChecks, CheckCircle2, XCircle, PieChart as PieIcon } from "lucide-react";
+import { toast } from "sonner";
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend, CartesianGrid } from "recharts";
 
-.app-header {
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  padding: 14px 24px;
-}
-.brand { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; }
-.brand-logo { height: 44px; width: auto; display: block; }
-.brand-text h1 { margin: 0; font-size: 18px; line-height: 1.2; }
-.brand-sub { margin: 2px 0 0; font-size: 12px; color: var(--muted); letter-spacing: .3px; }
+const CHART_COLORS = ["hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))", "hsl(var(--chart-5))"];
+const PALETTE = ["#3b5b8f", "#3faab5", "#5cb87a", "#e6b34a", "#d76a5d"];
 
-.tabs { display: flex; gap: 4px; }
-.tab {
-  background: none; border: none; padding: 8px 16px;
-  cursor: pointer; border-radius: var(--radius);
-  color: var(--muted); font-weight: 500;
-}
-.tab:hover { background: var(--bg); }
-.tab.active { background: var(--primary); color: #fff; }
+const TEMPLATE_HEADERS = [
+  "Process ID","Process Name","Process Description","Best Practice Requirement",
+  "Existing in IDH (Y/N)","Related Policy/SOP","Gap Identified","Comments","Department"
+];
 
-.container { max-width: 1400px; margin: 0 auto; padding: 24px; }
-.tab-panel { display: none; }
-.tab-panel.active { display: block; }
+const mapRow = buildRowMapper({
+  process_id: ["Process ID", "ProcessID", "PID"],
+  process_name: ["Process Name", "Name"],
+  process_description: ["Process Description", "Description"],
+  best_practice_requirement: ["Best Practice Requirement", "Best Practice"],
+  existing_in_idh: ["Existing in IDH", "Existing in IDH (Y/N)", "Existing"],
+  related_policy_sop: ["Related Policy/SOP", "Policy", "SOP"],
+  gap_identified: ["Gap Identified", "Gap"],
+  department: ["Department", "Dept"],
+  comments: ["Comments", "Comment", "Notes"],
+});
 
-.filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; align-items: center; }
-.filters input, .filters select {
-  padding: 8px 12px; border: 1px solid var(--border);
-  border-radius: var(--radius); background: var(--surface); font-size: 14px;
+type Row = {
+  id: string;
+  process_id: string | null;
+  process_name: string;
+  process_description: string | null;
+  best_practice_requirement: string | null;
+  existing_in_idh: boolean | null;
+  related_policy_sop: string | null;
+  gap_identified: boolean | null;
+  department: string | null;
+  comments: string | null;
+  validation_status: string | null;
+};
+
+export const Route = createFileRoute("/_authenticated/gap-analysis/assessment")({
+  component: GapAssessmentPage,
+});
+
+function GapAssessmentPage() {
+  const qc = useQueryClient();
+  const listFn = useServerFn(listGaps);
+  const upsertFn = useServerFn(upsertGap);
+  const bulkFn = useServerFn(bulkImportGaps);
+  const delFn = useServerFn(deleteGap);
+
+  const { data: rows = [], isLoading } = useQuery({ queryKey: ["gaps"], queryFn: () => listFn() as Promise<Row[]> });
+
+  const [search, setSearch] = useState("");
+  const [filterExisting, setFilterExisting] = useState<string>("all");
+  const [filterGap, setFilterGap] = useState<string>("all");
+  const [filterDept, setFilterDept] = useState<string>("all");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  const departments = useMemo(() =>
+    Array.from(new Set(rows.map((r) => r.department).filter(Boolean))) as string[], [rows]);
+
+  const filtered = useMemo(() => rows.filter((r) => {
+    if (search && !`${r.process_id} ${r.process_name} ${r.best_practice_requirement}`.toLowerCase().includes(search.toLowerCase())) return false;
+    if (filterExisting !== "all" && String(r.existing_in_idh) !== filterExisting) return false;
+    if (filterGap !== "all" && String(r.gap_identified) !== filterGap) return false;
+    if (filterDept !== "all" && r.department !== filterDept) return false;
+    return true;
+  }), [rows, search, filterExisting, filterGap, filterDept]);
+
+  const kpis = useMemo(() => {
+    const total = rows.length;
+    const existing = rows.filter((r) => r.existing_in_idh).length;
+    const missing = total - existing;
+    const gapPct = total ? Math.round((missing / total) * 1000) / 10 : 0;
+    return { total, existing, missing, gapPct };
+  }, [rows]);
+
+  const existVsMiss = [
+    { name: "Existing", value: kpis.existing },
+    { name: "Missing", value: kpis.missing },
+  ];
+
+  const byDept = useMemo(() => {
+    const acc: Record<string, { department: string; total: number; gaps: number }> = {};
+    for (const r of rows) {
+      const d = r.department || "Unassigned";
+      acc[d] ??= { department: d, total: 0, gaps: 0 };
+      acc[d].total += 1;
+      if (!r.existing_in_idh) acc[d].gaps += 1;
+    }
+    return Object.values(acc);
+  }, [rows]);
+
+  const importMut = useMutation({
+    mutationFn: async (parsed: Record<string, unknown>[]) => {
+      const rows = parsed
+        .filter((r) => r.process_name)
+        .map((r) => ({
+          process_id: r.process_id ? String(r.process_id) : null,
+          process_name: String(r.process_name),
+          process_description: r.process_description ? String(r.process_description) : null,
+          best_practice_requirement: r.best_practice_requirement ? String(r.best_practice_requirement) : null,
+          existing_in_idh: parseBool(r.existing_in_idh) ?? false,
+          related_policy_sop: r.related_policy_sop ? String(r.related_policy_sop) : null,
+          gap_identified: parseBool(r.gap_identified) ?? false,
+          department: r.department ? String(r.department) : null,
+          comments: r.comments ? String(r.comments) : null,
+        }));
+      return bulkFn({ data: { rows } });
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["gaps"] }),
+  });
+
+  const saveMut = useMutation({
+    mutationFn: (row: Partial<Row>) => upsertFn({ data: row as never }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["gaps"] }); toast.success("Saved"); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const deleteMut = useMutation({
+    mutationFn: (id: string) => delFn({ data: { id } }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["gaps"] }); setSelected(new Set()); toast.success("Deleted"); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const exportRows = () => {
+    downloadXlsx(filtered.map((r) => ({
+      "Process ID": r.process_id,
+      "Process Name": r.process_name,
+      "Process Description": r.process_description,
+      "Best Practice Requirement": r.best_practice_requirement,
+      "Existing in IDH": r.existing_in_idh ? "Y" : "N",
+      "Related Policy/SOP": r.related_policy_sop,
+      "Gap Identified": r.gap_identified ? "Y" : "N",
+      "Department": r.department,
+      "Comments": r.comments,
+      "Validation Status": r.validation_status,
+    })), `gap-assessment-${new Date().toISOString().slice(0,10)}.xlsx`);
+  };
+
+  const addRow = () => saveMut.mutate({ process_name: "New process", existing_in_idh: false, gap_identified: true });
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Gap Assessment</h1>
+        <p className="text-sm text-muted-foreground">Best-practice inventory vs. what exists in IDH.</p>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <KPICard label="Best Practice Processes" value={kpis.total} icon={ListChecks} tone="info" />
+        <KPICard label="Existing Processes" value={kpis.existing} icon={CheckCircle2} tone="success" />
+        <KPICard label="Missing Processes" value={kpis.missing} icon={XCircle} tone="destructive" />
+        <KPICard label="Gap %" value={`${kpis.gapPct}%`} icon={PieIcon} tone="warning" hint="Missing / Total × 100" />
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader><CardTitle className="text-base">Existing vs Missing</CardTitle></CardHeader>
+          <CardContent className="h-64">
+            <ResponsiveContainer>
+              <PieChart>
+                <Pie data={existVsMiss} dataKey="value" nameKey="name" innerRadius={55} outerRadius={90} paddingAngle={2}>
+                  {existVsMiss.map((_, i) => <Cell key={i} fill={PALETTE[i]} />)}
+                </Pie>
+                <Tooltip /><Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader><CardTitle className="text-base">Gaps by Department</CardTitle></CardHeader>
+          <CardContent className="h-64">
+            <ResponsiveContainer>
+              <BarChart data={byDept}>
+                <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                <XAxis dataKey="department" tick={{ fontSize: 12 }} />
+                <YAxis /><Tooltip /><Legend />
+                <Bar dataKey="total" fill={PALETTE[0]} name="Total" />
+                <Bar dataKey="gaps" fill={PALETTE[4]} name="Gaps" />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+          <CardTitle className="text-base">Records ({filtered.length})</CardTitle>
+          <div className="flex flex-wrap gap-2">
+            <ExcelImport
+              label="Import .xlsx"
+              mapper={mapRow}
+              templateHeaders={TEMPLATE_HEADERS}
+              onImport={(rows) => importMut.mutateAsync(rows as Record<string, unknown>[]).then(() => {})}
+            />
+            <Button variant="outline" onClick={exportRows}><Download className="mr-2 h-4 w-4" />Export</Button>
+            <Button onClick={addRow}><Plus className="mr-2 h-4 w-4" />New</Button>
+            {selected.size > 0 && (
+              <Button variant="destructive" onClick={() => selected.forEach((id) => deleteMut.mutate(id))}>
+                <Trash2 className="mr-2 h-4 w-4" />Delete ({selected.size})
+              </Button>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex flex-wrap gap-2">
+            <Input placeholder="Search process id / name / requirement..." value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-sm" />
+            <Select value={filterExisting} onValueChange={setFilterExisting}>
+              <SelectTrigger className="w-44"><SelectValue placeholder="Existing" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Existing: All</SelectItem>
+                <SelectItem value="true">Existing: Yes</SelectItem>
+                <SelectItem value="false">Existing: No</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={filterGap} onValueChange={setFilterGap}>
+              <SelectTrigger className="w-44"><SelectValue placeholder="Gap" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Gap: All</SelectItem>
+                <SelectItem value="true">Gap: Yes</SelectItem>
+                <SelectItem value="false">Gap: No</SelectItem>
+              </SelectContent>
+            </Select>
+            {departments.length > 0 && (
+              <Select value={filterDept} onValueChange={setFilterDept}>
+                <SelectTrigger className="w-48"><SelectValue placeholder="Department" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Department: All</SelectItem>
+                  {departments.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+
+          <div className="rounded-md border overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-10"></TableHead>
+                  <TableHead>Process ID</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Best Practice</TableHead>
+                  <TableHead>Existing</TableHead>
+                  <TableHead>Gap</TableHead>
+                  <TableHead>Department</TableHead>
+                  <TableHead>Policy/SOP</TableHead>
+                  <TableHead>Validation</TableHead>
+                  <TableHead>Comments</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isLoading && <TableRow><TableCell colSpan={10} className="text-center py-8 text-muted-foreground">Loading...</TableCell></TableRow>}
+                {!isLoading && filtered.length === 0 && <TableRow><TableCell colSpan={10} className="text-center py-8 text-muted-foreground">No records. Import an Excel file or add manually.</TableCell></TableRow>}
+                {filtered.map((r) => (
+                  <TableRow key={r.id}>
+                    <TableCell>
+                      <Checkbox checked={selected.has(r.id)} onCheckedChange={(v) => {
+                        const s = new Set(selected); v ? s.add(r.id) : s.delete(r.id); setSelected(s);
+                      }} />
+                    </TableCell>
+                    <EditableCell value={r.process_id ?? ""} onSave={(v) => saveMut.mutate({ ...r, process_id: v })} />
+                    <EditableCell value={r.process_name} onSave={(v) => saveMut.mutate({ ...r, process_name: v })} />
+                    <EditableCell value={r.best_practice_requirement ?? ""} onSave={(v) => saveMut.mutate({ ...r, best_practice_requirement: v })} />
+                    <TableCell>
+                      <BoolBadge value={r.existing_in_idh} onToggle={() => saveMut.mutate({ ...r, existing_in_idh: !r.existing_in_idh })} />
+                    </TableCell>
+                    <TableCell>
+                      <BoolBadge value={r.gap_identified} tone="danger" onToggle={() => saveMut.mutate({ ...r, gap_identified: !r.gap_identified })} />
+                    </TableCell>
+                    <EditableCell value={r.department ?? ""} onSave={(v) => saveMut.mutate({ ...r, department: v })} />
+                    <EditableCell value={r.related_policy_sop ?? ""} onSave={(v) => saveMut.mutate({ ...r, related_policy_sop: v })} />
+                    <TableCell>{r.validation_status ? <Badge variant="secondary">{r.validation_status}</Badge> : <span className="text-muted-foreground text-xs">—</span>}</TableCell>
+                    <EditableCell value={r.comments ?? ""} onSave={(v) => saveMut.mutate({ ...r, comments: v })} />
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
 }
 
-.kpis {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 12px; margin-bottom: 16px;
-}
-.kpi {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow);
-  display: flex; flex-direction: column; gap: 4px;
-  transition: background-color 0.2s, border-color 0.2s;
-}
-.kpi-label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .5px; transition: color 0.2s; }
-.kpi-value { font-size: 28px; font-weight: 600; transition: color 0.2s; }
-
-.kpi.kpi-red {
-  background: #fee2e2;
-  border-color: #fecaca;
-}
-.kpi.kpi-red .kpi-value {
-  color: #991b1b;
-}
-.kpi.kpi-red .kpi-label {
-  color: #b91c1c;
+function EditableCell({ value, onSave }: { value: string; onSave: (v: string) => void }) {
+  const [v, setV] = useState(value);
+  return (
+    <TableCell className="min-w-32">
+      <Input value={v} onChange={(e) => setV(e.target.value)} onBlur={() => v !== value && onSave(v)} className="h-8 border-0 bg-transparent focus-visible:bg-secondary" />
+    </TableCell>
+  );
 }
 
-.kpi.kpi-orange {
-  background: #ffedd5;
-  border-color: #fed7aa;
+function BoolBadge({ value, onToggle, tone }: { value: boolean | null; onToggle: () => void; tone?: "danger" }) {
+  const yes = value === true;
+  return (
+    <button onClick={onToggle} className="cursor-pointer">
+      <Badge variant={yes ? (tone === "danger" ? "destructive" : "default") : "outline"}>
+        {value === null ? "N/A" : yes ? "Yes" : "No"}
+      </Badge>
+    </button>
+  );
 }
-.kpi.kpi-orange .kpi-value {
-  color: #c2410c;
-}
-.kpi.kpi-orange .kpi-label {
-  color: #c2410c;
-}
-
-.kpi.kpi-green {
-  background: #dcfce7;
-  border-color: #bbf7d0;
-}
-.kpi.kpi-green .kpi-value {
-  color: #15803d;
-}
-.kpi.kpi-green .kpi-label {
-  color: #166534;
-}
-
-.charts {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 12px;
-}
-.chart-card {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow);
-  position: relative;
-}
-.chart-card h3 { margin: 0 0 12px; font-size: 14px; color: var(--muted); }
-.chart-card canvas { max-height: 260px; }
-.gauge-label {
-  position: absolute; left: 0; right: 0; bottom: 60px;
-  text-align: center; font-size: 24px; font-weight: 600; pointer-events: none;
-}
-
-.toolbar { display: flex; gap: 8px; margin-bottom: 16px; align-items: center; flex-wrap: wrap; }
-.btn {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 8px 14px; border: 1px solid var(--border);
-  background: var(--surface); border-radius: var(--radius);
-  cursor: pointer; font-size: 14px; font-weight: 500;
-  color: var(--text); transition: background .15s;
-}
-.btn:hover { background: var(--bg); }
-.btn.primary { background: var(--primary); color: #fff; border-color: var(--primary); }
-.btn.primary:hover { background: var(--primary-hover); border-color: var(--primary-hover); }
-.btn.danger { background: var(--danger); color: #fff; border-color: var(--danger); }
-.btn.ghost { background: transparent; }
-.btn.sm { padding: 4px 8px; font-size: 12px; }
-
-.table-wrap { overflow-x: auto; background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); }
-table { width: 100%; border-collapse: collapse; min-width: 1400px; }
-th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; font-size: 13px; }
-th { background: var(--bg); font-weight: 600; font-size: 11px; text-transform: uppercase; color: var(--muted); }
-tbody tr:hover { background: var(--bg); }
-td.wrap { white-space: normal; max-width: 240px; }
-
-.badge {
-  display: inline-block; padding: 2px 8px; border-radius: 12px;
-  font-size: 12px; font-weight: 500;
-}
-.badge.green { background: #dcfce7; color: #166534; }
-.badge.red   { background: #fee2e2; color: #991b1b; }
-.badge.amber { background: #fef3c7; color: #92400e; }
-.badge.blue  { background: #dcfce7; color: #166534; }
-.badge.gray  { background: #e5e7eb; color: #374151; }
-
-.record-form {
-  background: var(--surface); padding: 24px;
-  border-radius: var(--radius); box-shadow: var(--shadow);
-}
-.form-section {
-  margin: 20px 0 12px; padding-bottom: 6px;
-  border-bottom: 1px solid var(--border);
-  font-size: 14px; color: var(--primary); text-transform: uppercase; letter-spacing: .5px;
-}
-.form-section:first-child { margin-top: 0; }
-.grid {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 16px;
-}
-.grid label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
-.grid label.full { grid-column: 1 / -1; }
-.grid input, .grid select, .grid textarea {
-  padding: 8px 10px; border: 1px solid var(--border);
-  border-radius: var(--radius); font-size: 14px; color: var(--text);
-  background: var(--surface); font-family: inherit;
-}
-.grid input:focus, .grid select:focus, .grid textarea:focus {
-  outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(209,32,39,.15);
-}
-.form-actions { display: flex; gap: 8px; margin-top: 20px; }
-
-/* ===== Attachments ===== */
-.dropzone {
-  border: 2px dashed var(--border); border-radius: var(--radius);
-  padding: 22px; text-align: center; background: var(--bg);
-  transition: border-color .15s, background .15s;
-}
-.dropzone.drag { border-color: var(--primary); background: #fff5f5; }
-.dropzone p { margin: 0; color: var(--muted); }
-.link-btn {
-  color: var(--primary); cursor: pointer; text-decoration: underline; font-weight: 500;
-}
-.upload-progress { margin-top: 10px; display: flex; flex-direction: column; gap: 4px; align-items: stretch; }
-.upload-progress .bar { background: #e5e7eb; height: 6px; border-radius: 3px; overflow: hidden; }
-.upload-progress .fill { background: var(--primary); height: 100%; width: 0%; transition: width .15s; }
-
-.attach-list { list-style: none; padding: 0; margin: 12px 0 0; display: flex; flex-direction: column; gap: 6px; }
-.attach-item {
-  display: flex; align-items: center; gap: 10px;
-  padding: 8px 12px; border: 1px solid var(--border);
-  border-radius: var(--radius); background: var(--surface);
-}
-.attach-icon {
-  width: 32px; height: 32px; border-radius: 6px; flex: none;
-  display: grid; place-items: center; font-size: 11px; font-weight: 700;
-  color: #fff; background: var(--accent);
-}
-.attach-icon.pdf  { background: #dc2626; }
-.attach-icon.doc  { background: #16a34a; }
-.attach-icon.xls  { background: #16a34a; }
-.attach-icon.eml  { background: #7c3aed; }
-.attach-meta { flex: 1; min-width: 0; }
-.attach-name { font-weight: 500; word-break: break-all; }
-.attach-sub  { color: var(--muted); font-size: 12px; }
-.attach-actions { display: flex; gap: 4px; flex: none; }
-.files-cell { display: flex; flex-wrap: wrap; gap: 4px; }
-.files-chip {
-  font-size: 11px; padding: 2px 8px; background: #eef2f7;
-  border-radius: 12px; color: #374151; cursor: pointer;
-}
-.files-chip:hover { background: #dcfce7; }
-
-/* ===== PDF export helpers ===== */
-.pdf-only { display: none; }
-.pdf-table-wrap { display: none; }
-#dashboardCapture.exporting .pdf-only,
-#riskDashboardCapture.exporting .pdf-only,
-#dashboardCapture.exporting .pdf-table-wrap { display: block; }
-#dashboardCapture.exporting #pdfHeader,
-#riskDashboardCapture.exporting #riskPdfHeader {
-  display: flex; align-items: center; gap: 14px;
-  padding: 14px 16px; margin-bottom: 14px;
-  background: #fff; border: 1px solid var(--border); border-radius: var(--radius);
-}
-#dashboardCapture.exporting #pdfHeader img,
-#riskDashboardCapture.exporting #riskPdfHeader img { height: 44px; }
-#dashboardCapture.exporting #pdfHeader h2,
-#riskDashboardCapture.exporting #riskPdfHeader h2 { margin: 0; font-size: 16px; }
-#dashboardCapture.exporting #pdfHeader p,
-#riskDashboardCapture.exporting #riskPdfHeader p  { margin: 2px 0 0; font-size: 12px; color: var(--muted); }
-.pdf-section-title { margin: 18px 0 8px; font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
-#pdfTable { width: 100%; border-collapse: collapse; min-width: 0; }
-#pdfTable th, #pdfTable td { font-size: 12px; padding: 6px 8px; border: 1px solid var(--border); white-space: nowrap; }
-
-.toast {
-  position: fixed; bottom: 24px; left: 50%;
-  transform: translateX(-50%) translateY(20px);
-  background: var(--text); color: #fff; padding: 10px 16px;
-  border-radius: var(--radius); opacity: 0; pointer-events: none;
-  transition: opacity .2s, transform .2s; font-size: 14px;
-  z-index: 1000;
-}
-.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-
-@media (max-width: 640px) {
-  .brand-logo { height: 36px; }
-  .brand-text h1 { font-size: 16px; }
-  .container { padding: 16px; }
-}
-
-/* ===== CAPA Register ===== */
-.capa-modal {
-  position: fixed; inset: 0; background: rgba(15,23,42,.55);
-  display: flex; align-items: flex-start; justify-content: center;
-  z-index: 1000; padding: 40px 16px; overflow-y: auto;
-}
-.capa-modal-card {
-  background: var(--surface); border-radius: var(--radius);
-  width: 100%; max-width: 920px; padding: 24px;
-  box-shadow: 0 10px 30px rgba(0,0,0,.2);
-}
-.capa-modal-head {
-  display: flex; align-items: center; justify-content: space-between;
-  margin-bottom: 16px;
-}
-.capa-modal-head h3 { margin: 0; font-size: 18px; color: var(--text); }
-#capaTable { min-width: 1800px; }
-#capaTable td.wrap { white-space: normal; max-width: 240px; }
-/* ===== Append the block below to the END of your existing styles.css ===== */
-
-/* ===== Risk Register ===== */
-#riskTable { min-width: 1800px; }
-#riskTable td.risk-cell {
-  vertical-align: top;
-  min-width: 110px;
-  cursor: text;
-}
-#riskTable td.risk-cell:focus {
-  outline: 2px solid var(--primary);
-  outline-offset: -2px;
-  background: #fff5f5;
-}
-#riskTable td.wrap { white-space: normal; max-width: 280px; }
-
-.filter-row th {
-  background: var(--surface);
-  padding: 4px 6px;
-  text-transform: none;
-}
-.filter-row input.risk-filter-input {
-  width: 100%;
-  padding: 4px 6px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  font-size: 12px;
-  background: var(--bg);
-  color: var(--text);
-}
-.filter-row input.risk-filter-input:focus {
-  outline: none;
-  border-color: var(--primary);
-  background: #fff;
-}
-/* ===== Schedule Variance Table ===== */
-.variance-table {
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  overflow: hidden;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-  font-size: 14px;
-}
-.variance-table thead th {
-  background: #f8fafc;
-  color: #475569;
-  font-weight: 600;
-  font-size: 13px;
-  text-align: left;
-  padding: 12px 16px;
-  border-bottom: 1px solid #e5e7eb;
-  letter-spacing: 0.01em;
-}
-.variance-table tbody td {
-  padding: 12px 16px;
-  border-bottom: 1px solid #f1f5f9;
-  color: #14532d;
-  vertical-align: middle;
-}
-.variance-table tbody tr:last-child td { border-bottom: none; }
-.variance-table tbody tr:hover { background: #f8fafc; }
-.variance-table .var-name { font-weight: 500; color: #166534; }
-.variance-table .var-cell { width: 200px; }
-.variance-table .var-dash { color: #94a3b8; font-size: 16px; }
-.var-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 600;
-  color: #0f172a;
-  font-variant-numeric: tabular-nums;
-}
-.var-dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  display: inline-block;
-  box-shadow: 0 0 0 2px rgba(255,255,255,0.9), 0 1px 3px rgba(0,0,0,0.15);
-}
-.var-pill.ok    .var-dot { background: radial-gradient(circle at 30% 30%, #6ee7a8, #16a34a); }
-.var-pill.bad   .var-dot { background: radial-gradient(circle at 30% 30%, #fca5a5, #dc2626); }
-.var-pill.early .var-dot { background: radial-gradient(circle at 30% 30%, #fde68a, #d97706); }
-.var-pill.ok    { color: #166534; }
-.var-pill.bad   { color: #b91c1c; }
-.var-pill.early { color: #b45309; }
-/* Findings Summary table */
-.fs-head{display:flex;justify-content:space-between;align-items:flex-end;margin:18px 0 10px;flex-wrap:wrap;gap:8px;}
-.fs-meta{margin:4px 0 0;color:#6b7280;font-size:12px;}
-.fs-table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e5e7eb;border-radius:6px;overflow:hidden;font-size:13px;}
-.fs-table th,.fs-table td{padding:10px 12px;border-bottom:1px solid #e5e7eb;vertical-align:top;text-align:left;}
-.fs-table thead th{background:#f3f4f6;font-weight:600;color:#111827;}
-.fs-table tbody tr:last-child td{border-bottom:none;}
-.fs-cat-cell strong{display:block;color:#111827;margin-bottom:4px;}
-.fs-cat-cell .fs-msg{color:#374151;}
-.fs-action-cell{color:#1f2937;}
