@@ -1,63 +1,37 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Process Assurance Tracker</title>
-    <link rel="stylesheet" href="style.css">
-    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-</head>
-<body>
-    <header class="top-nav">
-        <div class="logo">IDH Process Assurance Tracker</div>
-        <nav>
-            <a href="#">Home</a>
-            <a href="#">Review</a>
-            <a href="#">Dashboard</a>
-            <a href="#" class="active">Process Map</a>
-        </nav>
-    </header>
+<section class="input-section">
+    <div class="form-row">
+        <div class="input-group">
+            <label>Process Title</label>
+            <input type="text" id="processTitle" value="Create new branch on LMS Process">
+        </div>
+        <div class="input-group">
+            <label>Process No.</label>
+            <input type="text" id="processNo" value="MD-PS003">
+        </div>
+        <div class="input-group">
+            <label>Version</label>
+            <input type="text" id="processVersion" value="01">
+        </div>
+    </div>
 
-    <main>
-        <section class="input-section">
-            <div class="form-row">
-                <div class="input-group">
-                    <label>Process Title</label>
-                    <input type="text" id="processTitle" value="Create new branch on LMS Process">
-                </div>
-                <div class="input-group">
-                    <label>Process No.</label>
-                    <input type="text" id="processNo" value="MD-PS003">
-                </div>
-                <div class="input-group">
-                    <label>Version</label>
-                    <input type="text" id="processVersion" value="01">
-                </div>
-            </div>
+    <textarea id="dataInput" placeholder="Paste Excel data here (Step ID, Lane, Type, Step Name, Next Step, Decision Yes, Decision No, Documents, Owner)..."></textarea>
 
-            <textarea id="dataInput" placeholder="Paste Excel data here (Step ID, Lane, Type, Step Name, Next Step, Decision Yes, Decision No, Documents, Owner)..."></textarea>
-            
-            <div class="button-row">
-                <button id="generateBtn" class="primary-btn">Generate Process Map</button>
-                <input type="file" id="excelUpload" accept=".xlsx, .xls" style="display: none;">
-                <button id="uploadBtn" class="secondary-btn" onclick="document.getElementById('excelUpload').click()">Upload Excel (.xlsx)</button>
-            </div>
-        </section>
+    <div class="button-row">
+        <button id="generateBtn" class="primary-btn">Generate Process Map</button>
+        <input type="file" id="excelUpload" accept=".xlsx, .xls" style="display: none;">
+        <button id="uploadBtn" class="secondary-btn" onclick="document.getElementById('excelUpload').click()">Upload Excel (.xlsx)</button>
+    </div>
+</section>
 
-        <section class="map-section">
-            <div class="map-header">
-                <h3 id="displayTitle">Process Map of: Create new branch on LMS Process</h3>
-                <p id="displayMeta">Process no. MD-PS003 Version no. 01</p>
-            </div>
-            
-            <div id="process-map-container">
-                <svg id="connections-layer"></svg>
-                <div id="swimlanes-layer"></div>
-                <div id="nodes-layer"></div>
-            </div>
-        </section>
-    </main>
+<section class="map-section">
+    <div class="map-header">
+        <h3 id="displayTitle">Process Map of: Create new branch on LMS Process</h3>
+        <p id="displayMeta">Process no. MD-PS003 Version no. 01</p>
+    </div>
 
-    <script src="processMap.js"></script>
-</body>
-</html>
+    <div id="process-map-container">
+        <svg id="connections-layer"></svg>
+        <div id="swimlanes-layer"></div>
+        <div id="nodes-layer"></div>
+    </div>
+</section>
