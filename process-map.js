@@ -7,90 +7,101 @@ document.addEventListener('DOMContentLoaded', () => {
     let nodes = {};
     let swimlanes = [];
 
-    // --- EVENT LISTENERS ---
-    generateBtn.addEventListener('click', () => {
-        updateHeaders();
-        parsePastedData(dataInput.value);
-        renderMap();
-    });
-
-    excelUpload.addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (evt) => {
-            const data = evt.target.result;
-            const workbook = XLSX.read(data, { type: 'binary' });
-            const firstSheet = workbook.SheetNames[0];
-            const json = XLSX.utils.sheet_to_json(workbook.Sheets[firstSheet]);
-            processExcelData(json);
+    // --- EVENT TRIGGERS ---
+    if (generateBtn) {
+        generateBtn.addEventListener('click', () => {
             updateHeaders();
+            parsePastedData(dataInput.value);
             renderMap();
-        };
-        reader.readAsBinaryString(file);
-    });
-
-    function updateHeaders() {
-        document.getElementById('displayTitle').innerText = `Process Map of: ${document.getElementById('processTitle').value}`;
-        document.getElementById('displayMeta').innerText = `Process no. ${document.getElementById('processNo').value} Version no. ${document.getElementById('processVersion').value}`;
+        });
     }
 
-    // --- DATA PARSING ---
+    if (excelUpload) {
+        excelUpload.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (evt) => {
+                const data = evt.target.result;
+                const workbook = XLSX.read(data, { type: 'binary' });
+                const firstSheet = workbook.SheetNames[0];
+                const json = XLSX.utils.sheet_to_json(workbook.Sheets[firstSheet]);
+                processExcelData(json);
+                updateHeaders();
+                renderMap();
+            };
+            reader.readAsBinaryString(file);
+        });
+    }
+
+    function updateHeaders() {
+        const titleEl = document.getElementById('displayTitle');
+        const metaEl = document.getElementById('displayMeta');
+        const titleVal = document.getElementById('processTitle')?.value || '';
+        const noVal = document.getElementById('processNo')?.value || '';
+        const verVal = document.getElementById('processVersion')?.value || '';
+
+        if (titleEl) titleEl.innerText = `Process Map of: ${titleVal}`;
+        if (metaEl) metaEl.innerText = `Process no. ${noVal} Version no. ${verVal}`;
+    }
+
+    // --- DATA PARSING STRATEGIES ---
     function processExcelData(json) {
         processData = json.map(row => ({
-            id: row['Step ID'] || '',
-            lane: row['Lane'] || 'General',
-            type: (row['Type'] || 'Activity').toLowerCase(),
-            name: row['Step Name'] || '',
-            next: row['Next Step'] || '',
-            yes: row['Decision Yes'] || '',
-            no: row['Decision No'] || '',
-            owner: row['Owner'] || ''
+            id: String(row['Step ID'] || '').trim(),
+            lane: String(row['Lane'] || 'General').trim(),
+            type: String(row['Type'] || 'Activity').toLowerCase().trim(),
+            name: String(row['Step Name'] || '').trim(),
+            next: String(row['Next Step'] || '').trim(),
+            yes: String(row['Decision Yes'] || '').trim(),
+            no: String(row['Decision No'] || '').trim(),
+            owner: String(row['Owner'] || '').trim()
         })).filter(row => row.id !== '');
     }
 
     function parsePastedData(text) {
         if (!text.trim()) return;
         const rows = text.trim().split('\n');
-        const headers = rows[0].split('\t').map(h => h.trim().toLowerCase());
         
         processData = rows.slice(1).map(rowStr => {
             const cols = rowStr.split('\t');
-            let obj = {};
-            // Assuming order from screenshot if headers don't match exactly
-            obj.id = cols[0] || '';
-            obj.lane = cols[1] || 'General';
-            obj.type = (cols[2] || 'Activity').toLowerCase();
-            obj.name = cols[3] || '';
-            obj.next = cols[4] || '';
-            obj.yes = cols[5] || '';
-            obj.no = cols[6] || '';
-            obj.owner = cols[8] || '';
-            return obj;
-        }).filter(row => row.id !== '');
+            if (cols.length < 4) return null;
+            return {
+                id: String(cols[0] || '').trim(),
+                lane: String(cols[1] || 'General').trim(),
+                type: String(cols[2] || 'Activity').toLowerCase().trim(),
+                name: String(cols[3] || '').trim(),
+                next: String(cols[4] || '').trim(),
+                yes: String(cols[5] || '').trim(),
+                no: String(cols[6] || '').trim(),
+                owner: String(cols[8] || '').trim()
+            };
+        }).filter(row => row && row.id !== '');
     }
 
-    // --- RENDERING ---
+    // --- ENGINE RENDERING ---
     function renderMap() {
         const swimlanesLayer = document.getElementById('swimlanes-layer');
         const nodesLayer = document.getElementById('nodes-layer');
         const connectionsLayer = document.getElementById('connections-layer');
         
+        if (!swimlanesLayer || !nodesLayer || !connectionsLayer) return;
+
         swimlanesLayer.innerHTML = '';
         nodesLayer.innerHTML = '';
         connectionsLayer.innerHTML = `
             <defs>
-                <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-                    <polygon points="0 0, 10 3.5, 0 7" fill="#1a365d" />
+                <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="8" refY="3.5" orient="auto">
+                    <polygon points="0 0, 10 3.5, 0 7" fill="#4a5568" />
                 </marker>
             </defs>
         `;
 
         if (processData.length === 0) return;
 
-        // Extract Swimlanes
+        // Unique Swimlanes Configuration
         swimlanes = [...new Set(processData.map(d => d.lane))];
-        const laneColors = ['#f0f4f8', '#f8d7da', '#d4edda', '#fff3cd', '#e2e3e5'];
+        const laneColors = ['#f4f6f9', '#fbf2f2', '#f2fbf4', '#fffdf5', '#f7f7f8'];
 
         swimlanes.forEach((lane, index) => {
             const sl = document.createElement('div');
@@ -110,10 +121,10 @@ document.addEventListener('DOMContentLoaded', () => {
             swimlanesLayer.appendChild(sl);
         });
 
-        // Calculate layout
+        // Run Position Computations
         calculatePositions();
 
-        // Draw Nodes
+        // Render Physical Nodes
         nodes = {};
         processData.forEach(nodeData => {
             const el = document.createElement('div');
@@ -137,16 +148,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function calculatePositions() {
-        const laneHeight = 200;
-        const startYOffset = 60;
-        const xSpacing = 250;
-        const startX = 80;
+        const laneHeight = 220;
+        const startYOffset = 65;
+        const xSpacing = 240;
+        const startX = 90;
 
         let levelMap = {};
-        
-        // Simple BFS to assign X levels based on sequence
         let queue = processData.filter(d => d.type === 'start');
-        if (queue.length === 0) queue = [processData[0]]; // fallback
+        if (queue.length === 0) queue = [processData[0]]; 
         
         let visited = new Set();
         queue.forEach(q => { levelMap[q.id] = 0; visited.add(q.id); });
@@ -157,42 +166,37 @@ document.addEventListener('DOMContentLoaded', () => {
             
             let targets = [curr.next, curr.yes, curr.no].filter(t => t);
             targets.forEach(tId => {
-                const targetNode = processData.find(d => d.id === tId);
-                if (targetNode && !visited.has(tId)) {
+                if (!visited.has(tId)) {
                     levelMap[tId] = currLevel + 1;
                     visited.add(tId);
-                    queue.push(targetNode);
+                    const nextNode = processData.find(d => d.id === tId);
+                    if (nextNode) queue.push(nextNode);
                 }
             });
         }
 
-        // Handle disconnected nodes
         processData.forEach(d => {
             if (levelMap[d.id] === undefined) levelMap[d.id] = 0;
-        });
-
-        // Calculate physical X and Y
-        processData.forEach(d => {
             const laneIndex = swimlanes.indexOf(d.lane);
+            
             d.x = startX + (levelMap[d.id] * xSpacing);
             d.y = (laneIndex * laneHeight) + startYOffset;
             
-            // Stagger Y if multiple nodes occupy same X/Lane combo (basic collision avoidance)
-            const peers = processData.filter(p => p.id !== d.id && p.lane === d.lane && levelMap[p.id] === levelMap[d.id]);
-            if (peers.length > 0) {
-                // simple offset
-                 d.y += (peers.indexOf(d) * 80);
+            // Layout collision adjustments
+            const conflicts = processData.filter(p => p.id !== d.id && p.lane === d.lane && levelMap[p.id] === levelMap[d.id]);
+            if (conflicts.length > 0) {
+                d.y += (conflicts.indexOf(d) * 75);
             }
         });
     }
 
-    // --- DRAWING LINES ---
+    // --- ORTHOGONAL CONNECTION PIPELINE ---
     function drawConnections() {
         const svg = document.getElementById('connections-layer');
-        // keep defs
+        if (!svg) return;
         const defs = svg.querySelector('defs');
         svg.innerHTML = '';
-        svg.appendChild(defs);
+        if (defs) svg.appendChild(defs);
 
         processData.forEach(source => {
             if (source.next) drawLine(source.id, source.next, 'connector', svg);
@@ -204,26 +208,20 @@ document.addEventListener('DOMContentLoaded', () => {
     function drawLine(sourceId, targetId, className, svg) {
         const sourceEl = nodes[sourceId];
         const targetEl = nodes[targetId];
-        
         if (!sourceEl || !targetEl) return;
 
         const sRect = sourceEl.getBoundingClientRect();
         const tRect = targetEl.getBoundingClientRect();
         const containerRect = svg.getBoundingClientRect();
 
-        // Start from right edge of source
         const startX = (sRect.right - containerRect.left);
         const startY = (sRect.top + sRect.height / 2 - containerRect.top);
-
-        // End at left edge of target
-        const endX = (tRect.left - containerRect.left) - 5; // -5 to account for arrow marker
+        const endX = (tRect.left - containerRect.left) - 6; 
         const endY = (tRect.top + tRect.height / 2 - containerRect.top);
 
-        // Calculate Orthogonal Path
+        // Compute 90-degree turning paths
         const midX = startX + (endX - startX) / 2;
-        
         const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-        // M start, L midX startY, L midX endY, L end
         const d = `M ${startX} ${startY} L ${midX} ${startY} L ${midX} ${endY} L ${endX} ${endY}`;
         
         path.setAttribute('d', d);
@@ -231,18 +229,19 @@ document.addEventListener('DOMContentLoaded', () => {
         svg.appendChild(path);
     }
 
-    // --- DRAG AND DROP ---
+    // --- INTERACTIVE DRAG HOOKS ---
     function makeDraggable(element, id) {
         let isDragging = false;
         let startX, startY, initialLeft, initialTop;
 
         element.addEventListener('mousedown', (e) => {
-            isDragging = true;
+            // Prevent interference from text selection inside nodes
+            if(e.target.closest('.node-content')) isDragging = true;
             startX = e.clientX;
             startY = e.clientY;
             initialLeft = element.offsetLeft;
             initialTop = element.offsetTop;
-            element.style.zIndex = 10;
+            element.style.zIndex = 100;
         });
 
         document.addEventListener('mousemove', (e) => {
@@ -253,7 +252,6 @@ document.addEventListener('DOMContentLoaded', () => {
             element.style.left = `${initialLeft + dx}px`;
             element.style.top = `${initialTop + dy}px`;
             
-            // Redraw lines efficiently on move
             drawConnections();
         });
 
@@ -261,7 +259,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (isDragging) {
                 isDragging = false;
                 element.style.zIndex = '';
-                // Optional: Snap to grid could go here
             }
         });
     }
