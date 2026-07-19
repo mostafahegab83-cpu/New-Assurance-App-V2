@@ -1,0 +1,1725 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>IDH · Process Assurance Tracker</title>
+<link rel="icon" href="idh-logo.png" />
+<link rel="stylesheet" href="styles.css" />
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+  /* ---------- Findings Summary section ---------- */
+  #findingsSection{margin-top:18px;background:#fff;border:1px solid #e3e8ef;border-radius:10px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.04);}
+  #findingsSection .fs-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:12px;}
+  #findingsSection .fs-meta{margin:4px 0 0;font-size:12px;color:#6b7280;}
+  #findingsSection .fs-kpis{display:flex;gap:10px;font-size:12px;font-weight:600;align-items:center;flex-wrap:wrap;}
+  #findingsSection .fs-kpis span{background:#f3f4f6;padding:4px 10px;border-radius:999px;color:#374151;}
+  #findingsSection .fs-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;}
+  #findingsSection .fs-item{border:1px solid #e3e8ef;border-left-width:4px;border-radius:8px;padding:10px 12px;background:#fafbfc;}
+  #findingsSection .fs-item.fs-sev-high{border-left-color:#dc2626;background:#fef2f2;}
+  #findingsSection .fs-item.fs-sev-med{border-left-color:#f59e0b;background:#fffbeb;}
+  #findingsSection .fs-item.fs-sev-low{border-left-color:#16a34a;background:#f0fdf4;}
+  #findingsSection .fs-row{display:flex;gap:8px;align-items:center;margin-bottom:4px;flex-wrap:wrap;}
+  #findingsSection .fs-badge{font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:2px 8px;border-radius:999px;color:#fff;background:#6b7280;}
+  #findingsSection .fs-badge.fs-sev-high{background:#dc2626;}
+  #findingsSection .fs-badge.fs-sev-med{background:#f59e0b;}
+  #findingsSection .fs-badge.fs-sev-low{background:#16a34a;}
+  #findingsSection .fs-cat{font-size:12px;font-weight:700;color:#1f3a8a;}
+  #findingsSection .fs-tag{font-size:11px;color:#6b7280;background:#fff;border:1px solid #e3e8ef;padding:1px 8px;border-radius:999px;}
+  #findingsSection .fs-msg{margin:0;font-size:13px;line-height:1.5;color:#1f2937;}
+  /* When hidden in dashboard but kept visible for the PDF export */
+  #dashboardCapture.exporting #findingsSection{display:block !important;}
+  /* ---------- Multi-select dropdown (filters) ---------- */
+  .ms-wrap{position:relative;display:inline-block;vertical-align:middle;min-width:170px;}
+  .ms-btn{width:100%;text-align:left;background:#fff;border:1px solid #cbd5e1;border-radius:6px;padding:7px 28px 7px 10px;font-size:13px;color:#1f2937;cursor:pointer;position:relative;line-height:1.2;min-height:34px;}
+  .ms-btn::after{content:"▾";position:absolute;right:10px;top:50%;transform:translateY(-50%);color:#64748b;font-size:11px;pointer-events:none;}
+  .ms-btn:hover{border-color:#94a3b8;}
+  .ms-wrap.open .ms-btn{border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,.15);}
+  .ms-label{display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .ms-panel{display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:1000;min-width:100%;max-width:340px;max-height:280px;overflow:auto;background:#fff;border:1px solid #cbd5e1;border-radius:8px;box-shadow:0 8px 24px rgba(15,23,42,.12);padding:6px;}
+  .ms-wrap.open .ms-panel{display:block;}
+  .ms-actions{display:flex;gap:6px;padding:4px 4px 8px;border-bottom:1px solid #eef2f7;margin-bottom:4px;}
+  .ms-actions button{flex:1;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:6px;padding:5px 8px;font-size:12px;font-weight:600;color:#334155;cursor:pointer;}
+  .ms-actions button:hover{background:#e2e8f0;}
+  .ms-opt{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;font-size:13px;color:#1f2937;cursor:pointer;}
+  .ms-opt:hover{background:#f8fafc;}
+  .ms-opt input{margin:0;}
+  .ms-empty{padding:8px;font-size:12px;color:#6b7280;text-align:center;}
+</style>
+</head>
+<body>
+  <!-- ==================== LOGIN OVERLAY ==================== -->
+  <div id="loginOverlay" style="position:fixed;inset:0;background:#f5f7fa;display:flex;align-items:center;justify-content:center;z-index:9999;">
+    <form id="loginForm" style="background:#fff;padding:32px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.1);min-width:320px;max-width:90vw;">
+      <img src="idh-logo.png" alt="IDH" style="height:48px;display:block;margin:0 auto 16px;" />
+      <h2 style="margin:0 0 16px;text-align:center;font-size:18px;color:#1f2937;">Sign in</h2>
+      <input id="loginEmail" type="email" placeholder="Email" required autocomplete="username" style="width:100%;padding:10px;margin-bottom:8px;border:1px solid #e3e8ef;border-radius:6px;font-size:14px;" />
+      <input id="loginPassword" type="password" placeholder="Password" required autocomplete="current-password" style="width:100%;padding:10px;margin-bottom:12px;border:1px solid #e3e8ef;border-radius:6px;font-size:14px;" />
+      <button type="submit" style="width:100%;padding:10px;background:#d12027;color:#fff;border:none;border-radius:6px;font-weight:600;cursor:pointer;font-size:14px;">Sign in</button>
+      <p id="loginError" style="color:#dc2626;font-size:13px;margin:8px 0 0;min-height:18px;text-align:center;"></p>
+    </form>
+  </div>
+
+  <header class="app-header">
+    <div class="brand">
+      <img src="idh-logo.png" alt="IDH — Integrated Diagnostics Holdings" class="brand-logo" />
+      <div class="brand-text">
+        <h1>Process Assurance Tracker</h1>
+        <p class="brand-sub">Integrated Diagnostics Holdings · <span id="syncStatus" style="color:#6b7280">Connecting…</span></p>
+      </div>
+    </div>
+    <nav class="tabs" role="tablist">
+      <button class="tab active" data-tab="home" role="tab">Home</button>
+      <button class="tab" data-tab="audit" role="tab">Review</button>
+      <button class="tab" data-tab="ncrc" role="tab">NC/Risk &amp; CAPA</button>
+      <button class="tab" data-tab="dashboard" role="tab">Dashboard</button>
+      <button class="tab" data-tab="documentControl" role="tab">Document Control</button>
+      <button class="tab" data-tab="processInventory" role="tab">Process Inventory</button>
+      <button class="tab" data-tab="gapAnalysis" role="tab">Gap Analysis</button>
+      <button class="tab" data-tab="processMap" role="tab">Process Map</button>
+      <button class="tab" data-tab="admin" role="tab" data-admin-only style="display:none;">Admin</button>
+      <div style="margin-left:auto; display:flex; flex-direction:column; align-items:flex-end; gap:2px;">
+        <span id="currentUserEmail" style="font-size:12px; color:#475569; line-height:1;"></span>
+        <button id="logoutBtn" class="tab" title="Sign out">Logout</button>
+      </div>
+    </nav>
+  </header>
+
+  <!-- ==================== HOME (tile launcher) ==================== -->
+  <style>
+    #home.tab-panel{padding:20px 24px 40px;width:100%;max-width:1200px;margin:0 auto;}
+    #home.tab-panel.active{display:block;}
+    .home-hero{position:relative;background:linear-gradient(135deg,#eaf2ff 0%,#f4f8ff 55%,#eef4ff 100%);border-radius:18px;padding:56px 48px;overflow:hidden;display:flex;align-items:center;justify-content:space-between;gap:24px;min-height:260px;box-shadow:0 1px 3px rgba(31,58,138,.06);}
+    .home-hero::before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 20% 100%, rgba(255,255,255,.6), transparent 60%);pointer-events:none;}
+    .home-hero h1{position:relative;font-size:44px;font-weight:600;color:#111827;margin:0;letter-spacing:-.5px;}
+    .home-hero img{position:relative;max-height:260px;width:auto;object-fit:contain;}
+    .home-tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:24px;}
+    .home-tile{background:#fff;border:1px solid #e5eaf2;border-radius:14px;padding:18px 16px;cursor:pointer;transition:transform .15s,box-shadow .15s,border-color .15s;display:flex;flex-direction:column;gap:10px;text-align:left;min-height:130px;position:relative;}
+    .home-tile:hover{transform:translateY(-3px);box-shadow:0 10px 24px rgba(31,58,138,.10);border-color:#c9d5ea;}
+    .home-tile .home-icon{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;font-size:22px;line-height:1;}
+    .home-tile h2{margin:0;font-size:15px;font-weight:700;color:#111827;line-height:1.25;}
+    .home-tile p{margin:0;font-size:12px;color:#6b7280;line-height:1.35;}
+    .home-tile .home-arrow{margin-top:auto;font-size:18px;color:#f59e0b;font-weight:700;}
+    .home-tile[data-go="admin"] .home-icon{background:#efeaff;color:#7c3aed;}
+    .home-tile[data-go="audit"] .home-icon{background:#fff1e6;color:#ea580c;}
+    .home-tile[data-go="ncrc"] .home-icon{background:#fff7dc;color:#d97706;}
+    .home-tile[data-go="dashboard"] .home-icon{background:#e6f0ff;color:#2563eb;}
+    .home-tile[data-go="documentControl"] .home-icon{background:#fdecec;color:#dc2626;}
+    .home-tile[data-go="processInventory"] .home-icon{background:#fff4d6;color:#b45309;}
+    .home-tile[data-go="gapAnalysis"] .home-icon{background:#e6f7f2;color:#0d9488;}
+    .home-tile[data-go="processMap"] .home-icon{background:#e6f6ec;color:#16a34a;}
+    @media (max-width: 1024px){.home-tiles{grid-template-columns:repeat(3,1fr);}.home-hero{padding:40px 32px;}.home-hero h1{font-size:34px;}}
+    @media (max-width: 640px){.home-tiles{grid-template-columns:repeat(2,1fr);}.home-hero{flex-direction:column;text-align:center;padding:32px 20px;}.home-hero img{max-height:180px;}.home-hero h1{font-size:28px;}}
+    /* NC/Risk & CAPA sub-nav */
+    .subtabs{display:flex;gap:8px;border-bottom:2px solid #e3e8ef;margin-bottom:16px;padding:0 8px;}
+    .subtab{background:none;border:none;padding:10px 16px;cursor:pointer;font-weight:600;color:#6b7280;border-bottom:3px solid transparent;margin-bottom:-2px;}
+    .subtab.active{color:#1f3a8a;border-bottom-color:#1f3a8a;}
+  </style>
+  <main class="container">
+    <section id="home" class="tab-panel active">
+      <div class="home-hero">
+        <h1>Welcome Back</h1>
+        <img src="home-hero.png" alt="" />
+      </div>
+      <div class="home-tiles">
+        <div class="home-tile" data-go="admin"><div class="home-icon">👥</div><h2>Admin</h2><p>Manage users, roles and system settings.</p><span class="home-arrow">→</span></div>
+        <div class="home-tile" data-go="audit"><div class="home-icon">📋</div><h2>Review</h2><p>Conduct and track reviews efficiently.</p><span class="home-arrow">→</span></div>
+        <div class="home-tile" data-go="ncrc"><div class="home-icon">⚠️</div><h2>NC / Risk &amp; CAPA</h2><p>Manage non-conformities, risks and CAPA actions.</p><span class="home-arrow">→</span></div>
+        <div class="home-tile" data-go="dashboard"><div class="home-icon">📊</div><h2>Dashboard</h2><p>Real-time insights and performance overview.</p><span class="home-arrow">→</span></div>
+        <div class="home-tile" data-go="documentControl"><div class="home-icon">📑</div><h2>Document Control</h2><p>Control, access and manage documents.</p><span class="home-arrow">→</span></div>
+        <div class="home-tile" data-go="processInventory"><div class="home-icon">🗂️</div><h2>Process Inventory</h2><p>Store and organize all processes.</p><span class="home-arrow">→</span></div>
+        <div class="home-tile" data-go="gapAnalysis"><div class="home-icon">🔍</div><h2>Gap Analysis</h2><p>Identify gaps and drive improvement.</p><span class="home-arrow">→</span></div>
+        <div class="home-tile" data-go="processMap"><div class="home-icon">🗺️</div><h2>Process Map</h2><p>Visualize and map your processes.</p><span class="home-arrow">→</span></div>
+      </div>
+    </section>
+    <!-- ==================== DASHBOARD ==================== -->
+    <section id="dashboard" class="tab-panel">
+
+      <div class="filters">
+        <select id="filterProcessOwner" multiple size="1" title="Hold Ctrl/Cmd to select multiple" data-placeholder="Process Owner"></select>
+        <select id="filterDept" multiple size="1" title="Hold Ctrl/Cmd to select multiple" data-placeholder="Department"></select>
+        <select id="filterDepartment" multiple size="1" title="Hold Ctrl/Cmd to select multiple" data-placeholder="Action Owner"></select>
+        <select id="filterProcess" multiple size="1" title="Hold Ctrl/Cmd to select multiple" data-placeholder="Process"></select>
+        <select id="filterCompliance" multiple size="1" title="Hold Ctrl/Cmd to select multiple" data-placeholder="Compliance Status">
+          <option>Compliant</option>
+          <option>Non-Compliant</option>
+          <option>Observation</option>
+        </select>
+        <select id="filterRiskLevel" multiple size="1" title="Hold Ctrl/Cmd to select multiple" data-placeholder="Risk Level">
+          <option>High</option><option>Medium</option><option>Low</option>
+        </select>
+        <select id="filterMitigation" multiple size="1" title="Hold Ctrl/Cmd to select multiple" data-placeholder="Mitigation Status">
+          <option>Open</option><option>Mitigated</option><option>Accepted</option>
+          <option>Closed</option>
+        </select>
+        <input type="search" id="filterSearch" placeholder="Search…" />
+        <button id="clearFilters" class="btn ghost">Clear</button>
+        <span class="spacer"></span>
+        <select id="pdfOrientation" title="PDF orientation">
+          <option value="portrait">Portrait</option>
+          <option value="landscape" selected>Landscape</option>
+        </select>
+        <select id="pdfScope" title="Sections to export">
+          <option value="all">Export options</option>
+          <option value="kpis">KPIs only</option>
+          <option value="charts">Charts only</option>
+          <option value="table">Table only</option>
+          <option value="findings">Summery only</option>
+        </select>
+        <button id="btnExportPdf" class="btn primary">Export to PDF</button>
+      </div>
+
+      <div class="subtabs">
+        <button class="subtab active" data-dashsub="dashFindings">Findings Dashboard</button>
+        <button class="subtab" data-dashsub="dashRisk">Risk Dashboard</button>
+      </div>
+
+      <div id="dashFindings" class="dash-sub-panel">
+        <div id="dashboardCapture">
+          <div class="pdf-only" id="pdfHeader">
+            <img src="idh-logo.png" alt="IDH" />
+            <div>
+              <h2>Assurance Tracker — Dashboard</h2>
+              <p id="pdfMeta"></p>
+            </div>
+          </div>
+
+          <div class="kpis" data-section="kpis" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">
+            <div class="kpi" style="display:flex;align-items:center;gap:12px;">
+              <span class="kpi-icon" aria-hidden="true" style="font-size:28px;line-height:1;flex-shrink:0;">📋</span>
+              <span style="display:flex;flex-direction:column;"><span class="kpi-label">Total Findings</span><span class="kpi-value" id="kpiTotalNcs">0</span></span>
+            </div>
+            <div class="kpi" style="display:flex;align-items:center;gap:12px;">
+              <span class="kpi-icon" aria-hidden="true" style="font-size:28px;line-height:1;flex-shrink:0;">✅</span>
+              <span style="display:flex;flex-direction:column;"><span class="kpi-label">Compliance %</span><span class="kpi-value" id="kpiCompliancePct">0%</span></span>
+            </div>
+            <div class="kpi" style="display:flex;align-items:center;gap:12px;">
+              <span class="kpi-icon" aria-hidden="true" style="font-size:28px;line-height:1;flex-shrink:0;">⏱️</span>
+              <span style="display:flex;flex-direction:column;"><span class="kpi-label">SLA Adherence %</span><span class="kpi-value" id="kpiSlaAdherence">0%</span></span>
+            </div>
+            <div class="kpi" style="display:flex;align-items:center;gap:12px;">
+              <span class="kpi-icon" aria-hidden="true" style="font-size:28px;line-height:1;flex-shrink:0;">🎯</span>
+              <span style="display:flex;flex-direction:column;"><span class="kpi-label">% Effective CAPA</span><span class="kpi-value" id="kpiEffectiveCapa">0%</span></span>
+            </div>
+          </div>
+
+          <div data-section="scheduleVariance" style="margin-top:16px;">
+            <h3 class="dash-section-title">Process Timeline Deviation (Days)</h3>
+            <div class="table-wrap">
+              <table id="scheduleVarianceTable" class="variance-table">
+                <thead>
+                  <tr>
+                    <th>Process Name</th>
+                    <th>Start Variance</th>
+                    <th>End Variance</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div data-section="charts">
+            <h3 class="dash-section-title">Task Performance</h3>
+            <div class="charts charts-1">
+              <div class="chart-card"><h3>Task Performance Distribution</h3><canvas id="chartTaskPerformance"></canvas></div>
+            </div>
+
+            <h3 class="dash-section-title">Compliance &amp; NC</h3>
+            <div class="charts charts-3">
+              <div class="chart-card"><h3>Compliance Overview</h3><canvas id="chartCompliance"></canvas></div>
+              <div class="chart-card"><h3>Non Compliance</h3><canvas id="chartNcCategory"></canvas></div>
+              <div class="chart-card"><h3>Non Compliance Reasons</h3><canvas id="chartNcReason"></canvas></div>
+            </div>
+
+            <h3 class="dash-section-title">CAPA</h3>
+            <div class="charts charts-3">
+              <div class="chart-card"><h3>Corrective / Preventive</h3><canvas id="chartCapaType"></canvas></div>
+              <div class="chart-card"><h3>Root Cause Category</h3><canvas id="chartRcCategory"></canvas></div>
+              <div class="chart-card"><h3>CAPA Status</h3><canvas id="chartCapaStatus"></canvas></div>
+            </div>
+          </div>
+
+          <div id="findingsSection" data-section="findings" style="display:block;margin-top:16px;">
+            <h3 class="dash-section-title">Summery</h3><p class="fs-meta" style="margin:0;color:#6b7280;">Findings will appear here.</p>
+          </div>
+        </div>
+      </div>
+
+      <div id="dashRisk" class="dash-sub-panel" style="display:none;">
+        <div id="riskDashboardCapture">
+          <div class="kpis" style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;">
+            <div class="kpi"><span class="kpi-label">Total Risks</span><span class="kpi-value" id="kpiTotalRisks">0</span></div>
+            <div class="kpi"><span class="kpi-label">Open Risks</span><span class="kpi-value" id="kpiOpenRisks">0</span></div>
+          </div>
+
+          <h3 class="dash-section-title">Risk</h3>
+          <div class="charts charts-3">
+            <div class="chart-card"><h3>Risk Type</h3><canvas id="chartRiskType"></canvas></div>
+            <div class="chart-card"><h3>Risk Level</h3><canvas id="chartRiskLevel"></canvas></div>
+            <div class="chart-card"><h3>Risk Mitigation Status</h3><canvas id="chartRiskMitigation"></canvas></div>
+          </div>
+
+          <div id="findingsSectionRisk" data-section="findings" style="display:block;margin-top:16px;">
+            <h3 class="dash-section-title">Summery</h3><p class="fs-meta" style="margin:0;color:#6b7280;">Risk findings will appear here.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ==================== AUDIT (Form + Records) ==================== -->
+    <section id="audit" class="tab-panel">
+      <div class="subtabs">
+        <button class="subtab active" data-sub="form">Review Form</button>
+        <button class="subtab" data-sub="records">Records</button>
+      </div>
+
+      <!-- Records sub-page -->
+      <div id="records" class="sub-panel">
+        <div class="toolbar">
+          <button id="btnExport" class="btn">Export CSV</button>
+          <label class="btn">
+            Import CSV
+            <input type="file" id="fileImport" accept=".csv" hidden />
+          </label>
+          <button id="btnDeleteSelected" class="btn danger" disabled>Delete Selected (<span id="selectedCount">0</span>)</button>
+          <button id="btnClearAll" class="btn danger">Clear All</button>
+          <button id="btnRestoreBackup" class="btn" title="Restore the last Clear All backup">Restore Last Backup</button>
+          <span class="muted" id="recordsCount"></span>
+          <span class="muted" id="backupInfo" style="margin-left:8px;"></span>
+        </div>
+        <div class="filters">
+          <input type="search" id="recFilterAuditId" placeholder="Review ID" />
+          <input type="search" id="recFilterUser" placeholder="User Name" list="dlUser" />
+          <select id="recFilterProcess" multiple data-placeholder="Process Name"></select>
+          <input type="search" id="recFilterPhase" placeholder="Process Phase" list="dlPhase" />
+          <input type="search" id="recFilterDepartment" placeholder="Department" list="dlRecDepartment" />
+          <datalist id="dlRecDepartment"></datalist>
+          <button id="recClearFilters" class="btn ghost">Clear Filters</button>
+        </div>
+        <div class="table-wrap">
+          <table id="recordsTable">
+            <thead><tr id="recordsHead"></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Form sub-page -->
+      <div id="form" class="sub-panel active">
+      <form id="recordForm" class="record-form" autocomplete="off">
+        <input type="hidden" id="recordId" />
+
+        <h3 class="form-section">General</h3>
+        <div class="grid">
+          <label>Review Date<input type="date" id="auditDate" /></label>
+          <label>Review ID<input type="text" id="auditId" placeholder="e.g. AUD-001" /></label>
+          <label>Step No
+            <div style="display:flex;gap:6px;align-items:center;">
+              <input type="text" id="stepNumber" placeholder="Auto" style="flex:1;" />
+              <button type="button" id="btnAutoStepNo" title="Auto-generate next step number for this process"
+                style="padding:6px 10px;border:1px solid #2563eb;background:#2563eb;color:#fff;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;white-space:nowrap;">Auto</button>
+            </div>
+          </label>
+          <label>User Name<input list="dlUser" id="userName" placeholder="N/A" /><datalist id="dlUser"></datalist></label>
+          <label>Process Name<input list="dlProcess" id="processName" placeholder="N/A" /><datalist id="dlProcess"></datalist></label>
+          <label>Department<input list="dlProcessOwner" id="processOwner" placeholder="N/A" /><datalist id="dlProcessOwner"></datalist></label>
+          <label>Process Owner<input type="text" id="processPreparedBy" placeholder="N/A" /></label>
+          <label>Process Phase<input list="dlPhase" id="processPhase" placeholder="N/A" /><datalist id="dlPhase"></datalist></label>
+          <label>Day / Week<input type="text" id="dayWeek" placeholder="N/A" /></label>
+          <label>Planned Start Date<input type="date" id="plannedStartDate" /></label>
+          <label>Actual Start Date<input type="date" id="actualStartDate" /></label>
+          <label>Planned End Date<input type="date" id="plannedEndDate" /></label>
+          <label>Actual End Date<input type="date" id="actualEndDate" /></label>
+          <label class="full">Control / Checklist Item<input type="text" id="controlItem" placeholder="N/A" /></label>
+          <label>Action Owner<input list="dlDepartment" id="department" placeholder="N/A" /><datalist id="dlDepartment"></datalist></label>
+          <label>Sub-Department<input type="text" id="subDepartment" placeholder="N/A" /></label>
+          <label>Owner<input list="dlOwner" id="owner" placeholder="N/A" /><datalist id="dlOwner"></datalist></label>
+          <label class="full">Required Evidence (link)<input type="url" id="evidence" placeholder="https://… or N/A" /></label>
+          <label class="full">Comment<textarea id="ncDescription" rows="2" placeholder="N/A"></textarea></label>
+        </div>
+
+        <h3 class="form-section">Task Performance</h3>
+        <style>
+          .task-perf-wrap{display:flex;flex-direction:column;gap:10px;padding:14px;border:1px solid #e5e7eb;border-radius:8px;background:#f9fafb;}
+          .task-perf-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+          .task-perf-row > span:first-child{min-width:130px;font-weight:600;color:#374151;}
+          .task-perf-badge{padding:6px 16px;border-radius:999px;font-weight:700;color:#fff;background:#9ca3af;display:inline-block;}
+          .task-perf-badge.red{background:#dc2626;}
+          .task-perf-badge.yellow{background:#f59e0b;}
+          .task-perf-badge.green{background:#16a34a;}
+          .tp-btn{padding:6px 16px;border:1px solid #d1d5db;background:#fff;border-radius:6px;cursor:pointer;font-size:13px;font-weight:500;}
+          .tp-btn:hover{background:#f3f4f6;}
+          .tp-btn.active{background:#2563eb;color:#fff;border-color:#2563eb;}
+        </style>
+        <div class="grid">
+          <div class="full task-perf-wrap">
+            <div class="task-perf-row">
+              <span>Task Performance:</span>
+              <span id="taskPerfBadge" class="task-perf-badge">Not Set</span>
+            </div>
+            <div class="task-perf-row">
+              <span>Task Status:</span>
+              <button type="button" class="tp-btn" data-group="done" data-val="Done">Done</button>
+              <button type="button" class="tp-btn" data-group="done" data-val="Not Done">Not Done</button>
+            </div>
+            <div class="task-perf-row" id="tpCorrectnessRow" style="display:none;">
+              <span>Outcome:</span>
+              <button type="button" class="tp-btn" data-group="correct" data-val="Right">Right</button>
+              <button type="button" class="tp-btn" data-group="correct" data-val="Wrong">Wrong</button>
+            </div>
+            <div class="task-perf-row" id="tpTimingRow" style="display:none;">
+              <span>Timing:</span>
+              <button type="button" class="tp-btn" data-group="timing" data-val="On Time">On Time</button>
+              <button type="button" class="tp-btn" data-group="timing" data-val="Late SLA">Late SLA</button>
+            </div>
+            <input type="hidden" id="taskDone" />
+            <input type="hidden" id="taskCorrectness" />
+            <input type="hidden" id="taskTiming" />
+            <input type="hidden" id="taskPerformance" />
+          </div>
+        </div>
+        <script>
+        (function(){
+          const state = { done:'', correct:'', timing:'' };
+          const $ = id => document.getElementById(id);
+          const setBadge = (text, cls) => {
+            const b = $('taskPerfBadge');
+            b.textContent = text;
+            b.classList.remove('red','yellow','green');
+            if (cls) b.classList.add(cls);
+          };
+          const show = (id, v) => { const el = $(id); if (el) el.style.display = v ? 'flex' : 'none'; };
+          const setHidden = (id, v) => { const el = $(id); if (el) el.value = v; };
+          const clearGroup = g => document.querySelectorAll('.tp-btn[data-group="'+g+'"]').forEach(b => b.classList.remove('active'));
+
+          function update(){
+            setHidden('taskDone', state.done);
+            setHidden('taskCorrectness', state.correct);
+            setHidden('taskTiming', state.timing);
+            show('tpCorrectnessRow', state.done === 'Done');
+            show('tpTimingRow', state.done === 'Done' && state.correct === 'Right');
+            let label = 'Not Set', cls = '';
+            if (state.done === 'Not Done') { label = 'Not Done'; cls = 'red'; }
+            else if (state.done === 'Done') {
+              if (state.correct === 'Wrong') { label = 'Wrong'; cls = 'red'; }
+              else if (state.correct === 'Right') {
+                if (state.timing === 'Late SLA') { label = 'Late SLA'; cls = 'yellow'; }
+                else if (state.timing === 'On Time') { label = 'On Time'; cls = 'green'; }
+                else { label = 'Pending Timing'; }
+              } else { label = 'Pending Outcome'; }
+            }
+            setBadge(label, cls);
+            setHidden('taskPerformance', cls ? label : '');
+          }
+
+          document.addEventListener('click', e => {
+            const btn = e.target.closest('.tp-btn');
+            if (!btn) return;
+            e.preventDefault();
+            const group = btn.dataset.group;
+            const val = btn.dataset.val;
+            clearGroup(group);
+            btn.classList.add('active');
+            if (group === 'done') {
+              state.done = val;
+              if (val === 'Not Done') { state.correct=''; state.timing=''; clearGroup('correct'); clearGroup('timing'); }
+            } else if (group === 'correct') {
+              state.correct = val;
+              if (val === 'Wrong') { state.timing=''; clearGroup('timing'); }
+            } else if (group === 'timing') {
+              state.timing = val;
+            }
+            update();
+          });
+
+          function syncFromInputs(){
+            const norm = v => (!v || v === 'N/A') ? '' : v;
+            state.done = norm($('taskDone')?.value);
+            state.correct = norm($('taskCorrectness')?.value);
+            state.timing = norm($('taskTiming')?.value);
+            clearGroup('done'); clearGroup('correct'); clearGroup('timing');
+            document.querySelectorAll('.tp-btn').forEach(b => {
+              if ((b.dataset.group==='done' && b.dataset.val===state.done) ||
+                  (b.dataset.group==='correct' && b.dataset.val===state.correct) ||
+                  (b.dataset.group==='timing' && b.dataset.val===state.timing)) {
+                b.classList.add('active');
+              }
+            });
+            update();
+          }
+
+          // Sync on form reset (new record)
+          document.getElementById('recordForm')?.addEventListener('reset', () => setTimeout(syncFromInputs, 0));
+          // Poll for programmatic value changes (record edit loads values via .value = ...)
+          let last = '';
+          setInterval(() => {
+            const cur = ($('taskDone')?.value||'')+'|'+($('taskCorrectness')?.value||'')+'|'+($('taskTiming')?.value||'');
+            if (cur !== last) { last = cur; syncFromInputs(); }
+          }, 400);
+          syncFromInputs();
+        })();
+        </script>
+
+        <script>
+        // Step Number auto-generator: computes next step number for the selected Process Name.
+        // If Excel/CSV import provides a "Step No" column, its value is preserved on edit.
+        (function(){
+          function computeNext(proc){
+            const recs = window.__paRecords || [];
+            if (!proc) {
+              const nums = recs.map(r => parseInt(r.stepNumber,10)).filter(n => !isNaN(n));
+              return (nums.length ? Math.max(...nums) : 0) + 1;
+            }
+            const nums = recs
+              .filter(r => (r.processName||'').trim().toLowerCase() === proc.trim().toLowerCase())
+              .map(r => parseInt(r.stepNumber,10))
+              .filter(n => !isNaN(n));
+            return (nums.length ? Math.max(...nums) : 0) + 1;
+          }
+          const btn = document.getElementById('btnAutoStepNo');
+          const inp = document.getElementById('stepNumber');
+          const proc = document.getElementById('processName');
+          if (btn && inp) {
+            btn.addEventListener('click', () => {
+              inp.value = computeNext(proc ? proc.value : '');
+            });
+          }
+          // Auto-fill on submit if left blank AND this is a new record (no recordId)
+          const form = document.getElementById('recordForm');
+          if (form && inp) {
+            form.addEventListener('submit', () => {
+              const rid = document.getElementById('recordId');
+              if (!inp.value && (!rid || !rid.value)) {
+                inp.value = computeNext(proc ? proc.value : '');
+              }
+            }, true);
+          }
+        })();
+        </script>
+
+        <script>
+        // Auto-generate NC ID, CAPA ID, Risk ID.
+        // Format: [ProcessInitials]-[StepNo(2d)]-[Type]-[Seq(3d)]
+        //   Type: NC | CA | PA | R
+        //   Sequence increments per (initials, stepNo, type) across all records.
+        (function(){
+          const $ = id => document.getElementById(id);
+          function initials(proc){
+            const words = String(proc||'').trim().split(/\s+/).filter(Boolean).slice(0,2);
+            if (!words.length) return 'XX';
+            const letters = words.map(w => w[0]).join('').toUpperCase();
+            return letters.length === 1 ? (letters + (words[0][1]||'X').toUpperCase()) : letters;
+          }
+          function pad(n, w){ return String(n).padStart(w,'0'); }
+          function capaTypeCode(){
+            const v = ($('capaType')?.value||'').trim().toLowerCase();
+            if (v === 'preventive') return 'PA';
+            if (v === 'corrective') return 'CA';
+            return 'CA';
+          }
+          function nextSeq(prefix, type){
+            const recs = window.__paRecords || [];
+            const key = prefix + '-' + type + '-';
+            let max = 0;
+            const fields = { NC: 'ncId', CA: 'capaIdField', PA: 'capaIdField', R: 'riskId' };
+            const fld = fields[type];
+            recs.forEach(r => {
+              const val = String(r[fld]||'');
+              if (val.startsWith(key)) {
+                const n = parseInt(val.slice(key.length), 10);
+                if (!isNaN(n) && n > max) max = n;
+              }
+            });
+            return max + 1;
+          }
+          function genId(type){
+            const proc = $('processName')?.value || '';
+            const step = parseInt($('stepNumber')?.value, 10);
+            if (!proc.trim() || isNaN(step)) return '';
+            const prefix = initials(proc) + '-' + pad(step,2);
+            return prefix + '-' + type + '-' + pad(nextSeq(prefix, type), 3);
+          }
+          const form = $('recordForm');
+          if (form) {
+            form.addEventListener('submit', () => {
+              const rid = $('recordId');
+              const isNew = !rid || !rid.value;
+              // Ensure stepNumber is filled first (handled by prior submit listener in capture phase)
+              const step = $('stepNumber');
+              if (step && !step.value && isNew) {
+                // fallback: let prior script fill it; re-read after microtask via sync value
+              }
+              const nc = $('ncId');
+              if (nc && !nc.value && isNew) {
+                const compliance = ($('compliance')?.value||'').toLowerCase();
+                const ncType = ($('ncType')?.value||'').toLowerCase();
+                if (compliance === 'non-compliant' || compliance === 'observation' || (ncType && ncType !== 'n/a')) {
+                  const id = genId('NC'); if (id) nc.value = id;
+                }
+              }
+              const ca = $('capaIdField');
+              if (ca && !ca.value && isNew) {
+                const need = ($('capaNeeded')?.value||'').toLowerCase();
+                if (need === 'yes') {
+                  const id = genId(capaTypeCode()); if (id) ca.value = id;
+                }
+              }
+              const rk = $('riskId');
+              if (rk && !rk.value && isNew) {
+                const exist = ($('riskExist')?.value||'').toLowerCase();
+                if (exist === 'yes') {
+                  const id = genId('R'); if (id) rk.value = id;
+                }
+              }
+            }, true);
+          }
+        })();
+        </script>
+
+
+
+        <h3 class="form-section">NC Register</h3>
+        <div class="grid">
+          <label>Compliance Status
+            <select id="compliance">
+              <option>N/A</option><option>Compliant</option>
+              <option>Non-Compliant</option><option>Observation</option>
+            </select>
+          </label>
+          <label>NC Reason Category
+            <select id="complianceReasonCategory">
+              <option>N/A</option>
+              <option>Evidence &amp; Documentation</option>
+              <option>Process Compliance</option>
+              <option>SLA Adherence</option>
+            </select>
+          </label>
+          <label>NC Reason
+            <select id="complianceReason">
+              <option>N/A</option>
+            </select>
+          </label>
+          <label>NC Category
+            <select id="ncCategory">
+              <option>N/A</option><option>People</option><option>Process</option><option>Technology</option>
+            </select>
+          </label>
+          <label>NC Type
+            <select id="ncType">
+              <option>N/A</option><option>Major</option><option>Minor</option><option>Enhancement</option>
+            </select>
+          </label>
+          <label>NC ID<input type="text" id="ncId" placeholder="Auto-generated" readonly style="background:#f3f4f6;color:#374151;" /></label>
+          <label>Severity Level
+            <select id="severityLevel">
+              <option>N/A</option><option>Low</option><option>Medium</option><option>High</option><option>Critical</option>
+            </select>
+          </label>
+          <label>Action Owner<input type="text" id="ncResponsibleDept" placeholder="N/A" /></label>
+          <label>Verified By<input type="text" id="verifiedBy" placeholder="N/A" /></label>
+          <label class="full">NC Description<textarea id="ncDesc" rows="2" placeholder="N/A"></textarea></label>
+          <label class="full">Root Cause<input type="text" id="rootCause" placeholder="N/A" /></label>
+          <label>Target SLA / Days<input type="number" id="targetSla" placeholder="N/A" min="0" /></label>
+          <label>Actual SLA<input type="number" id="actualSla" placeholder="N/A" min="0" /></label>
+        </div>
+
+        <h3 class="form-section">CAPA</h3>
+        <div class="grid">
+          <label>CAPA ID<input type="text" id="capaIdField" placeholder="Auto-generated" readonly style="background:#f3f4f6;color:#374151;" /></label>
+          <label>CAPA Needed
+            <select id="capaNeeded"><option>N/A</option><option>Yes</option><option>No</option></select>
+          </label>
+          <label>CAPA Type
+            <select id="capaType">
+              <option>N/A</option><option>Corrective</option><option>Preventive</option>
+            </select>
+          </label>
+          <label>RC Category
+            <select id="rcCategory">
+              <option>N/A</option>
+              <option>Improper Root Cause Analysis</option>
+              <option>CAPA Design Failure</option>
+              <option>CAPA Implementation Failure</option>
+              <option>Effectiveness Verification Failure</option>
+            </select>
+          </label>
+          <label>RC Sub-Category
+            <select id="rcSubCategory">
+              <option>N/A</option>
+            </select>
+          </label>
+          <label>CAPA Status
+            <select id="capaStatus">
+              <option>N/A</option>
+              <option>In Progress</option>
+              <option>Pending</option>
+              <option>Closed</option>
+              <option>Cancelled</option>
+              <option>Overdue</option>
+            </select>
+          </label>
+          <label>Action Owner<input type="text" id="actionOwner" placeholder="N/A" /></label>
+          <label>Accountable<input type="text" id="accountable" placeholder="N/A" /></label>
+          <label>Start Date<input type="date" id="startDate" /></label>
+          <label>End Date<input type="date" id="endDate" /></label>
+          <label>Closure Date<input type="date" id="closureDate" /></label>
+          <label>Overdue Dates<input type="text" id="overdueDates" placeholder="e.g. 5 days" /></label>
+          <label class="full">Effectiveness Criteria<input type="text" id="effectivenessCriteria" placeholder="N/A" /></label>
+          <label>Effectiveness
+            <select id="effectiveness">
+              <option>N/A</option><option>Effective</option>
+              <option>Partially Effective</option><option>Ineffective</option>
+            </select>
+          </label>
+          <label class="full">Comments<textarea id="comments" rows="2" placeholder="N/A"></textarea></label>
+        </div>
+
+        <h3 class="form-section">Risk</h3>
+        <div class="grid">
+          <label>Risk ID<input type="text" id="riskId" placeholder="Auto-generated" readonly style="background:#f3f4f6;color:#374151;" /></label>
+          <label>Risk Exist
+            <select id="riskExist"><option>N/A</option><option>Yes</option><option>No</option></select>
+          </label>
+          <label>Risk Type
+            <select id="riskType">
+              <option>N/A</option><option>Operational</option><option>Compliance</option>
+              <option>Financial</option><option>Reputational</option>
+            </select>
+          </label>
+          <label>Risk Level
+            <select id="riskLevel">
+              <option>N/A</option><option>High</option><option>Medium</option><option>Low</option>
+            </select>
+          </label>
+          <label>Affected Department<input type="text" id="affectedDepartment" placeholder="N/A" /></label>
+          <label>Risk Owner<input type="text" id="riskOwner" placeholder="N/A" /></label>
+          <label>Mitigation Status
+            <select id="mitigation">
+              <option>N/A</option><option>Open</option><option>Mitigated</option>
+              <option>Accepted</option><option>Closed</option>
+            </select>
+          </label>
+          <label>Linked CAPA ID<input type="text" id="linkedCapaId" placeholder="e.g. CA-001" /></label>
+          <label class="full">Control<input type="text" id="control" placeholder="N/A" /></label>
+          <label class="full">Findings / Gaps<textarea id="findings" rows="2" placeholder="N/A"></textarea></label>
+        </div>
+
+        <h3 class="form-section">Attachments</h3>
+        <p class="muted" style="margin:0 0 8px">
+          Allowed: .msg, .eml, .xlsx, .xls, .docx, .doc, .pdf · Max 10 MB per file.
+          Files are stored in Firebase Storage and shared across all devices.
+        </p>
+        <div id="dropzone" class="dropzone">
+          <p><strong>Drag &amp; drop</strong> files here, or
+            <label class="link-btn">browse<input type="file" id="fileAttach" multiple
+              accept=".msg,.eml,.xlsx,.xls,.docx,.doc,.pdf" hidden /></label>
+          </p>
+          <div id="uploadProgress" class="upload-progress" hidden>
+            <div class="bar"><div class="fill" id="uploadFill"></div></div>
+            <span id="uploadText" class="muted"></span>
+          </div>
+        </div>
+        <ul id="attachmentList" class="attach-list"></ul>
+
+        <div class="form-actions">
+          <button type="submit" class="btn primary">Save Record</button>
+          <button type="button" id="btnReset" class="btn ghost">Reset</button>
+        </div>
+      </form>
+      </div>
+    </section>
+
+    <!-- ==================== NC / RISK & CAPA (derived from Audit form) ==================== -->
+    <section id="ncrc" class="tab-panel">
+      <div class="subtabs">
+        <button class="subtab active" data-sub="sub-nc">NC Register</button>
+        <button class="subtab" data-sub="sub-capa">CAPA Register</button>
+        <button class="subtab" data-sub="sub-risk">Risk Register</button>
+      </div>
+
+      <!-- NC sub-page: table + filters -->
+      <div id="sub-nc" class="sub-panel active">
+        <div class="filters">
+          <input type="search" id="ncrcNcSearch" placeholder="Search…" />
+          <select id="ncrcNcType"><option value="">All NC Types</option><option>Major</option><option>Minor</option><option>Enhancement</option></select>
+          <select id="ncrcNcSeverity"><option value="">All Severities</option><option>Low</option><option>Medium</option><option>High</option><option>Critical</option></select>
+          <select id="ncrcNcCompliance"><option value="">All Compliance</option><option>Non-Compliant</option><option>Observation</option><option>Compliant</option></select>
+          <span class="spacer"></span>
+          <button class="btn" data-export="nc-excel">Export Excel</button>
+          <button class="btn primary" data-export="nc-pdf">Export PDF</button>
+        </div>
+        <div class="table-wrap">
+          <table id="ncrcNcTable">
+            <thead><tr>
+              <th>NC ID</th><th>Review ID</th><th>Review Date</th><th>Process</th><th>Phase</th>
+              <th>Compliance</th><th>NC Type</th><th>Severity</th><th>Category</th>
+              <th>Resp. Dept</th><th>Root Cause</th><th>Verified By</th>
+            </tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <p class="muted" id="ncrcNcCount" style="margin-top:8px;"></p>
+      </div>
+
+      <!-- CAPA sub-page: kanban + table -->
+      <div id="sub-capa" class="sub-panel">
+        <div class="filters">
+          <input type="search" id="ncrcCapaSearch" placeholder="Search…" />
+          <select id="ncrcCapaType"><option value="">All CAPA Types</option><option>Corrective</option><option>Preventive</option></select>
+          <select id="ncrcCapaStatus"><option value="">All Statuses</option><option>In Progress</option><option>Pending</option><option>Closed</option><option>Cancelled</option><option>Overdue</option></select>
+          <span class="spacer"></span>
+          <button class="btn" data-export="capa-excel">Export Excel</button>
+          <button class="btn primary" data-export="capa-pdf">Export PDF</button>
+        </div>
+        <div class="kanban" id="ncrcCapaKanban"></div>
+        <div class="table-wrap">
+          <table id="ncrcCapaTable">
+            <thead><tr>
+              <th>CAPA ID</th><th>Review ID</th><th>NC ID</th><th>Process</th><th>Phase</th>
+              <th>CAPA Type</th><th>RC Category</th><th>Status</th>
+              <th>Owner</th><th>Accountable</th><th>Start</th><th>End</th><th>Effectiveness</th>
+            </tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <p class="muted" id="ncrcCapaCount" style="margin-top:8px;"></p>
+      </div>
+
+      <!-- Risk sub-page: cards + full table -->
+      <div id="sub-risk" class="sub-panel">
+        <div class="filters">
+          <input type="search" id="ncrcRiskSearch" placeholder="Search…" />
+          <select id="ncrcRiskLevel"><option value="">All Risk Levels</option><option>High</option><option>Medium</option><option>Low</option></select>
+          <select id="ncrcRiskMitigation"><option value="">All Mitigation</option><option>Open</option><option>Mitigated</option><option>Accepted</option><option>Closed</option></select>
+          <span class="spacer"></span>
+          <button class="btn" data-export="risk-excel">Export Excel</button>
+          <button class="btn primary" data-export="risk-pdf">Export PDF</button>
+        </div>
+        <div class="filters">
+          <input type="search" id="ncrcRiskAuditId" placeholder="Review ID" />
+          <input type="date" id="ncrcRiskAuditDate" />
+          <input type="search" id="ncrcRiskProcessName" placeholder="Process Name" />
+          <input type="search" id="ncrcRiskProcessPhase" placeholder="Process Phase" />
+          <input type="search" id="ncrcRiskRiskId" placeholder="Risk ID" />
+          <input type="search" id="ncrcRiskLinkedCapaId" placeholder="Linked CAPA ID" />
+        </div>
+        <div class="risk-cards" id="ncrcRiskCards"></div>
+        <div class="table-wrap" style="margin-top:12px;">
+          <table id="ncrcRiskTable">
+            <thead><tr>
+              <th>Risk ID</th><th>Review ID</th><th>Review Date</th><th>Process</th><th>Phase</th>
+              <th>Risk Exist</th><th>Risk Type</th><th>Risk Level</th>
+              <th>Affected Dept</th><th>Risk Owner</th><th>Mitigation</th>
+              <th>Linked CAPA ID</th><th>Control</th><th>Findings</th>
+            </tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <p class="muted" id="ncrcRiskCount" style="margin-top:8px;"></p>
+      </div>
+    </section>
+
+
+
+    <!-- ==================== DOCUMENT CONTROL ==================== -->
+    <section id="documentControl" class="tab-panel">
+      <style>
+        #documentControl .dc-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px;}
+        #documentControl .dc-kpi{background:#fff;border:1px solid #e3e8ef;border-radius:8px;padding:14px 16px;box-shadow:0 1px 3px rgba(0,0,0,.04);}
+        #documentControl .dc-kpi .lbl{font-size:11px;font-weight:700;color:#6b7280;letter-spacing:.5px;text-transform:uppercase;}
+        #documentControl .dc-kpi .val{font-size:28px;font-weight:700;margin-top:6px;color:#1f3a8a;}
+        #documentControl .dc-kpi.warn .val{color:#f59e0b;}
+        #documentControl .dc-kpi.danger .val{color:#d12027;}
+        #documentControl .dc-toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px;}
+        #documentControl .dc-toolbar input,#documentControl .dc-toolbar select{padding:8px 10px;border:1px solid #cfd6df;border-radius:6px;font-size:13px;background:#fff;}
+        #documentControl .dc-toolbar .spacer{flex:1;}
+        #documentControl table{width:100%;border-collapse:collapse;background:#fff;font-size:13px;}
+        #documentControl th,#documentControl td{padding:8px 10px;border-bottom:1px solid #eef1f5;text-align:left;vertical-align:middle;}
+        #documentControl th{font-size:11px;letter-spacing:.5px;text-transform:uppercase;color:#6b7280;background:#f8fafc;}
+        #documentControl tr:hover{background:#fafbfd;}
+        #documentControl .pill{display:inline-block;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:600;}
+        #documentControl .pill.draft{background:#e5e7eb;color:#374151;}
+        #documentControl .pill.approved{background:#d1fae5;color:#065f46;}
+        #documentControl .pill.review{background:#fef3c7;color:#92400e;}
+        #documentControl .pill.obsolete{background:#fee2e2;color:#991b1b;}
+        #documentControl .link-open{display:inline-block;padding:4px 14px;background:#d12027;color:#fff;border-radius:6px;text-decoration:none;font-size:12px;font-weight:600;}
+        #documentControl .link-open.disabled{background:#cbd5e1;pointer-events:none;}
+        /* Modal */
+        .dc-modal{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:flex-start;justify-content:center;z-index:1000;overflow-y:auto;padding:40px 16px;}
+        .dc-modal.open{display:flex;}
+        .dc-modal .box{background:#fff;border-radius:10px;width:100%;max-width:920px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.25);}
+        .dc-modal h3{margin:0 0 18px;color:#1f3a8a;}
+        .dc-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px 14px;}
+        .dc-grid label{display:flex;flex-direction:column;font-size:12px;font-weight:600;color:#374151;gap:4px;}
+        .dc-grid label.full{grid-column:1/-1;}
+        .dc-grid input,.dc-grid select,.dc-grid textarea{padding:8px 10px;border:1px solid #cfd6df;border-radius:6px;font-size:13px;font-family:inherit;}
+        .dc-grid textarea{min-height:60px;resize:vertical;}
+        .dc-grid .hint{font-weight:400;color:#6b7280;font-size:11px;margin-top:-2px;}
+        .dc-modal .actions{display:flex;justify-content:flex-end;gap:8px;margin-top:20px;}
+        .dc-modal .actions .btn-cancel{background:#fff;color:#374151;border:1px solid #cfd6df;padding:8px 18px;border-radius:6px;cursor:pointer;font-weight:600;}
+        .dc-modal .actions .btn-save{background:#d12027;color:#fff;border:none;padding:8px 18px;border-radius:6px;cursor:pointer;font-weight:600;}
+        #documentControl .row-overdue{background:#fef2f2;}
+        #documentControl .row-due{background:#fffbeb;}
+      </style>
+
+      <div class="dc-kpis">
+        <div class="dc-kpi"><div class="lbl">Total</div><div class="val" id="dcKpiTotal">0</div></div>
+        <div class="dc-kpi"><div class="lbl">Active (Approved)</div><div class="val" id="dcKpiApproved">0</div></div>
+        <div class="dc-kpi"><div class="lbl">Under Review</div><div class="val" id="dcKpiReview">0</div></div>
+        <div class="dc-kpi"><div class="lbl">Obsolete</div><div class="val" id="dcKpiObsolete">0</div></div>
+        <div class="dc-kpi warn"><div class="lbl">Due in 30 Days</div><div class="val" id="dcKpiDue">0</div></div>
+        <div class="dc-kpi danger"><div class="lbl">Overdue Review</div><div class="val" id="dcKpiOverdue">0</div></div>
+      </div>
+
+      <div class="dc-toolbar">
+        <input type="search" id="dcSearch" placeholder="Search by ID or name…" style="min-width:220px;" />
+        <select id="dcFilterDept"><option value="">Department Name</option></select>
+        <select id="dcFilterType">
+          <option value="">Document Type</option>
+          <option>Policy</option><option>Procedure</option><option>Process</option><option>Work Instruction</option>
+          <option>Form</option><option>Manual</option><option>Record</option><option>Other</option>
+        </select>
+        <select id="dcFilterStatus">
+          <option value="">All Statuses</option>
+          <option>Draft</option><option>Under Review</option><option>Approved</option><option>Obsolete</option>
+        </select>
+        <select id="dcSort">
+          <option value="review">Sort: Review Date</option>
+          <option value="updated">Sort: Updated</option>
+          <option value="name">Sort: Name</option>
+          <option value="id">Sort: Doc ID</option>
+        </select>
+        <div class="spacer"></div>
+        <button id="dcBtnAdd" class="btn primary">+ Add Document</button>
+      </div>
+
+      <div class="table-wrap">
+        <table id="dcTable">
+          <thead>
+            <tr>
+              <th>Doc ID</th><th>Name</th><th>Dept</th><th>Type</th><th>Ver</th>
+              <th>Owner</th><th>Status</th><th>Effective</th><th>Review</th>
+              <th>Updated</th><th>Link</th><th>Files</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody><tr><td colspan="12" style="text-align:center;color:#6b7280;padding:24px">No documents yet.</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ==================== DOCUMENT MODAL ==================== -->
+    <div id="dcModal" class="dc-modal" role="dialog" aria-modal="true">
+      <div class="box">
+        <h3 id="dcModalTitle">Add Document</h3>
+        <form id="dcForm">
+          <div class="dc-grid">
+            <label>Document ID *<input name="docId" required maxlength="60" /></label>
+            <label>Document Name *<input name="name" required maxlength="200" /></label>
+            <label>Department<input name="department" /></label>
+
+            <label>Document Type
+              <select name="type">
+                <option>Policy</option><option>Procedure</option><option>Process</option><option>Work Instruction</option>
+                <option>Form</option><option>Manual</option><option>Record</option><option>Other</option>
+              </select>
+            </label>
+            <label>Version *<input name="version" required value="1.0" /></label>
+            <label>Document Owner<input name="owner" /></label>
+
+            <label>Effective Date<input type="date" name="effectiveDate" /></label>
+            <label>Review Date<input type="date" name="reviewDate" /></label>
+            <label>Status
+              <select name="status">
+                <option>Draft</option><option>Under Review</option><option>Approved</option><option>Obsolete</option>
+              </select>
+            </label>
+
+            <label class="full">Shared Document URL
+              <span class="hint">(SharePoint / OneDrive / Google Drive — optional if you upload files below)</span>
+              <input type="url" name="link" placeholder="https://…" />
+            </label>
+
+            <label class="full">Attach Files
+              <span class="hint">PDF, Excel, Word, Email (.msg / .eml) — multiple files allowed. Stored locally in your browser.</span>
+              <input type="file" id="dcFileInput" multiple
+                     accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.msg,.eml,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,message/rfc822" />
+              <div id="dcFileList" style="margin-top:6px;display:flex;flex-direction:column;gap:4px;font-weight:400;"></div>
+            </label>
+
+            <label>Prepared By<input name="preparedBy" /></label>
+            <label>Reviewed By<input name="reviewedBy" /></label>
+            <label>Approved By<input name="approvedBy" /></label>
+
+            <label>Approval Date<input type="date" name="approvalDate" /></label>
+
+            <label class="full">Change Description<textarea name="changeDescription"></textarea></label>
+            <label class="full">Remarks<textarea name="remarks"></textarea></label>
+          </div>
+          <div class="actions">
+            <button type="button" class="btn-cancel" id="dcCancel">Cancel</button>
+            <button type="submit" class="btn-save" id="dcSaveBtn">Create Document</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ==================== HISTORY / FILES MODAL ==================== -->
+    <div id="dcHistoryModal" class="dc-modal" role="dialog" aria-modal="true">
+      <div class="box" style="max-width:760px;">
+        <h3 id="dcHistoryTitle">Version History</h3>
+        <div id="dcHistoryBody" style="max-height:60vh;overflow:auto;"></div>
+        <div class="actions"><button type="button" class="btn-cancel" id="dcHistoryClose">Close</button></div>
+      </div>
+    </div>
+
+    <!-- ==================== FILE VIEWER MODAL ==================== -->
+    <div id="dcViewerModal" class="dc-modal" role="dialog" aria-modal="true">
+      <div class="box" style="max-width:960px; padding:0; display:flex; flex-direction:column; max-height:90vh;">
+        <div style="padding:16px 24px; border-bottom:1px solid #e3e8ef; display:flex; align-items:center; justify-content:space-between; background:#f8fafc; border-radius:10px 10px 0 0;">
+          <h3 id="dcViewerTitle" style="margin:0; color:#1f3a8a; font-size:16px;">View File</h3>
+          <button type="button" class="btn-cancel" id="dcViewerClose" style="padding:6px 14px; font-size:13px;">Close</button>
+        </div>
+        <div id="dcViewerBody" style="flex:1; overflow:auto; padding:16px; background:#f5f7fa; min-height:300px; display:flex; align-items:center; justify-content:center;">
+          <p style="color:#6b7280;">Loading preview…</p>
+        </div>
+        <div id="dcViewerFooter" style="padding:12px 24px; border-top:1px solid #e3e8ef; display:flex; justify-content:flex-end; gap:8px; background:#fff; border-radius:0 0 10px 10px;">
+          <a id="dcViewerDownload" class="btn primary" style="text-decoration:none; display:inline-block; padding:8px 18px; border-radius:6px; font-weight:600; font-size:13px;" href="#" download>Download</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== PROCESS INVENTORY ==================== -->
+    <section id="processInventory" class="tab-panel">
+      <style>
+        #processInventory .pi-toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px;}
+        #processInventory .pi-toolbar input,
+        #processInventory .pi-toolbar select{padding:6px 10px;border:1px solid #cfd6df;border-radius:6px;font-size:13px;min-height:34px;background:#fff;}
+        #processInventory .pi-toolbar #piSearch{flex:1;min-width:220px;}
+        #processInventory .pi-table-wrap{overflow:auto;background:#fff;border:1px solid #e3e8ef;border-radius:8px;}
+        #processInventory table{width:100%;border-collapse:collapse;font-size:13px;}
+        #processInventory th,#processInventory td{padding:8px 10px;border-bottom:1px solid #eef1f5;text-align:left;vertical-align:top;}
+        #processInventory th{background:#f5f7fa;color:#1f3a8a;font-weight:700;position:sticky;top:0;}
+        #processInventory tr:hover td{background:#fafbfc;}
+        #processInventory #piPager{display:flex;gap:10px;align-items:center;justify-content:flex-end;padding:10px 4px;}
+        #processInventory .pi-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;margin:12px 0;}
+        #processInventory .pi-form-grid label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:#374151;font-weight:600;}
+        #processInventory .pi-form-grid label.full{grid-column:1 / -1;}
+        #processInventory .pi-form-grid input{padding:7px 10px;border:1px solid #cfd6df;border-radius:6px;font-size:13px;}
+        #processInventory .btn{padding:6px 14px;border:1px solid #cfd6df;background:#fff;border-radius:6px;cursor:pointer;font-weight:600;font-size:13px;}
+        #processInventory .btn.primary{background:#1f3a8a;color:#fff;border-color:#1f3a8a;}
+        #processInventory .btn.danger{background:#d12027;color:#fff;border-color:#d12027;}
+        /* Sub-tabs */
+        #processInventory .pi-subtabs{display:flex;gap:6px;border-bottom:1px solid #e3e8ef;margin-bottom:14px;}
+        #processInventory .pi-subtab{padding:8px 16px;border:none;background:transparent;cursor:pointer;font-weight:600;font-size:13px;color:#6b7280;border-bottom:2px solid transparent;}
+        #processInventory .pi-subtab.active{color:#1f3a8a;border-bottom-color:#1f3a8a;}
+        #processInventory .pi-subpanel{display:none;}
+        #processInventory .pi-subpanel.active{display:block;}
+
+        /* Dashboard */
+        #piDash .kpi-row{display:grid;grid-template-columns:repeat(7,1fr);gap:12px;margin-bottom:16px;}
+        @media(max-width:1200px){#piDash .kpi-row{grid-template-columns:repeat(4,1fr);}}
+        @media(max-width:640px){#piDash .kpi-row{grid-template-columns:repeat(2,1fr);}}
+        #piDash .kpi-card{background:#fff;border:1px solid #e3e8ef;border-radius:12px;padding:14px;display:flex;gap:12px;align-items:center;box-shadow:0 1px 2px rgba(15,23,42,.04);transition:transform .2s;}
+        #piDash .kpi-card:hover{transform:translateY(-2px);box-shadow:0 4px 12px rgba(15,23,42,.08);}
+        #piDash .kpi-ico{width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
+        #piDash .kpi-meta{flex:1;min-width:0;}
+        #piDash .kpi-meta .lbl{font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.3px;}
+        #piDash .kpi-meta .val{font-size:22px;font-weight:700;color:#0f172a;line-height:1.2;}
+        #piDash .kpi-meta .sub{font-size:11px;color:#6b7280;margin-top:2px;}
+        #piDash .grid-1{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;margin-bottom:16px;}
+        #piDash .grid-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:16px;}
+        #piDash .grid-3{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,2fr) minmax(0,1fr);gap:12px;margin-bottom:16px;}
+        #piDash .grid-4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px;}
+        @media(max-width:1100px){#piDash .grid-2,#piDash .grid-3,#piDash .grid-4{grid-template-columns:1fr;}}
+        #piDash .card{background:#fff;border:1px solid #e3e8ef;border-radius:12px;padding:14px;box-shadow:0 1px 2px rgba(15,23,42,.04);min-width:0;overflow:hidden;}
+        #piDash .card h3{margin:0 0 10px;font-size:13px;color:#1f3a8a;font-weight:700;display:flex;justify-content:space-between;align-items:center;}
+        #piDash .card canvas{max-height:260px;}
+        #piDash .mini-table{width:100%;font-size:12px;border-collapse:collapse;table-layout:fixed;}
+        #piDash .mini-table th{text-align:left;color:#6b7280;font-weight:600;padding:6px 4px;border-bottom:1px solid #eef1f5;text-transform:uppercase;font-size:10px;letter-spacing:.3px;}
+        #piDash .mini-table th:first-child{width:68%;}
+        #piDash .mini-table th:nth-child(2){width:20%;}
+        #piDash .mini-table th:nth-child(3){width:12%;}
+        #piDash .mini-table td{padding:6px 4px;border-bottom:1px solid #f4f5f7;color:#374151;overflow-wrap:anywhere;word-break:break-word;}
+        #piDash .mini-table tr:last-child td{border-bottom:none;}
+        #piDash .insight-list{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:10px;}
+        #piDash .insight-list li{padding:8px 10px;background:#f8fafc;border-left:3px solid #1f3a8a;border-radius:4px;font-size:12px;color:#374151;line-height:1.4;}
+        #piDash .full-report-btn{width:100%;margin-top:12px;padding:10px;background:#1f3a8a;color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:13px;}
+        #piDash .full-report-btn:hover{background:#152a66;}
+      </style>
+
+      <div class="pi-subtabs" role="tablist">
+        <button class="pi-subtab active" data-pi-sub="search" role="tab">Inventory Searching</button>
+        <button class="pi-subtab" data-pi-sub="dash" role="tab">Process Inventory Dashboard</button>
+      </div>
+
+      <!-- === Sub-panel: Inventory Searching === -->
+      <div class="pi-subpanel active" id="piPanelSearch">
+        <div class="pi-toolbar">
+          <input id="piSearch" placeholder="Search title, code, type, department, company…" />
+          <select id="piFilterCompany"><option value="">Company Name</option></select>
+          <select id="piFilterDept"><option value="">Department Name</option></select>
+          <select id="piFilterType"><option value="">Document Type</option></select>
+          <input id="piFilterIssue" placeholder="Issue No" style="width:110px;" />
+          <input id="piFilterFrom" type="date" title="Issue Date from" />
+          <input id="piFilterTo"   type="date" title="Issue Date to" />
+          <button class="btn" id="piClearFilters">Clear</button>
+          <button class="btn primary" id="piAddBtn">+ Add Process</button>
+          <button class="btn" id="piImportBtn">Import Excel</button>
+          <button class="btn" id="piExportBtn">Export Excel</button>
+          <button class="btn danger" id="piBulkDelBtn" style="display:none;">Delete Selected (<span id="piBulkDelCount">0</span>)</button>
+          <button class="btn" id="piSelectAllFiltered" style="display:none;">Select all <span id="piSelectAllFilteredCount"></span> filtered</button>
+          <input type="file" id="piImportFile" accept=".xlsx,.xls" style="display:none;" />
+        </div>
+
+        <div class="pi-table-wrap">
+          <table id="piTable">
+            <thead>
+              <tr>
+                <th style="width:32px;"><input type="checkbox" id="piSelectAll" title="Select all on this page" /></th>
+                <th data-pi-sort="documentTitle">Document Title</th>
+                <th data-pi-sort="documentType">Document Type</th>
+                <th data-pi-sort="documentCode">Document Code</th>
+                <th data-pi-sort="issueNo">Issue No</th>
+                <th data-pi-sort="issueDate">Issue Date</th>
+                <th data-pi-sort="expiryDate">Expiry Date</th>
+                <th>Company 1</th>
+                <th>Company 2</th>
+                <th>Company 3</th>
+                <th>Company 4</th>
+                <th data-pi-sort="department">Department</th>
+                <th data-pi-sort="subDepartment">Sub-Department</th>
+                <th style="width:120px;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="piTableBody">
+              <tr><td colspan="14" style="text-align:center;color:#6b7280;padding:24px;">Loading processes…</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div id="piPager"></div>
+
+        <datalist id="piTypeList"></datalist>
+        <datalist id="piDeptList"></datalist>
+        <datalist id="piCompanyDatalist"></datalist>
+      </div>
+
+      <!-- === Sub-panel: Dashboard === -->
+      <div class="pi-subpanel" id="piPanelDash">
+        <div id="piDash">
+          <!-- Dashboard filters -->
+          <div class="pi-toolbar" style="margin-bottom:14px;">
+            <input id="pidSearch" placeholder="Search title, code, company, department…" />
+            <select id="pidCompany"><option value="">Company Name</option></select>
+            <select id="pidDept"><option value="">Department Name</option></select>
+            <select id="pidType"><option value="">Document Type</option></select>
+            <select id="pidIssue"><option value="">Issue Number</option></select>
+            <input id="pidFrom" type="date" title="Issue Date from" />
+            <input id="pidTo"   type="date" title="Issue Date to" />
+            <button class="btn" id="pidClear">Clear Filters</button>
+          </div>
+
+          <!-- KPI cards -->
+          <div class="kpi-row">
+            <div class="kpi-card"><div class="kpi-ico" style="background:#e0edff;color:#1f3a8a;">📄</div><div class="kpi-meta"><div class="lbl">Total Processes</div><div class="val" id="pidKpiTotal">0</div><div class="sub">All documented processes</div></div></div>
+            <div class="kpi-card"><div class="kpi-ico" style="background:#dcfce7;color:#166534;">🏢</div><div class="kpi-meta"><div class="lbl">Total Companies</div><div class="val" id="pidKpiCompanies">0</div><div class="sub">Companies using processes</div></div></div>
+            <div class="kpi-card"><div class="kpi-ico" style="background:#ede9fe;color:#5b21b6;">🏛️</div><div class="kpi-meta"><div class="lbl">Total Departments</div><div class="val" id="pidKpiDepts">0</div><div class="sub">Across all companies</div></div></div>
+            <div class="kpi-card"><div class="kpi-ico" style="background:#fef3c7;color:#92400e;">📁</div><div class="kpi-meta"><div class="lbl">Document Types</div><div class="val" id="pidKpiTypes">0</div><div class="sub" id="pidKpiTypesSub">Procedure, Policy, SOP…</div></div></div>
+            <div class="kpi-card"><div class="kpi-ico" style="background:#fee2e2;color:#991b1b;">🤝</div><div class="kpi-meta"><div class="lbl">Shared Processes</div><div class="val" id="pidKpiShared">0 (0%)</div><div class="sub" id="pidKpiSharedSub">shared by 2 or more companies</div></div></div>
+          </div>
+
+          <!-- Analytics charts -->
+          <div class="grid-4">
+            <div class="card"><h3>Processes by Company</h3><canvas id="pidChartCompany"></canvas></div>
+            <div class="card"><h3>Document Type Distribution</h3><canvas id="pidChartType"></canvas></div>
+            <div class="card"><h3>Processes by Department</h3><canvas id="pidChartDept"></canvas></div>
+            <div class="card"><h3>Document Revision Status</h3><canvas id="pidChartIssue"></canvas></div>
+          </div>
+
+          <!-- Management KPIs -->
+          <div class="grid-1">
+            <div class="card">
+              <h3>Dashboard Insights</h3>
+              <ul class="insight-list" id="pidInsights"><li>Loading insights…</li></ul>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button class="full-report-btn" id="pidExportPdf" style="background:#2563eb;color:#fff;border-color:#2563eb;">Export to PDF</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Trend + Documents by Year (same row) -->
+          <div class="grid-2">
+            <div class="card">
+              <h3>Processes Added Trend
+                <select id="pidTrendRange" style="font-size:12px;padding:2px 6px;border:1px solid #cfd6df;border-radius:4px;font-weight:500;">
+                  <option value="month">This Month</option>
+                  <option value="year" selected>This Year</option>
+                  <option value="all">All Years</option>
+                </select>
+              </h3>
+              <canvas id="pidChartTrend"></canvas>
+            </div>
+            <div class="card"><h3>Documents by Year</h3><canvas id="pidChartYear"></canvas></div>
+          </div>
+
+
+        </div>
+      </div>
+    </section>
+
+    <!-- Process Inventory: Add / Edit modal -->
+    <div id="piModal" class="detail-overlay" style="display:none;">
+      <div class="detail-card" style="max-width:640px;">
+        <h3 id="piModalTitle">Add Process</h3>
+        <form id="piForm">
+          <div class="pi-form-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;">
+            <label class="full" style="grid-column:1 / -1;">Document Title
+              <input name="documentTitle" required />
+            </label>
+            <label>Document Type
+              <input name="documentType" required list="piTypeList" />
+            </label>
+            <label>Document Code
+              <input name="documentCode" required />
+            </label>
+            <label>Issue No
+              <input name="issueNo" required />
+            </label>
+            <label>Issue Date
+              <input name="issueDate" type="date" required />
+            </label>
+            <label class="full" style="grid-column:1 / -1;">Department
+              <input name="department" required list="piDeptList" />
+            </label>
+          </div>
+
+          <div style="border-top:1px solid #eef1f5;padding-top:10px;">
+            <div style="font-weight:600;color:#374151;font-size:13px;margin-bottom:6px;">Companies</div>
+            <div id="piCompanyList" style="margin-bottom:8px;"></div>
+            <div style="display:flex;gap:6px;">
+              <input id="piNewCompany" placeholder="Add a company…" list="piCompanyDatalist"
+                     style="flex:1;padding:6px 10px;border:1px solid #cfd6df;border-radius:6px;font-size:13px;" />
+              <button type="button" class="btn" id="piAddCompanyBtn">Add</button>
+            </div>
+          </div>
+
+          <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;">
+            <button type="button" class="btn" id="piCancelBtn">Cancel</button>
+            <button type="submit" class="btn primary">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Process Inventory: Full companies popup -->
+    <div id="piCompaniesModal" class="detail-overlay" style="display:none;">
+      <div class="detail-card" style="max-width:480px;">
+        <h3 id="piCompaniesFullTitle">Companies</h3>
+        <ul id="piCompaniesFullList" style="padding-left:20px;margin:8px 0;"></ul>
+        <div style="text-align:right;"><button class="btn" id="piCompaniesClose">Close</button></div>
+      </div>
+    </div>
+
+    <!-- ==================== ADMIN ==================== -->
+    <section id="admin" class="tab-panel" data-admin-only style="display:none;">
+      <div class="toolbar">
+        <input type="email" id="newUserEmail" placeholder="user@company.com" />
+        <button id="btnAddUser" class="btn primary">Approve User</button>
+      </div>
+
+      <div class="table-wrap" style="margin-bottom:16px;">
+        <h3 class="form-section">Approved Users</h3>
+        <table id="usersTable">
+          <thead>
+            <tr><th>Email</th><th>Status</th><th>Actions</th></tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="3" style="text-align:center;color:#6b7280;padding:16px">Loading users…</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="table-wrap">
+        <h3 class="form-section">Audit Trail</h3>
+        <table id="auditTable">
+          <thead>
+            <tr><th>Time</th><th>User</th><th>Action</th><th>Details</th></tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="4" style="text-align:center;color:#6b7280;padding:16px">Loading audit trail…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ==================== GAP ANALYSIS ==================== -->
+    <section id="gapAnalysis" class="tab-panel">
+      <div class="subtabs">
+        <button class="subtab active" data-gasub="gapAssessment">Gap Assessment</button>
+        <button class="subtab" data-gasub="gapAssessmentDashboard">Gap Assessment Dashboard</button>
+        <button class="subtab" data-gasub="processValidation">Process Validation Interviews</button>
+        <button class="subtab" data-gasub="gapDashboard">Process Validation Dashboard</button>
+      </div>
+
+      <div id="gapAssessment" class="ga-sub-panel">
+        <div class="filters" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0;">
+          <label class="btn primary" style="cursor:pointer;">
+            Import Excel
+            <input type="file" id="gaImportFile" accept=".xlsx,.xls" style="display:none;" />
+          </label>
+          <button id="gaAddRow" class="btn">+ Add Row</button>
+          <button id="gaExport" class="btn ghost">Export to Excel</button>
+          <button id="gaClear" class="btn ghost" style="color:#b91c1c;">Clear All</button>
+          <input type="search" id="gaSearch" placeholder="Search…" style="margin-left:auto;min-width:220px;" />
+          <select id="gaFilterGapId" data-ga-filter="gapId" style="min-width:130px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;"><option value="">All Gap ID</option></select>
+          <select id="gaFilterProcessName" data-ga-filter="processName2" style="min-width:160px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;"><option value="">All Process Name</option></select>
+          <select id="gaFilterProcessDesc" data-ga-filter="processDesc" style="min-width:190px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;"><option value="">All Process Description</option></select>
+          <select id="gaFilterProcessOwner" data-ga-filter="processOwner" style="min-width:160px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;"><option value="">All Process Owner</option></select>
+          <select id="gaFilterExists" data-ga-filter="exists" style="min-width:120px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;"><option value="">All Exists?</option></select>
+          <select id="gaFilterSeverity" data-ga-filter="severity" style="min-width:130px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;"><option value="">All Severity</option></select>
+          <button id="gaResetFilters" class="btn ghost">Reset Filters</button>
+        </div>
+
+        <style>
+          #gaTable td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+          #gaTable td:last-child { overflow: visible; text-overflow: clip; white-space: nowrap; }
+          #gaTable td .ga-edit, #gaTable td .ga-save, #gaTable td .ga-cancel, #gaTable td .ga-del { white-space: nowrap; }
+        </style>
+        <div style="overflow-x:auto;border:1px solid #cbd5e1;border-radius:8px;background:#fff;">
+          <table id="gaTable" style="width:100%;border-collapse:collapse;font-size:13px;min-width:1430px;table-layout:fixed;">
+            <thead style="background:#1f3a8a;color:#fff;">
+              <tr>
+                <th style="padding:10px;text-align:left;width:100px;border-right:1px solid #3b82f6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Gap ID</th>
+                <th style="padding:10px;text-align:left;width:140px;border-right:1px solid #3b82f6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Process Name</th>
+                <th style="padding:10px;text-align:left;width:220px;border-right:1px solid #3b82f6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Process Description</th>
+                <th style="padding:10px;text-align:left;width:140px;border-right:1px solid #3b82f6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Process Owner</th>
+                <th style="padding:10px;text-align:center;width:80px;border-right:1px solid #3b82f6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Exists?</th>
+                <th style="padding:10px;text-align:center;width:110px;border-right:1px solid #3b82f6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Severity</th>
+                <th style="padding:10px;text-align:left;width:180px;border-right:1px solid #3b82f6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Recommended Action</th>
+                <th style="padding:10px;text-align:left;width:150px;border-right:1px solid #3b82f6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Comment</th>
+                <th style="padding:10px;text-align:center;width:230px;overflow:visible;text-overflow:clip;white-space:nowrap;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="gaTbody"></tbody>
+          </table>
+        </div>
+        <div id="gaEmpty" style="text-align:center;padding:24px;color:#6b7280;">
+          No rows yet. Import an Excel file or add a row to get started.
+        </div>
+      </div>
+
+      <!-- ==================== PROCESS VALIDATION INTERVIEWS ==================== -->
+      <div id="processValidation" class="ga-sub-panel" style="display:none;">
+        <style>
+          #pvTable td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+          #pvTable td:last-child { overflow: visible; text-overflow: clip; white-space: nowrap; }
+          #pvTable td .pv-edit, #pvTable td .pv-save, #pvTable td .pv-cancel, #pvTable td .pv-del { white-space: nowrap; }
+        </style>
+        <div class="filters" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0;">
+          <label class="btn primary" style="cursor:pointer;">
+            Import Excel
+            <input type="file" id="pvImportFile" accept=".xlsx,.xls" style="display:none;" />
+          </label>
+          <button id="pvAddRow" class="btn">+ Add Row</button>
+          <button id="pvExport" class="btn ghost">Export to Excel</button>
+          <button id="pvClear" class="btn ghost" style="color:#b91c1c;">Clear All</button>
+          <button id="pvRemoveDuplicates" class="btn ghost">Remove Duplicates</button>
+          <input type="search" id="pvSearch" placeholder="Search…" style="margin-left:auto;min-width:220px;" />
+          <select id="pvFilterDocTitle" data-pv-filter="docTitle" style="min-width:170px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;"><option value="">All Document Title</option></select>
+          <select id="pvFilterDocType" data-pv-filter="docType" style="min-width:145px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;"><option value="">All Document Type</option></select>
+          <select id="pvFilterDocCode" data-pv-filter="docCode" style="min-width:145px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;"><option value="">All Document Code</option></select>
+          <select id="pvFilterProcessOwner" data-pv-filter="processOwner" style="min-width:155px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;"><option value="">All Process Owner</option></select>
+          <select id="pvFilterCompanyName" data-pv-filter="companyName" style="min-width:155px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;"><option value="">All Company Name</option></select>
+          <button id="pvResetFilters" class="btn ghost">Reset Filters</button>
+        </div>
+
+        <div style="overflow-x:auto;border:1px solid #cbd5e1;border-radius:8px;background:#fff;">
+          <table id="pvTable" style="width:100%;border-collapse:collapse;font-size:13px;min-width:1215px;table-layout:fixed;">
+            <thead style="background:#1f3a8a;color:#fff;">
+              <tr>
+                <th style="padding:10px;text-align:left;width:170px;border-right:1px solid #3b82f6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Document Title</th>
+                <th style="padding:10px;text-align:left;width:95px;border-right:1px solid #3b82f6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Document Type</th>
+                <th style="padding:10px;text-align:left;width:85px;border-right:1px solid #3b82f6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Document Code</th>
+                <th style="padding:10px;text-align:left;width:115px;border-right:1px solid #3b82f6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Process Owner</th>
+                <th style="padding:10px;text-align:left;width:115px;border-right:1px solid #3b82f6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Company Name</th>
+                <th style="padding:10px;text-align:center;width:105px;border-right:1px solid #3b82f6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Process Exists?</th>
+                <th style="padding:10px;text-align:center;width:110px;border-right:1px solid #3b82f6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Evidence Exists?</th>
+                <th style="padding:10px;text-align:center;width:100px;border-right:1px solid #3b82f6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Automated?</th>
+                <th style="padding:10px;text-align:left;width:145px;border-right:1px solid #3b82f6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Status</th>
+                <th style="padding:10px;text-align:left;width:170px;border-right:1px solid #3b82f6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Comments</th>
+                <th style="padding:10px;text-align:center;width:160px;overflow:visible;text-overflow:clip;white-space:nowrap;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="pvTbody"></tbody>
+          </table>
+        </div>
+        <div id="pvEmpty" style="text-align:center;padding:24px;color:#6b7280;">
+          No rows yet. Import an Excel file (Document Title, Document Type, Document Code, Process Owner, Company Name) or add a row to get started.
+        </div>
+      </div>
+
+      <!-- ==================== PROCESS VALIDATION DASHBOARD ==================== -->
+      <div id="gapDashboard" class="ga-sub-panel" style="display:none;">
+        <div class="filters" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0;">
+          <strong style="color:#1f3a8a;font-size:15px;">Process Validation Interviews — Analytics</strong>
+          <span id="gdCount" style="color:#6b7280;font-size:13px;"></span>
+          <button id="gdRefresh" class="btn ghost" style="margin-left:auto;">Refresh</button>
+          <button id="gdExportPdf" class="btn ghost" data-export-pdf="gdCharts" data-pdf-title="Process Validation Dashboard" data-pdf-file="process-validation-dashboard.pdf">📄 Export to PDF</button>
+        </div>
+
+        <div id="gdEmpty" style="display:none;text-align:center;padding:24px;color:#6b7280;border:1px dashed #cbd5e1;border-radius:8px;background:#fff;">
+          No Process Validation Interviews data yet. Add rows in the Process Validation Interviews tab to see the dashboard.
+        </div>
+
+        <div id="gdCharts" style="display:block;">
+          <!-- KPI CARDS -->
+          <div id="gdKpis" style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:16px;">
+            <div class="gd-kpi" style="background:#fff;border:1px solid #cbd5e1;border-radius:10px;padding:18px;display:flex;align-items:center;gap:16px;">
+              <div style="width:64px;height:64px;border-radius:50%;background:#16a34a;display:flex;align-items:center;justify-content:center;color:#fff;font-size:28px;flex-shrink:0;">✅</div>
+              <div style="flex:1;text-align:center;">
+                <div style="color:#16a34a;font-size:13px;font-weight:700;letter-spacing:.5px;">PROCESS EXISTS</div>
+                <div id="gdPePct" style="color:#16a34a;font-size:34px;font-weight:800;line-height:1;margin:4px 0;">0%</div>
+                <div style="font-size:12px;"><span style="color:#16a34a;font-weight:600;">Yes: <span id="gdPeYes">0%</span></span> &nbsp;|&nbsp; <span style="color:#dc2626;font-weight:600;">No: <span id="gdPeNo">0%</span></span></div>
+                <div style="color:#6b7280;font-size:12px;margin-top:2px;">of total processes</div>
+              </div>
+            </div>
+            <div class="gd-kpi" style="background:#fff;border:1px solid #cbd5e1;border-radius:10px;padding:18px;display:flex;align-items:center;gap:16px;">
+              <div style="width:64px;height:64px;border-radius:50%;background:#1d4ed8;display:flex;align-items:center;justify-content:center;color:#fff;font-size:28px;flex-shrink:0;">📁</div>
+              <div style="flex:1;text-align:center;">
+                <div style="color:#1d4ed8;font-size:13px;font-weight:700;letter-spacing:.5px;">EVIDENCE EXISTS</div>
+                <div id="gdEvPct" style="color:#1d4ed8;font-size:34px;font-weight:800;line-height:1;margin:4px 0;">0%</div>
+                <div style="font-size:12px;"><span style="color:#1d4ed8;font-weight:600;">Yes: <span id="gdEvYes">0%</span></span> &nbsp;|&nbsp; <span style="color:#dc2626;font-weight:600;">No: <span id="gdEvNo">0%</span></span></div>
+                <div style="color:#6b7280;font-size:12px;margin-top:2px;">of total processes</div>
+              </div>
+            </div>
+            <div class="gd-kpi" style="background:#fff;border:1px solid #cbd5e1;border-radius:10px;padding:18px;display:flex;align-items:center;gap:16px;">
+              <div style="width:64px;height:64px;border-radius:50%;background:#7c3aed;display:flex;align-items:center;justify-content:center;color:#fff;font-size:28px;flex-shrink:0;">⚙️</div>
+              <div style="flex:1;text-align:center;">
+                <div style="color:#7c3aed;font-size:13px;font-weight:700;letter-spacing:.5px;">AUTOMATED</div>
+                <div id="gdAuPct" style="color:#7c3aed;font-size:34px;font-weight:800;line-height:1;margin:4px 0;">0%</div>
+                <div style="font-size:12px;"><span style="color:#7c3aed;font-weight:600;">Yes: <span id="gdAuYes">0%</span></span> &nbsp;|&nbsp; <span style="color:#dc2626;font-weight:600;">No: <span id="gdAuNo">0%</span></span></div>
+                <div style="color:#6b7280;font-size:12px;margin-top:2px;">of total processes</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 100% STACKED BAR TABLE -->
+          <div style="background:#fff;border:1px solid #cbd5e1;border-radius:10px;padding:20px;margin-bottom:16px;">
+            <div style="text-align:center;font-weight:700;color:#0f172a;font-size:20px;">Performance by Process Owner – 100% Stacked Bar Chart</div>
+            <div style="text-align:center;color:#6b7280;font-size:13px;margin-bottom:14px;">(Percentage of Processes)</div>
+            <div style="text-align:right;font-size:13px;margin-bottom:10px;">
+              <span style="display:inline-block;width:14px;height:14px;background:#16a34a;vertical-align:middle;margin-right:4px;"></span>Yes
+              &nbsp;&nbsp;
+              <span style="display:inline-block;width:14px;height:14px;background:#dc2626;vertical-align:middle;margin-right:4px;"></span>No
+            </div>
+            <div style="overflow-x:auto;">
+              <table id="gdStackTable" class="gd-stack" style="width:100%;border-collapse:collapse;font-size:14px;table-layout:fixed;">
+                <colgroup>
+                  <col style="width:100px;min-width:100px;max-width:100px;">
+                  <col style="width:auto;">
+                  <col style="width:auto;">
+                  <col style="width:auto;">
+                </colgroup>
+                <thead>
+                  <tr style="background:#0f172a;color:#fff;">
+                    <th style="padding:10px 8px;text-align:left;font-size:12px;white-space:normal;word-break:break-word;line-height:1.2;">PROCESS OWNER</th>
+                    <th style="padding:10px 8px;font-size:12px;">PROCESS EXISTS (%)</th>
+                    <th style="padding:10px 8px;font-size:12px;">EVIDENCE EXISTS (%)</th>
+                    <th style="padding:10px 8px;font-size:12px;">AUTOMATED (%)</th>
+                  </tr>
+                </thead>
+                <tbody id="gdStackBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== GAP ASSESSMENT DASHBOARD ==================== -->
+      <div id="gapAssessmentDashboard" class="ga-sub-panel" style="display:none;">
+        <div class="filters" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0;">
+          <strong style="color:#1f3a8a;font-size:15px;">Gap Assessment — Analytics & Executive View</strong>
+          <span id="gadCount" style="color:#6b7280;font-size:13px;"></span>
+          <button id="gadRefresh" class="btn ghost" style="margin-left:auto;">Refresh</button>
+          <button id="gadExportPdf" class="btn ghost" data-export-pdf="gadContent" data-pdf-title="Gap Assessment Dashboard" data-pdf-file="gap-assessment-dashboard.pdf">📄 Export to PDF</button>
+        </div>
+
+        <div id="gadEmpty" style="display:none;text-align:center;padding:24px;color:#6b7280;border:1px dashed #cbd5e1;border-radius:8px;background:#fff;">
+          No Gap Assessment data yet. Add rows in the Gap Assessment tab to see the dashboard.
+        </div>
+
+        <div id="gadContent">
+          <!-- KPI ROW: 4 cards -->
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;">
+            <div class="gad-kpi" style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:14px;box-shadow:0 1px 2px rgba(0,0,0,0.04);display:flex;align-items:center;gap:10px;">
+              <div style="width:40px;height:40px;border-radius:10px;background:#eef2ff;display:flex;align-items:center;justify-content:center;font-size:20px;">📄</div>
+              <div>
+                <div style="font-size:10px;font-weight:700;color:#6b7280;letter-spacing:.5px;">TOTAL PROCESSES</div>
+                <div id="gadKpiTotal" style="font-size:22px;font-weight:800;color:#111827;line-height:1.1;">0</div>
+                <div style="font-size:11px;color:#6b7280;">All gap records</div>
+              </div>
+            </div>
+            <div class="gad-kpi" style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:14px;box-shadow:0 1px 2px rgba(0,0,0,0.04);display:flex;align-items:center;gap:10px;">
+              <div style="width:40px;height:40px;border-radius:10px;background:#fee2e2;display:flex;align-items:center;justify-content:center;font-size:20px;">⚠️</div>
+              <div>
+                <div style="font-size:10px;font-weight:700;color:#6b7280;letter-spacing:.5px;">MISSING PROCESSES</div>
+                <div id="gadKpiMissing" style="font-size:22px;font-weight:800;color:#dc2626;line-height:1.1;">0</div>
+                <div id="gadKpiMissingSub" style="font-size:11px;color:#6b7280;">0% of total</div>
+              </div>
+            </div>
+            <div class="gad-kpi" style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:14px;box-shadow:0 1px 2px rgba(0,0,0,0.04);display:flex;align-items:center;gap:10px;">
+              <div style="width:40px;height:40px;border-radius:10px;background:#fee2e2;display:flex;align-items:center;justify-content:center;font-size:20px;">🛡️</div>
+              <div>
+                <div style="font-size:10px;font-weight:700;color:#6b7280;letter-spacing:.5px;">CRITICAL GAPS</div>
+                <div id="gadKpiCritical" style="font-size:22px;font-weight:800;color:#dc2626;line-height:1.1;">0</div>
+                <div style="font-size:11px;color:#6b7280;">Critical severity</div>
+              </div>
+            </div>
+            <div class="gad-kpi" style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:14px;box-shadow:0 1px 2px rgba(0,0,0,0.04);display:flex;align-items:center;gap:10px;">
+              <div style="width:40px;height:40px;border-radius:10px;background:#dcfce7;display:flex;align-items:center;justify-content:center;font-size:20px;">✅</div>
+              <div>
+                <div style="font-size:10px;font-weight:700;color:#6b7280;letter-spacing:.5px;">COMPLIANCE RATE</div>
+                <div id="gadKpiCompliance" style="font-size:22px;font-weight:800;color:#16a34a;line-height:1.1;">0%</div>
+                <div style="font-size:11px;color:#6b7280;">Processes exist</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 1: Gap Risk Heatmap -->
+          <div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:10px;margin-bottom:16px;">
+            <h3 style="margin:0 0 4px;color:#1f3a8a;font-size:13px;font-weight:800;">1. GAP RISK HEATMAP BY PROCESS OWNER</h3>
+            <div style="color:#6b7280;font-size:11px;margin-bottom:8px;">Count of missing processes by severity</div>
+            <div style="overflow-x:auto;">
+              <table id="gadHeatTable" style="width:100%;border-collapse:collapse;font-size:11px;">
+                <thead>
+                  <tr style="background:#f8fafc;color:#0f172a;">
+                    <th style="padding:5px;text-align:left;border:1px solid #e5e7eb;">OWNER</th>
+                    <th style="padding:5px;border:1px solid #e5e7eb;">CRIT</th>
+                    <th style="padding:5px;border:1px solid #e5e7eb;">HIGH</th>
+                    <th style="padding:5px;border:1px solid #e5e7eb;">MED</th>
+                    <th style="padding:5px;border:1px solid #e5e7eb;">LOW</th>
+                    <th style="padding:5px;border:1px solid #e5e7eb;">TOTAL</th>
+                  </tr>
+                </thead>
+                <tbody id="gadHeatBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Section 2: Missing Processes + Key Insights -->
+          <div style="display:grid;grid-template-columns:1fr 0.75fr;gap:12px;margin-bottom:16px;align-items:start;">
+            <div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:14px;">
+              <h3 style="margin:0 0 4px;color:#1f3a8a;font-size:14px;font-weight:800;">2. MISSING PROCESSES BY PROCESS OWNER</h3>
+              <div style="color:#6b7280;font-size:12px;margin-bottom:10px;">Sorted by missing count (High to Low)</div>
+              <div style="position:relative;height:300px;"><canvas id="gadChart3"></canvas></div>
+            </div>
+            <div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:14px;">
+              <h3 style="margin:0 0 10px;color:#1f3a8a;font-size:14px;font-weight:800;">💡 KEY INSIGHTS</h3>
+              <div id="gadInsights" style="display:flex;flex-direction:column;gap:10px;"></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== PROCESS MAP GENERATOR ==================== -->
+    <section id="processMap" class="tab-panel">
+      <style>
+        #processMap .pm-panel{background:#fff;border:1px solid #e3e8ef;border-radius:8px;padding:16px;margin-bottom:16px;}
+        #processMap .pm-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;}
+        #processMap .pm-row > div{flex:1;min-width:200px;}
+        #processMap label{display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:4px;}
+        #processMap input[type=text]{width:100%;padding:7px 10px;border:1px solid #cfd6df;border-radius:6px;font-size:13px;}
+        #processMap textarea{width:100%;height:200px;font-family:Consolas,monospace;font-size:12px;padding:8px;border:1px solid #cfd6df;border-radius:6px;resize:vertical;}
+        #processMap .pm-btn{padding:8px 16px;border:1px solid #cfd6df;background:#fff;border-radius:6px;cursor:pointer;font-weight:600;font-size:13px;margin-right:8px;}
+        #processMap .pm-btn.primary{background:#1f3a8a;color:#fff;border-color:#1f3a8a;}
+        #processMap .pm-btn:hover{opacity:.9;}
+        #processMap .pm-hint{font-size:11px;color:#6b7280;margin-top:4px;}
+        #processMap #pmMapWrap{overflow:auto;background:#fff;border:1px solid #e3e8ef;border-radius:8px;padding:12px;}
+        #processMap #pmMap{display:block;background:#fff;}
+      </style>
+      <div class="pm-panel">
+        <div class="pm-row">
+          <div><label>Process Title</label><input id="pmTitle" type="text" placeholder="Enter process title"></div>
+          <div><label>Process No.</label><input id="pmNo" type="text" placeholder="e.g. MD-PS003"></div>
+          <div><label>Version</label><input id="pmVer" type="text" placeholder="e.g. 01"></div>
+        </div>
+        <label>Upload Excel with columns: Process ID, Process Name, Process No, Version, Step ID, Step Name, Step Type, Swimlane, Sequence, Parent Step, Next Step(s), Branch Label, Annotation, Shape (optional: Previous Step(s)). Legacy TSV paste still supported.</label>
+        <textarea id="pmData" autocomplete="off" placeholder="Optional: paste legacy TSV rows here, or use Upload Excel (.xlsx)."></textarea>
+        <div class="pm-hint">Tip: Upload the .xlsx directly. When the file contains multiple Process IDs, a selector will appear above the map.</div>
+        <div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+          <button class="pm-btn primary" id="pmGenerate">Generate Process Map</button>
+          <label class="pm-btn" style="display:inline-block;margin:0;">
+            Upload Excel (.xlsx)
+            <input type="file" id="pmExcelFile" accept=".xlsx,.xls" style="display:none;" />
+          </label>
+          <button class="pm-btn" id="pmDownloadPdf">Export PDF</button>
+          <button class="pm-btn" id="pmDownloadPng">Download PNG</button>
+          <button class="pm-btn" id="pmDownloadSvg">Download SVG</button>
+          <button class="pm-btn" id="pmDownloadVsdx">Export Visio (.vdx)</button>
+        </div>
+      </div>
+      <div id="pmMapWrap"><svg id="pmMap"></svg></div>
+    </section>
+  </main>
+
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="findings-engine.js?v=20260609-1"></script>
+  <script type="module" src="app.js?v=20260609-findings"></script>
+  <script type="module" src="nc-risk-capa.js?v=20260527-multi"></script>
+  <script type="module" src="document-control.js?v=20260608-1"></script>
+  <script type="module" src="process-inventory.js?v=20260705-7"></script>
+  <script src="process-inventory-dashboard.js?v=20260705-8"></script>
+  <script type="module" src="gap-analysis.js?v=20260712-3"></script>
+  <script type="module" src="process-validation.js?v=20260712-1"></script>
+  <script type="module" src="process-validation-dashboard.js?v=20260712-1"></script>
+  <script type="module" src="gap-assessment-dashboard.js?v=20260712-3"></script>
+  <script src="process-map.js?v=20260715-v3"></script>
+
+  <script>
+  // Export-to-PDF handler (shared for dashboard sub-pages)
+  document.addEventListener('click', async (ev) => {
+    const btn = ev.target.closest('[data-export-pdf]');
+    if (!btn) return;
+    ev.preventDefault();
+    const targetId = btn.getAttribute('data-export-pdf');
+    const title = btn.getAttribute('data-pdf-title') || 'Dashboard';
+    const filename = btn.getAttribute('data-pdf-file') || 'dashboard.pdf';
+    const target = document.getElementById(targetId);
+    if (!target) { alert('Nothing to export.'); return; }
+    if (!window.html2canvas || !window.jspdf) { alert('PDF libraries not loaded.'); return; }
+    const originalText = btn.textContent;
+    btn.textContent = 'Generating PDF…';
+    btn.disabled = true;
+    try {
+      // Give charts a tick to settle
+      await new Promise(r => setTimeout(r, 100));
+      const canvas = await html2canvas(target, {
+        backgroundColor: '#ffffff',
+        scale: 2,
+        useCORS: true,
+        windowWidth: target.scrollWidth,
+        windowHeight: target.scrollHeight
+      });
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+      const margin = 24;
+      const headerH = 40;
+      // Title header
+      pdf.setFontSize(14);
+      pdf.setTextColor(31, 58, 138);
+      pdf.text(title, margin, margin + 4);
+      pdf.setFontSize(9);
+      pdf.setTextColor(107, 114, 128);
+      pdf.text(new Date().toLocaleString(), pageW - margin, margin + 4, { align: 'right' });
+      const availW = pageW - margin * 2;
+      const availH = pageH - margin * 2 - headerH;
+      const imgProps = { w: canvas.width, h: canvas.height };
+      const ratio = Math.min(availW / imgProps.w, availH / imgProps.h);
+      const renderW = imgProps.w * ratio;
+      const renderH = imgProps.h * ratio;
+      const imgData = canvas.toDataURL('image/png');
+      // If content is very tall, paginate by slicing the canvas
+      if (renderH <= availH) {
+        pdf.addImage(imgData, 'PNG', margin + (availW - renderW) / 2, margin + headerH, renderW, renderH);
+      } else {
+        // Slice into pages based on availH mapped back to source pixels
+        const sliceHpx = Math.floor(availH / (availW / imgProps.w));
+        let y = 0, page = 0;
+        const tmp = document.createElement('canvas');
+        tmp.width = imgProps.w;
+        const ctx = tmp.getContext('2d');
+        while (y < imgProps.h) {
+          const h = Math.min(sliceHpx, imgProps.h - y);
+          tmp.height = h;
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, tmp.width, h);
+          ctx.drawImage(canvas, 0, y, imgProps.w, h, 0, 0, imgProps.w, h);
+          const slice = tmp.toDataURL('image/png');
+          if (page > 0) pdf.addPage();
+          pdf.setFontSize(14); pdf.setTextColor(31, 58, 138);
+          pdf.text(title, margin, margin + 4);
+          pdf.setFontSize(9); pdf.setTextColor(107, 114, 128);
+          pdf.text(new Date().toLocaleString() + '  ·  Page ' + (page + 1), pageW - margin, margin + 4, { align: 'right' });
+          const sliceRenderW = availW;
+          const sliceRenderH = h * (availW / imgProps.w);
+          pdf.addImage(slice, 'PNG', margin, margin + headerH, sliceRenderW, sliceRenderH);
+          y += h; page += 1;
+        }
+      }
+      pdf.save(filename);
+    } catch (err) {
+      console.error('PDF export failed', err);
+      alert('PDF export failed: ' + (err && err.message ? err.message : err));
+    } finally {
+      btn.textContent = originalText;
+      btn.disabled = false;
+    }
+  });
+  </script>
+
+  <style>
+    .sub-panel{display:none;}
+    .sub-panel.active{display:block;}
+    .dash-sub-panel{display:none;}
+    .dash-sub-panel.active{display:block;}
+    .ga-sub-panel{display:none;}
+    .ga-sub-panel.active{display:block;}
+    /* Detail modal (NC / CAPA / Risk row click) */
+    .detail-overlay{position:fixed;inset:0;background:rgba(15,23,42,.55);display:flex;align-items:flex-start;justify-content:center;z-index:10000;overflow-y:auto;padding:40px 16px;}
+    .detail-card{background:#fff;border-radius:10px;width:100%;max-width:720px;padding:20px 24px;box-shadow:0 20px 60px rgba(0,0,0,.25);}
+    .detail-card h3{margin:0 0 12px;color:#1f3a8a;}
+    .detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;font-size:13px;}
+    .detail-grid .row{display:flex;gap:6px;padding:4px 0;border-bottom:1px solid #f1f5f9;}
+    .detail-grid .lbl{font-weight:600;color:#374151;min-width:130px;}
+    .detail-grid .val{color:#111827;word-break:break-word;}
+  </style>
+  <script>
+  (function(){
+    function activate(btn, attr, panelSelector){
+      const group = btn.parentElement;
+      const targetId = btn.getAttribute(attr);
+      group.querySelectorAll('['+attr+']').forEach(b=>b.classList.toggle('active', b===btn));
+      // Find sibling panels: search within the closest common ancestor
+      const scope = group.parentElement || document;
+      scope.querySelectorAll(panelSelector).forEach(p=>{
+        const on = p.id === targetId;
+        p.classList.toggle('active', on);
+        p.style.display = on ? '' : 'none';
+      });
+    }
+    document.addEventListener('click', function(e){
+      const t = e.target.closest('button');
+      if(!t) return;
+      if(t.hasAttribute('data-sub'))       return activate(t,'data-sub','.sub-panel');
+      if(t.hasAttribute('data-dashsub'))   return activate(t,'data-dashsub','.dash-sub-panel');
+      if(t.hasAttribute('data-gasub'))     return activate(t,'data-gasub','.ga-sub-panel');
+      if(t.hasAttribute('data-pi-sub')){
+        const key = t.getAttribute('data-pi-sub');
+        const map = {search:'piPanelSearch', dash:'piPanelDash'};
+        const scope = document.getElementById('processInventory') || document;
+        scope.querySelectorAll('[data-pi-sub]').forEach(b=>b.classList.toggle('active', b===t));
+        scope.querySelectorAll('.pi-subpanel').forEach(p=>p.classList.toggle('active', p.id===map[key]));
+      }
+    });
+  })();
+  // Safety: close any leftover Risk/NC/CAPA detail overlay when switching main tabs
+  document.addEventListener('click', function(e){
+    const nav = e.target.closest('[data-tab], nav a, .tab-btn, .navbtn');
+    if(!nav) return;
+    const ov = document.getElementById('detailOverlay');
+    if(ov) ov.remove();
+  });
+  </script>
+
+</body>
+</html>
