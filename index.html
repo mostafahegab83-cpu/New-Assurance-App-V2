@@ -33,6 +33,11 @@
   #findingsSection .fs-msg{margin:0;font-size:13px;line-height:1.5;color:#1f2937;}
   /* When hidden in dashboard but kept visible for the PDF export */
   #dashboardCapture.exporting #findingsSection{display:block !important;}
+  /* ---------- Column search inputs (dashboard tables) ---------- */
+  .col-search-row th{padding:4px 6px !important;background:#f8fafc;}
+  .col-search{width:100%;box-sizing:border-box;padding:5px 8px;font-size:12px;font-weight:400;border:1px solid #cbd5e1;border-radius:6px;background:#fff;color:#1f2937;}
+  .col-search:focus{outline:none;border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,.15);}
+  #dashboardCapture.exporting .col-search-row{display:none;}
   /* ---------- Multi-select dropdown (filters) ---------- */
   .ms-wrap{position:relative;display:inline-block;vertical-align:middle;min-width:170px;}
   .ms-btn{width:100%;text-align:left;background:#fff;border:1px solid #cbd5e1;border-radius:6px;padding:7px 28px 7px 10px;font-size:13px;color:#1f2937;cursor:pointer;position:relative;line-height:1.2;min-height:34px;}
@@ -40,15 +45,20 @@
   .ms-btn:hover{border-color:#94a3b8;}
   .ms-wrap.open .ms-btn{border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,.15);}
   .ms-label{display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .ms-panel{display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:1000;min-width:100%;max-width:340px;max-height:280px;overflow:auto;background:#fff;border:1px solid #cbd5e1;border-radius:8px;box-shadow:0 8px 24px rgba(15,23,42,.12);padding:6px;}
+  .ms-panel{display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:1000;min-width:220px;max-width:360px;background:#fff;border:1px solid #cbd5e1;border-radius:8px;box-shadow:0 8px 24px rgba(15,23,42,.12);padding:6px;}
   .ms-wrap.open .ms-panel{display:block;}
-  .ms-actions{display:flex;gap:6px;padding:4px 4px 8px;border-bottom:1px solid #eef2f7;margin-bottom:4px;}
+  .ms-search-wrap{padding:2px 2px 6px;border-bottom:1px solid #eef2f7;margin-bottom:6px;}
+  .ms-search{width:100%;box-sizing:border-box;padding:6px 8px;font-size:12px;font-weight:400;border:1px solid #cbd5e1;border-radius:6px;background:#f8fafc;color:#1f2937;outline:none;}
+  .ms-search:focus{background:#fff;border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,.15);}
+  .ms-actions{display:flex;gap:6px;padding:0 2px 6px;border-bottom:1px solid #eef2f7;margin-bottom:4px;}
   .ms-actions button{flex:1;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:6px;padding:5px 8px;font-size:12px;font-weight:600;color:#334155;cursor:pointer;}
   .ms-actions button:hover{background:#e2e8f0;}
+  .ms-list{max-height:220px;overflow-y:auto;overflow-x:hidden;}
   .ms-opt{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;font-size:13px;color:#1f2937;cursor:pointer;}
   .ms-opt:hover{background:#f8fafc;}
   .ms-opt input{margin:0;}
   .ms-empty{padding:8px;font-size:12px;color:#6b7280;text-align:center;}
+  .ms-no-match{padding:8px;font-size:12px;color:#6b7280;text-align:center;}
 </style>
 </head>
 <body>
@@ -219,6 +229,11 @@
                     <th>Process Name</th>
                     <th>Start Variance</th>
                     <th>End Variance</th>
+                  </tr>
+                  <tr class="col-search-row">
+                    <th><input type="search" class="col-search" data-col="processName" placeholder="Search process…" aria-label="Search Process Name" /></th>
+                    <th><input type="search" class="col-search" data-col="startVariance" placeholder="Search…" aria-label="Search Start Variance" /></th>
+                    <th><input type="search" class="col-search" data-col="endVariance" placeholder="Search…" aria-label="Search End Variance" /></th>
                   </tr>
                 </thead>
                 <tbody></tbody>
@@ -1628,7 +1643,7 @@
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script src="findings-engine.js?v=20260609-1"></script>
-  <script type="module" src="app.js?v=20260609-findings"></script>
+  <script type="module" src="app.js?v=20261015-dashboard-search-filters"></script>
   <script type="module" src="nc-risk-capa.js?v=20260527-multi"></script>
   <script type="module" src="document-control.js?v=20260608-1"></script>
   <script type="module" src="process-inventory.js?v=20260705-7"></script>
