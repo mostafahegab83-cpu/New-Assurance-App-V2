@@ -1,1881 +1,3069 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>IDH · Process Assurance Tracker</title>
-<link rel="icon" href="idh-logo.png" />
-<link rel="stylesheet" href="styles.css" />
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<style>
-  /* ---------- Findings Summary section ---------- */
-  #findingsSection{margin-top:18px;background:#fff;border:1px solid #e3e8ef;border-radius:10px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.04);}
-  #findingsSection .fs-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:12px;}
-  #findingsSection .fs-meta{margin:4px 0 0;font-size:12px;color:#6b7280;}
-  #findingsSection .fs-kpis{display:flex;gap:10px;font-size:12px;font-weight:600;align-items:center;flex-wrap:wrap;}
-  #findingsSection .fs-kpis span{background:#f3f4f6;padding:4px 10px;border-radius:999px;color:#374151;}
-  #findingsSection .fs-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;}
-  #findingsSection .fs-item{border:1px solid #e3e8ef;border-left-width:4px;border-radius:8px;padding:10px 12px;background:#fafbfc;}
-  #findingsSection .fs-item.fs-sev-high{border-left-color:#dc2626;background:#fef2f2;}
-  #findingsSection .fs-item.fs-sev-med{border-left-color:#f59e0b;background:#fffbeb;}
-  #findingsSection .fs-item.fs-sev-low{border-left-color:#16a34a;background:#f0fdf4;}
-  #findingsSection .fs-row{display:flex;gap:8px;align-items:center;margin-bottom:4px;flex-wrap:wrap;}
-  #findingsSection .fs-badge{font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:2px 8px;border-radius:999px;color:#fff;background:#6b7280;}
-  #findingsSection .fs-badge.fs-sev-high{background:#dc2626;}
-  #findingsSection .fs-badge.fs-sev-med{background:#f59e0b;}
-  #findingsSection .fs-badge.fs-sev-low{background:#16a34a;}
-  #findingsSection .fs-cat{font-size:12px;font-weight:700;color:#1f3a8a;}
-  #findingsSection .fs-tag{font-size:11px;color:#6b7280;background:#fff;border:1px solid #e3e8ef;padding:1px 8px;border-radius:999px;}
-  #findingsSection .fs-msg{margin:0;font-size:13px;line-height:1.5;color:#1f2937;}
-  /* When hidden in dashboard but kept visible for the PDF export */
-  #dashboardCapture.exporting #findingsSection{display:block !important;}
-  /* ---------- Column search inputs (dashboard tables) ---------- */
-  .col-search-row th{padding:4px 6px !important;background:#f8fafc;}
-  .col-search{width:100%;box-sizing:border-box;padding:5px 8px;font-size:12px;font-weight:400;border:1px solid #cbd5e1;border-radius:6px;background:#fff;color:#1f2937;}
-  .col-search:focus{outline:none;border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,.15);}
-  #dashboardCapture.exporting .col-search-row{display:none;}
-  /* ---------- Multi-select dropdown (filters) ---------- */
-  .ms-wrap{position:relative;display:inline-block;vertical-align:middle;min-width:170px;}
-  .ms-btn{width:100%;text-align:left;background:#fff;border:1px solid #cbd5e1;border-radius:6px;padding:7px 28px 7px 10px;font-size:13px;color:#1f2937;cursor:pointer;position:relative;line-height:1.2;min-height:34px;}
-  .ms-btn::after{content:"▾";position:absolute;right:10px;top:50%;transform:translateY(-50%);color:#64748b;font-size:11px;pointer-events:none;}
-  .ms-btn:hover{border-color:#94a3b8;}
-  .ms-wrap.open .ms-btn{border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,.15);}
-  .ms-label{display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .ms-panel{display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:1000;min-width:220px;max-width:360px;background:#fff;border:1px solid #cbd5e1;border-radius:8px;box-shadow:0 8px 24px rgba(15,23,42,.12);padding:6px;}
-  .ms-wrap.open .ms-panel{display:block;}
-  .ms-search-wrap{padding:2px 2px 6px;border-bottom:1px solid #eef2f7;margin-bottom:6px;}
-  .ms-search{width:100%;box-sizing:border-box;padding:6px 8px;font-size:12px;font-weight:400;border:1px solid #cbd5e1;border-radius:6px;background:#f8fafc;color:#1f2937;outline:none;}
-  .ms-search:focus{background:#fff;border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,.15);}
-  .ms-actions{display:flex;gap:6px;padding:0 2px 6px;border-bottom:1px solid #eef2f7;margin-bottom:4px;}
-  .ms-actions button{flex:1;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:6px;padding:5px 8px;font-size:12px;font-weight:600;color:#334155;cursor:pointer;}
-  .ms-actions button:hover{background:#e2e8f0;}
-  .ms-list{max-height:220px;overflow-y:auto;overflow-x:hidden;}
-  .ms-opt{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;font-size:13px;color:#1f2937;cursor:pointer;}
-  .ms-opt:hover{background:#f8fafc;}
-  .ms-opt input{margin:0;}
-  .ms-empty{padding:8px;font-size:12px;color:#6b7280;text-align:center;}
-  .ms-no-match{padding:8px;font-size:12px;color:#6b7280;text-align:center;}
-</style>
-</head>
-<body>
-  <!-- ==================== LOGIN OVERLAY ==================== -->
-  <div id="loginOverlay" style="position:fixed;inset:0;background:#f5f7fa;display:flex;align-items:center;justify-content:center;z-index:9999;">
-    <form id="loginForm" style="background:#fff;padding:32px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.1);min-width:320px;max-width:90vw;">
-      <img src="idh-logo.png" alt="IDH" style="height:48px;display:block;margin:0 auto 16px;" />
-      <h2 style="margin:0 0 16px;text-align:center;font-size:18px;color:#1f2937;">Sign in</h2>
-      <input id="loginEmail" type="email" placeholder="Email" required autocomplete="username" style="width:100%;padding:10px;margin-bottom:8px;border:1px solid #e3e8ef;border-radius:6px;font-size:14px;" />
-      <input id="loginPassword" type="password" placeholder="Password" required autocomplete="current-password" style="width:100%;padding:10px;margin-bottom:12px;border:1px solid #e3e8ef;border-radius:6px;font-size:14px;" />
-      <button type="submit" style="width:100%;padding:10px;background:#d12027;color:#fff;border:none;border-radius:6px;font-weight:600;cursor:pointer;font-size:14px;">Sign in</button>
-      <p style="margin:12px 0 0;text-align:center;">
-        <a href="#" id="forgotPasswordLink" style="font-size:13px;color:#d12027;text-decoration:none;font-weight:600;">Forgot password?</a>
-      </p>
-      <p id="loginError" style="color:#dc2626;font-size:13px;margin:8px 0 0;min-height:18px;text-align:center;"></p>
-    </form>
-  </div>
-
-  <header class="app-header">
-    <div class="brand">
-      <img src="idh-logo.png" alt="IDH — Integrated Diagnostics Holdings" class="brand-logo" />
-      <div class="brand-text">
-        <h1>Process Assurance Tracker</h1>
-        <p class="brand-sub">Integrated Diagnostics Holdings · <span id="syncStatus" style="color:#6b7280">Connecting…</span></p>
-      </div>
-    </div>
-    <nav class="tabs" role="tablist">
-      <button class="tab active" data-tab="home" role="tab">Home</button>
-      <button class="tab" data-tab="audit" role="tab">Review</button>
-      <button class="tab" data-tab="ncrc" role="tab">NC/Risk &amp; CAPA</button>
-      <button class="tab" data-tab="dashboard" role="tab">Dashboard</button>
-      <button class="tab" data-tab="documentControl" role="tab">Document Control</button>
-      <button class="tab" data-tab="processInventory" role="tab">Process Inventory</button>
-      <button class="tab" data-tab="gapAnalysis" role="tab">Gap Analysis</button>
-      <button class="tab" data-tab="processMap" role="tab">Process Map</button>
-      <button class="tab" data-tab="admin" role="tab" data-admin-only style="display:none;">Admin</button>
-      <div style="margin-left:auto; display:flex; flex-direction:column; align-items:flex-end; gap:2px;">
-        <span id="currentUserEmail" style="font-size:12px; color:#475569; line-height:1;"></span>
-        <button id="logoutBtn" class="tab" title="Sign out">Logout</button>
-      </div>
-    </nav>
-  </header>
-
-  <!-- ==================== HOME (tile launcher) ==================== -->
-  <style>
-    #home.tab-panel{padding:20px 24px 40px;width:100%;max-width:1200px;margin:0 auto;}
-    #home.tab-panel.active{display:block;}
-    .home-hero{position:relative;background:linear-gradient(135deg,#eaf2ff 0%,#f4f8ff 55%,#eef4ff 100%);border-radius:18px;padding:56px 48px;overflow:hidden;display:flex;align-items:center;justify-content:space-between;gap:24px;min-height:260px;box-shadow:0 1px 3px rgba(31,58,138,.06);}
-    .home-hero::before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 20% 100%, rgba(255,255,255,.6), transparent 60%);pointer-events:none;}
-    .home-hero h1{position:relative;font-size:44px;font-weight:600;color:#111827;margin:0;letter-spacing:-.5px;}
-    .home-hero img{position:relative;max-height:260px;width:auto;object-fit:contain;}
-    .home-tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:24px;}
-    .home-tile{background:#fff;border:1px solid #e5eaf2;border-radius:14px;padding:18px 16px;cursor:pointer;transition:transform .15s,box-shadow .15s,border-color .15s;display:flex;flex-direction:column;gap:10px;text-align:left;min-height:130px;position:relative;}
-    .home-tile:hover{transform:translateY(-3px);box-shadow:0 10px 24px rgba(31,58,138,.10);border-color:#c9d5ea;}
-    .home-tile .home-icon{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;font-size:22px;line-height:1;}
-    .home-tile h2{margin:0;font-size:15px;font-weight:700;color:#111827;line-height:1.25;}
-    .home-tile p{margin:0;font-size:12px;color:#6b7280;line-height:1.35;}
-    .home-tile .home-arrow{margin-top:auto;font-size:18px;color:#f59e0b;font-weight:700;}
-    .home-tile[data-go="admin"] .home-icon{background:#efeaff;color:#7c3aed;}
-    .home-tile[data-go="audit"] .home-icon{background:#fff1e6;color:#ea580c;}
-    .home-tile[data-go="ncrc"] .home-icon{background:#fff7dc;color:#d97706;}
-    .home-tile[data-go="dashboard"] .home-icon{background:#e6f0ff;color:#2563eb;}
-    .home-tile[data-go="documentControl"] .home-icon{background:#fdecec;color:#dc2626;}
-    .home-tile[data-go="processInventory"] .home-icon{background:#fff4d6;color:#b45309;}
-    .home-tile[data-go="gapAnalysis"] .home-icon{background:#e6f7f2;color:#0d9488;}
-    .home-tile[data-go="processMap"] .home-icon{background:#e6f6ec;color:#16a34a;}
-    @media (max-width: 1024px){.home-tiles{grid-template-columns:repeat(3,1fr);}.home-hero{padding:40px 32px;}.home-hero h1{font-size:34px;}}
-    @media (max-width: 640px){.home-tiles{grid-template-columns:repeat(2,1fr);}.home-hero{flex-direction:column;text-align:center;padding:32px 20px;}.home-hero img{max-height:180px;}.home-hero h1{font-size:28px;}}
-    /* NC/Risk & CAPA sub-nav */
-    .subtabs{display:flex;gap:8px;border-bottom:2px solid #e3e8ef;margin-bottom:16px;padding:0 8px;}
-    .subtab{background:none;border:none;padding:10px 16px;cursor:pointer;font-weight:600;color:#6b7280;border-bottom:3px solid transparent;margin-bottom:-2px;}
-    .subtab.active{color:#1f3a8a;border-bottom-color:#1f3a8a;}
-  </style>
-  <main class="container">
-    <section id="home" class="tab-panel active">
-      <div class="home-hero">
-        <h1>Driving Excellence Through Process Assurance</h1>
-        <img src="home-hero.png" alt="" />
-      </div>
-      <div class="home-tiles">
-        <div class="home-tile" data-go="admin"><div class="home-icon">👥</div><h2>Admin</h2><p>Manage users, roles and system settings.</p><span class="home-arrow">→</span></div>
-        <div class="home-tile" data-go="audit"><div class="home-icon">📋</div><h2>Review</h2><p>Conduct and track reviews efficiently.</p><span class="home-arrow">→</span></div>
-        <div class="home-tile" data-go="ncrc"><div class="home-icon">⚠️</div><h2>NC / Risk &amp; CAPA</h2><p>Manage non-conformities, risks and CAPA actions.</p><span class="home-arrow">→</span></div>
-        <div class="home-tile" data-go="dashboard"><div class="home-icon">📊</div><h2>Dashboard</h2><p>Real-time insights and performance overview.</p><span class="home-arrow">→</span></div>
-        <div class="home-tile" data-go="documentControl"><div class="home-icon">📑</div><h2>Document Control</h2><p>Control, access and manage documents.</p><span class="home-arrow">→</span></div>
-        <div class="home-tile" data-go="processInventory"><div class="home-icon">🗂️</div><h2>Process Inventory</h2><p>Store and organize all processes.</p><span class="home-arrow">→</span></div>
-        <div class="home-tile" data-go="gapAnalysis"><div class="home-icon">🔍</div><h2>Gap Analysis</h2><p>Identify gaps and drive improvement.</p><span class="home-arrow">→</span></div>
-        <div class="home-tile" data-go="processMap"><div class="home-icon">🗺️</div><h2>Process Map</h2><p>Visualize and map your processes.</p><span class="home-arrow">→</span></div>
-      </div>
-    </section>
-    <!-- ==================== DASHBOARD ==================== -->
-    <section id="dashboard" class="tab-panel">
-
-      <div class="filters">
-        <select id="filterProcessOwner" multiple size="1" title="Hold Ctrl/Cmd to select multiple" data-placeholder="Process Owner"></select>
-        <select id="filterDept" multiple size="1" title="Hold Ctrl/Cmd to select multiple" data-placeholder="Department"></select>
-        <select id="filterDepartment" multiple size="1" title="Hold Ctrl/Cmd to select multiple" data-placeholder="Action Owner"></select>
-        <select id="filterProcess" multiple size="1" title="Hold Ctrl/Cmd to select multiple" data-placeholder="Process"></select>
-        <select id="filterCompliance" multiple size="1" title="Hold Ctrl/Cmd to select multiple" data-placeholder="Compliance Status">
-          <option>Compliant</option>
-          <option>Non-Compliant</option>
-          <option>Observation</option>
-        </select>
-        <select id="filterRiskLevel" multiple size="1" title="Hold Ctrl/Cmd to select multiple" data-placeholder="Risk Level">
-          <option>High</option><option>Medium</option><option>Low</option>
-        </select>
-        <select id="filterMitigation" multiple size="1" title="Hold Ctrl/Cmd to select multiple" data-placeholder="Mitigation Status">
-          <option>Open</option><option>Mitigated</option><option>Accepted</option>
-          <option>Closed</option>
-        </select>
-        <input type="search" id="filterSearch" placeholder="Search…" />
-        <button id="clearFilters" class="btn ghost">Clear</button>
-        <span class="spacer"></span>
-        <select id="pdfOrientation" title="PDF orientation">
-          <option value="portrait">Portrait</option>
-          <option value="landscape" selected>Landscape</option>
-        </select>
-        <select id="pdfScope" title="Sections to export">
-          <option value="all">Export options</option>
-          <option value="kpis">KPIs only</option>
-          <option value="charts">Charts only</option>
-          <option value="table">Table only</option>
-          <option value="findings">Summery only</option>
-        </select>
-        <button id="btnExportPdf" class="btn primary">Export to PDF</button>
-      </div>
-
-      <div class="subtabs">
-        <button class="subtab active" data-dashsub="dashFindings">Findings Dashboard</button>
-        <button class="subtab" data-dashsub="dashRisk">Risk Dashboard</button>
-      </div>
-
-      <div id="dashFindings" class="dash-sub-panel active">
-        <div id="dashboardCapture">
-          <div class="pdf-only" id="pdfHeader">
-            <img src="idh-logo.png" alt="IDH" />
-            <div>
-              <h2>Assurance Tracker — Dashboard</h2>
-              <p id="pdfMeta"></p>
-            </div>
-          </div>
-
-          <div class="kpis" data-section="kpis" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">
-            <div class="kpi" style="display:flex;align-items:center;gap:12px;">
-              <span class="kpi-icon" aria-hidden="true" style="font-size:28px;line-height:1;flex-shrink:0;">📋</span>
-              <span style="display:flex;flex-direction:column;"><span class="kpi-label">Total Findings</span><span class="kpi-value" id="kpiTotalNcs">0</span></span>
-            </div>
-            <div class="kpi" style="display:flex;align-items:center;gap:12px;">
-              <span class="kpi-icon" aria-hidden="true" style="font-size:28px;line-height:1;flex-shrink:0;">✅</span>
-              <span style="display:flex;flex-direction:column;"><span class="kpi-label">Compliance %</span><span class="kpi-value" id="kpiCompliancePct">0%</span></span>
-            </div>
-            <div class="kpi" style="display:flex;align-items:center;gap:12px;">
-              <span class="kpi-icon" aria-hidden="true" style="font-size:28px;line-height:1;flex-shrink:0;">⏱️</span>
-              <span style="display:flex;flex-direction:column;"><span class="kpi-label">SLA Adherence %</span><span class="kpi-value" id="kpiSlaAdherence">0%</span></span>
-            </div>
-            <div class="kpi" style="display:flex;align-items:center;gap:12px;">
-              <span class="kpi-icon" aria-hidden="true" style="font-size:28px;line-height:1;flex-shrink:0;">🎯</span>
-              <span style="display:flex;flex-direction:column;"><span class="kpi-label">% Effective CAPA</span><span class="kpi-value" id="kpiEffectiveCapa">0%</span></span>
-            </div>
-          </div>
-
-          <div data-section="scheduleVariance" style="margin-top:16px;">
-            <h3 class="dash-section-title">Process Timeline Deviation (Days)</h3>
-            <div class="table-wrap">
-              <table id="scheduleVarianceTable" class="variance-table">
-                <thead>
-                  <tr>
-                    <th>Process Name</th>
-                    <th>Start Variance</th>
-                    <th>End Variance</th>
-                  </tr>
-                  <tr class="col-search-row">
-                    <th><input type="search" class="col-search" data-col="processName" placeholder="Search process…" aria-label="Search Process Name" /></th>
-                    <th><input type="search" class="col-search" data-col="startVariance" placeholder="Search…" aria-label="Search Start Variance" /></th>
-                    <th><input type="search" class="col-search" data-col="endVariance" placeholder="Search…" aria-label="Search End Variance" /></th>
-                  </tr>
-                </thead>
-                <tbody></tbody>
-              </table>
-            </div>
-          </div>
-
-          <div data-section="charts">
-            <h3 class="dash-section-title">Task Performance</h3>
-            <div class="charts charts-1">
-              <div class="chart-card"><h3>Task Performance Distribution</h3><canvas id="chartTaskPerformance"></canvas></div>
-            </div>
-
-            <h3 class="dash-section-title">Compliance &amp; NC</h3>
-            <div class="charts charts-3">
-              <div class="chart-card"><h3>Compliance Overview</h3><canvas id="chartCompliance"></canvas></div>
-              <div class="chart-card"><h3>Non Compliance</h3><canvas id="chartNcCategory"></canvas></div>
-              <div class="chart-card"><h3>Non Compliance Reasons</h3><canvas id="chartNcReason"></canvas></div>
-            </div>
-
-            <h3 class="dash-section-title">CAPA</h3>
-            <div class="charts charts-3">
-              <div class="chart-card"><h3>Corrective / Preventive</h3><canvas id="chartCapaType"></canvas></div>
-              <div class="chart-card"><h3>Root Cause Category</h3><canvas id="chartRcCategory"></canvas></div>
-              <div class="chart-card"><h3>CAPA Status</h3><canvas id="chartCapaStatus"></canvas></div>
-            </div>
-          </div>
-
-          <div id="findingsSection" data-section="findings" style="display:block;margin-top:16px;">
-            <h3 class="dash-section-title">Summery</h3><p class="fs-meta" style="margin:0;color:#6b7280;">Findings will appear here.</p>
-          </div>
-        </div>
-      </div>
-
-      <div id="dashRisk" class="dash-sub-panel" style="display:none;">
-        <div id="riskDashboardCapture">
-          <div class="kpis" style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;">
-            <div class="kpi" style="display:flex;align-items:center;gap:12px;">
-              <span class="kpi-icon" aria-hidden="true" style="font-size:28px;line-height:1;flex-shrink:0;">⚠️</span>
-              <span style="display:flex;flex-direction:column;"><span class="kpi-label">Total Risks</span><span class="kpi-value" id="kpiTotalRisks">0</span></span>
-            </div>
-            <div class="kpi" style="display:flex;align-items:center;gap:12px;">
-              <span class="kpi-icon" aria-hidden="true" style="font-size:28px;line-height:1;flex-shrink:0;">🚨</span>
-              <span style="display:flex;flex-direction:column;"><span class="kpi-label">Open Risks</span><span class="kpi-value" id="kpiOpenRisks">0</span></span>
-            </div>
-          </div>
-
-          <h3 class="dash-section-title">Risk</h3>
-          <div class="charts charts-3">
-            <div class="chart-card"><h3>Risk Type</h3><canvas id="chartRiskType"></canvas></div>
-            <div class="chart-card"><h3>Risk Level</h3><canvas id="chartRiskLevel"></canvas></div>
-            <div class="chart-card"><h3>Risk Mitigation Status</h3><canvas id="chartRiskMitigation"></canvas></div>
-          </div>
-
-          <div id="findingsSectionRisk" data-section="findings" style="display:block;margin-top:16px;">
-            <h3 class="dash-section-title">Summery</h3><p class="fs-meta" style="margin:0;color:#6b7280;">Risk findings will appear here.</p>
-          </div>
-        </div>
-      </div>
-    </section>
-
-
-    <!-- ==================== AUDIT (Form + Records) ==================== -->
-    <section id="audit" class="tab-panel">
-      <div class="subtabs">
-        <button class="subtab active" data-sub="form">Review Form</button>
-        <button class="subtab" data-sub="records">Records</button>
-      </div>
-
-      <!-- Records sub-page -->
-      <div id="records" class="sub-panel">
-        <div class="toolbar">
-          <button id="btnExport" class="btn">Export CSV</button>
-          <label class="btn">
-            Import CSV
-            <input type="file" id="fileImport" accept=".csv" hidden />
-          </label>
-          <button id="btnDeleteSelected" class="btn danger" disabled>Delete Selected (<span id="selectedCount">0</span>)</button>
-          <button id="btnClearAll" class="btn danger">Clear All</button>
-          <button id="btnRestoreBackup" class="btn" title="Restore the last Clear All backup">Restore Last Backup</button>
-          <span class="muted" id="recordsCount"></span>
-          <span class="muted" id="backupInfo" style="margin-left:8px;"></span>
-        </div>
-        <div class="filters">
-          <input type="search" id="recFilterAuditId" placeholder="Review ID" />
-          <input type="search" id="recFilterUser" placeholder="User Name" list="dlUser" />
-          <select id="recFilterProcess" multiple data-placeholder="Process Name"></select>
-          <input type="search" id="recFilterPhase" placeholder="Process Phase" list="dlPhase" />
-          <input type="search" id="recFilterDepartment" placeholder="Department" list="dlRecDepartment" />
-          <datalist id="dlRecDepartment"></datalist>
-          <button id="recClearFilters" class="btn ghost">Clear Filters</button>
-        </div>
-        <div class="table-wrap">
-          <table id="recordsTable">
-            <thead><tr id="recordsHead"></tr></thead>
-            <tbody></tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- Form sub-page -->
-      <div id="form" class="sub-panel active">
-      <form id="recordForm" class="record-form" autocomplete="off">
-        <input type="hidden" id="recordId" />
-
-        <h3 class="form-section">General</h3>
-        <div class="grid">
-          <label>Review Date<input type="date" id="auditDate" /></label>
-          <label>Review ID<input type="text" id="auditId" placeholder="e.g. AUD-001" /></label>
-          <label>Step No
-            <div style="display:flex;gap:6px;align-items:center;">
-              <input type="text" id="stepNumber" placeholder="Auto" style="flex:1;" />
-              <button type="button" id="btnAutoStepNo" title="Auto-generate next step number for this process"
-                style="padding:6px 10px;border:1px solid #2563eb;background:#2563eb;color:#fff;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;white-space:nowrap;">Auto</button>
-            </div>
-          </label>
-          <label>User Name<input list="dlUser" id="userName" placeholder="N/A" /><datalist id="dlUser"></datalist></label>
-          <label>Process Name<input list="dlProcess" id="processName" placeholder="N/A" /><datalist id="dlProcess"></datalist></label>
-          <label>Department<input list="dlProcessOwner" id="processOwner" placeholder="N/A" /><datalist id="dlProcessOwner"></datalist></label>
-          <label>Process Owner<input type="text" id="processPreparedBy" placeholder="N/A" /></label>
-          <label>Process Phase<input list="dlPhase" id="processPhase" placeholder="N/A" /><datalist id="dlPhase"></datalist></label>
-          <label>Day / Week<input type="text" id="dayWeek" placeholder="N/A" /></label>
-          <label>Planned Start Date<input type="date" id="plannedStartDate" /></label>
-          <label>Actual Start Date<input type="date" id="actualStartDate" /></label>
-          <label>Planned End Date<input type="date" id="plannedEndDate" /></label>
-          <label>Actual End Date<input type="date" id="actualEndDate" /></label>
-          <label class="full">Control / Checklist Item<input type="text" id="controlItem" placeholder="N/A" /></label>
-          <label>Action Owner<input list="dlDepartment" id="department" placeholder="N/A" /><datalist id="dlDepartment"></datalist></label>
-          <label>Sub-Department<input type="text" id="subDepartment" placeholder="N/A" /></label>
-          <label>Owner<input list="dlOwner" id="owner" placeholder="N/A" /><datalist id="dlOwner"></datalist></label>
-          <label class="full">Required Evidence (link)<input type="url" id="evidence" placeholder="https://… or N/A" /></label>
-          <label class="full">Comment<textarea id="ncDescription" rows="2" placeholder="N/A"></textarea></label>
-        </div>
-
-        <h3 class="form-section">Task Performance</h3>
-        <style>
-          .task-perf-wrap{display:flex;flex-direction:column;gap:10px;padding:14px;border:1px solid #e5e7eb;border-radius:8px;background:#f9fafb;}
-          .task-perf-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
-          .task-perf-row > span:first-child{min-width:130px;font-weight:600;color:#374151;}
-          .task-perf-badge{padding:6px 16px;border-radius:999px;font-weight:700;color:#fff;background:#9ca3af;display:inline-block;}
-          .task-perf-badge.red{background:#dc2626;}
-          .task-perf-badge.yellow{background:#f59e0b;}
-          .task-perf-badge.green{background:#16a34a;}
-          .tp-btn{padding:6px 16px;border:1px solid #d1d5db;background:#fff;border-radius:6px;cursor:pointer;font-size:13px;font-weight:500;}
-          .tp-btn:hover{background:#f3f4f6;}
-          .tp-btn.active{background:#2563eb;color:#fff;border-color:#2563eb;}
-        </style>
-        <div class="grid">
-          <div class="full task-perf-wrap">
-            <div class="task-perf-row">
-              <span>Task Performance:</span>
-              <span id="taskPerfBadge" class="task-perf-badge">Not Set</span>
-            </div>
-            <div class="task-perf-row">
-              <span>Task Status:</span>
-              <button type="button" class="tp-btn" data-group="done" data-val="Done">Done</button>
-              <button type="button" class="tp-btn" data-group="done" data-val="Not Done">Not Done</button>
-            </div>
-            <div class="task-perf-row" id="tpCorrectnessRow" style="display:none;">
-              <span>Outcome:</span>
-              <button type="button" class="tp-btn" data-group="correct" data-val="Right">Right</button>
-              <button type="button" class="tp-btn" data-group="correct" data-val="Wrong">Wrong</button>
-            </div>
-            <div class="task-perf-row" id="tpTimingRow" style="display:none;">
-              <span>Timing:</span>
-              <button type="button" class="tp-btn" data-group="timing" data-val="On Time">On Time</button>
-              <button type="button" class="tp-btn" data-group="timing" data-val="Late SLA">Late SLA</button>
-            </div>
-            <input type="hidden" id="taskDone" />
-            <input type="hidden" id="taskCorrectness" />
-            <input type="hidden" id="taskTiming" />
-            <input type="hidden" id="taskPerformance" />
-          </div>
-        </div>
-        <script>
-        (function(){
-          const state = { done:'', correct:'', timing:'' };
-          const $ = id => document.getElementById(id);
-          const setBadge = (text, cls) => {
-            const b = $('taskPerfBadge');
-            b.textContent = text;
-            b.classList.remove('red','yellow','green');
-            if (cls) b.classList.add(cls);
-          };
-          const show = (id, v) => { const el = $(id); if (el) el.style.display = v ? 'flex' : 'none'; };
-          const setHidden = (id, v) => { const el = $(id); if (el) el.value = v; };
-          const clearGroup = g => document.querySelectorAll('.tp-btn[data-group="'+g+'"]').forEach(b => b.classList.remove('active'));
-
-          function update(){
-            setHidden('taskDone', state.done);
-            setHidden('taskCorrectness', state.correct);
-            setHidden('taskTiming', state.timing);
-            show('tpCorrectnessRow', state.done === 'Done');
-            show('tpTimingRow', state.done === 'Done' && state.correct === 'Right');
-            let label = 'Not Set', cls = '';
-            if (state.done === 'Not Done') { label = 'Not Done'; cls = 'red'; }
-            else if (state.done === 'Done') {
-              if (state.correct === 'Wrong') { label = 'Wrong'; cls = 'red'; }
-              else if (state.correct === 'Right') {
-                if (state.timing === 'Late SLA') { label = 'Late SLA'; cls = 'yellow'; }
-                else if (state.timing === 'On Time') { label = 'On Time'; cls = 'green'; }
-                else { label = 'Pending Timing'; }
-              } else { label = 'Pending Outcome'; }
-            }
-            setBadge(label, cls);
-            setHidden('taskPerformance', cls ? label : '');
-          }
-
-          document.addEventListener('click', e => {
-            const btn = e.target.closest('.tp-btn');
-            if (!btn) return;
-            e.preventDefault();
-            const group = btn.dataset.group;
-            const val = btn.dataset.val;
-            clearGroup(group);
-            btn.classList.add('active');
-            if (group === 'done') {
-              state.done = val;
-              if (val === 'Not Done') { state.correct=''; state.timing=''; clearGroup('correct'); clearGroup('timing'); }
-            } else if (group === 'correct') {
-              state.correct = val;
-              if (val === 'Wrong') { state.timing=''; clearGroup('timing'); }
-            } else if (group === 'timing') {
-              state.timing = val;
-            }
-            update();
-          });
-
-          function syncFromInputs(){
-            const norm = v => (!v || v === 'N/A') ? '' : v;
-            state.done = norm($('taskDone')?.value);
-            state.correct = norm($('taskCorrectness')?.value);
-            state.timing = norm($('taskTiming')?.value);
-            clearGroup('done'); clearGroup('correct'); clearGroup('timing');
-            document.querySelectorAll('.tp-btn').forEach(b => {
-              if ((b.dataset.group==='done' && b.dataset.val===state.done) ||
-                  (b.dataset.group==='correct' && b.dataset.val===state.correct) ||
-                  (b.dataset.group==='timing' && b.dataset.val===state.timing)) {
-                b.classList.add('active');
-              }
-            });
-            update();
-          }
-
-          // Sync on form reset (new record)
-          document.getElementById('recordForm')?.addEventListener('reset', () => setTimeout(syncFromInputs, 0));
-          // Poll for programmatic value changes (record edit loads values via .value = ...)
-          let last = '';
-          setInterval(() => {
-            const cur = ($('taskDone')?.value||'')+'|'+($('taskCorrectness')?.value||'')+'|'+($('taskTiming')?.value||'');
-            if (cur !== last) { last = cur; syncFromInputs(); }
-          }, 400);
-          syncFromInputs();
-        })();
-        </script>
-
-        <script>
-        // Step Number auto-generator: computes next step number for the selected Process Name.
-        // If Excel/CSV import provides a "Step No" column, its value is preserved on edit.
-        (function(){
-          function computeNext(proc){
-            const recs = window.__paRecords || [];
-            if (!proc) {
-              const nums = recs.map(r => parseInt(r.stepNumber,10)).filter(n => !isNaN(n));
-              return (nums.length ? Math.max(...nums) : 0) + 1;
-            }
-            const nums = recs
-              .filter(r => (r.processName||'').trim().toLowerCase() === proc.trim().toLowerCase())
-              .map(r => parseInt(r.stepNumber,10))
-              .filter(n => !isNaN(n));
-            return (nums.length ? Math.max(...nums) : 0) + 1;
-          }
-          window.__computeNextStepNo = computeNext;
-          const btn = document.getElementById('btnAutoStepNo');
-          const inp = document.getElementById('stepNumber');
-          const proc = document.getElementById('processName');
-          if (btn && inp) {
-            btn.addEventListener('click', () => {
-              inp.value = computeNext(proc ? proc.value : '');
-            });
-          }
-          // Auto-fill on submit if left blank AND this is a new record (no recordId)
-          const form = document.getElementById('recordForm');
-          if (form && inp) {
-            form.addEventListener('submit', () => {
-              const rid = document.getElementById('recordId');
-              if (!inp.value && (!rid || !rid.value)) {
-                inp.value = computeNext(proc ? proc.value : '');
-              }
-            }, true);
-          }
-        })();
-        </script>
-
-        <script>
-        // Auto-generate NC ID, CAPA ID, Risk ID (live, as the form is filled).
-        // Format: [ProcessInitials]-[StepNo(2d)]-[Type]-[Seq(3d)]
-        //   Type: NC | CA (corrective) | PA (preventive) | R
-        //   Sequence increments per (initials, stepNo, type) across all records.
-        function __initAutoIds(){
-          const $ = id => document.getElementById(id);
-          const FIELDS = { NC: 'ncId', CA: 'capaIdField', PA: 'capaIdField', R: 'riskId' };
-
-          function initials(proc){
-            const words = String(proc||'').trim().split(/\s+/).filter(Boolean).slice(0,2);
-            if (!words.length) return '';
-            const letters = words.map(w => w[0]).join('').toUpperCase();
-            return letters.length === 1 ? (letters + (words[0][1]||'X').toUpperCase()) : letters;
-          }
-          function pad(n, w){ return String(n).padStart(w,'0'); }
-          function capaTypeCode(){
-            const v = ($('capaType')?.value||'').trim().toLowerCase();
-            return v === 'preventive' ? 'PA' : 'CA';
-          }
-          function stepNo(){
-            const raw = parseInt($('stepNumber')?.value, 10);
-            if (!isNaN(raw)) return raw;
-            // new record with empty Step No: preview the next step number
-            if (isNew() && typeof window.__computeNextStepNo === 'function') {
-              const n = parseInt(window.__computeNextStepNo($('processName')?.value || ''), 10);
-              if (!isNaN(n)) return n;
-            }
-            return NaN;
-          }
-          function isNew(){
-            const rid = $('recordId');
-            return !rid || !rid.value;
-          }
-          function nextSeq(prefix, type){
-            const recs = window.__paRecords || [];
-            const key = prefix + '-' + type + '-';
-            const fld = FIELDS[type];
-            let max = 0;
-            recs.forEach(r => {
-              const val = String(r[fld]||'');
-              if (val.startsWith(key)) {
-                const n = parseInt(val.slice(key.length), 10);
-                if (!isNaN(n) && n > max) max = n;
-              }
-            });
-            return max + 1;
-          }
-          function genId(type){
-            const ini = initials($('processName')?.value || '');
-            const step = stepNo();
-            if (!ini || isNaN(step)) return '';
-            const prefix = ini + '-' + pad(step, 2);
-            return prefix + '-' + type + '-' + pad(nextSeq(prefix, type), 3);
-          }
-
-          function needNc(){
-            const compliance = ($('compliance')?.value||'').toLowerCase();
-            const ncType = ($('ncType')?.value||'').toLowerCase();
-            return compliance === 'non-compliant' || compliance === 'observation'
-              || (!!ncType && ncType !== 'n/a');
-          }
-          function needCapa(){ return ($('capaNeeded')?.value||'').toLowerCase() === 'yes'; }
-          function needRisk(){ return ($('riskExist')?.value||'').toLowerCase() === 'yes'; }
-
-          // Review ID: R + Review Date (YYYYMMDD) + Step No (2 digits), e.g. R-20260915-01
-          function genReviewId(){
-            const d = ($('auditDate')?.value || '').replace(/-/g, '');
-            const step = stepNo();
-            if (!/^\d{8}$/.test(d) || isNaN(step)) return '';
-            return 'R-' + d + '-' + pad(step, 2);
-          }
-
-          // Only overwrite IDs this script generated itself, never imported/saved ones.
-          function setId(el, value){
-            if (!el) return;
-            // Existing reviews from older versions can have a blank or "N/A" ID.
-            // Fill those gaps, but never replace a real saved/imported ID.
-            const current = String(el.value || '').trim();
-            const missing = !current || current.toLowerCase() === 'n/a';
-            if (!missing && !el.dataset.autoGen) return;
-            if (value) { el.value = value; el.dataset.autoGen = '1'; }
-            else if (el.dataset.autoGen) { el.value = ''; delete el.dataset.autoGen; }
-          }
-
-          function refresh(){
-            setId($('auditId'),     genReviewId());
-            setId($('ncId'),        needNc()   ? genId('NC')            : '');
-            setId($('capaIdField'), needCapa() ? genId(capaTypeCode())  : '');
-            setId($('riskId'),      needRisk() ? genId('R')             : '');
-          }
-
-          ['processName','stepNumber','auditDate','compliance','ncType','capaNeeded','capaType','riskExist']
-            .forEach(id => {
-              const el = $(id);
-              if (!el) return;
-              el.addEventListener('change', refresh);
-              el.addEventListener('input', refresh);
-            });
-          $('btnAutoStepNo')?.addEventListener('click', () => setTimeout(refresh, 0));
-
-          const form = $('recordForm');
-          if (form) {
-            // clear auto flags on reset, then re-evaluate
-            form.addEventListener('reset', () => setTimeout(() => {
-              ['auditId','ncId','capaIdField','riskId'].forEach(id => { const el = $(id); if (el) delete el.dataset.autoGen; });
-              refresh();
-            }, 0));
-            // final safety net: fill any still-empty ID right before saving
-            form.addEventListener('submit', () => {
-              refresh();
-            }, true);
-          }
-
-          // records load asynchronously and app code fills fields programmatically
-          // (no input/change events), so re-evaluate on a light interval.
-          let last = '';
-          setInterval(() => {
-            const sig = [
-              (window.__paRecords || []).length,
-              $('processName')?.value, $('stepNumber')?.value, $('auditDate')?.value,
-              $('compliance')?.value, $('ncType')?.value,
-              $('capaNeeded')?.value, $('capaType')?.value,
-              $('riskExist')?.value, $('recordId')?.value
-            ].join('|');
-            if (sig !== last) { last = sig; refresh(); }
-          }, 400);
-          refresh();
-        }
-        if (document.readyState === 'loading') {
-          document.addEventListener('DOMContentLoaded', __initAutoIds);
-        } else {
-          __initAutoIds();
-        }
-        </script>
-
-
-
-        <h3 class="form-section">NC Register</h3>
-        <div class="grid">
-          <label>Compliance Status
-            <select id="compliance">
-              <option>N/A</option><option>Compliant</option>
-              <option>Non-Compliant</option><option>Observation</option>
-            </select>
-          </label>
-          <label>NC Reason Category
-            <select id="complianceReasonCategory">
-              <option>N/A</option>
-              <option>Evidence &amp; Documentation</option>
-              <option>Process Compliance</option>
-              <option>Process Execution</option>
-              <option>SLA Adherence</option>
-            </select>
-          </label>
-          <label>NC Reason
-            <select id="complianceReason">
-              <option>N/A</option>
-            </select>
-          </label>
-          <label>NC Category
-            <select id="ncCategory">
-              <option>N/A</option><option>People</option><option>Process</option><option>Technology</option>
-            </select>
-          </label>
-          <label>NC Type
-            <select id="ncType">
-              <option>N/A</option><option>Major</option><option>Minor</option><option>Enhancement</option>
-            </select>
-          </label>
-          <label>NC ID<input type="text" id="ncId" placeholder="Auto-generated" readonly style="background:#f3f4f6;color:#374151;" /></label>
-          <label>Severity Level
-            <select id="severityLevel">
-              <option>N/A</option><option>Low</option><option>Medium</option><option>High</option><option>Critical</option>
-            </select>
-          </label>
-          <label>Action Owner<input type="text" id="ncResponsibleDept" placeholder="N/A" /></label>
-          <label>Verified By<input type="text" id="verifiedBy" placeholder="N/A" /></label>
-          <label class="full">NC Description<textarea id="ncDesc" rows="2" placeholder="N/A"></textarea></label>
-          <label class="full">Root Cause<input type="text" id="rootCause" placeholder="N/A" /></label>
-          <label>Target SLA / Days<input type="number" id="targetSla" placeholder="N/A" min="0" /></label>
-          <label>Actual SLA<input type="number" id="actualSla" placeholder="N/A" min="0" /></label>
-        </div>
-
-        <h3 class="form-section">CAPA</h3>
-        <div class="grid">
-          <label>CAPA ID<input type="text" id="capaIdField" placeholder="Auto-generated" readonly style="background:#f3f4f6;color:#374151;" /></label>
-          <label>CAPA Needed
-            <select id="capaNeeded"><option>N/A</option><option>Yes</option><option>No</option></select>
-          </label>
-          <label>CAPA Type
-            <select id="capaType">
-              <option>N/A</option><option>Corrective</option><option>Preventive</option>
-            </select>
-          </label>
-          <label>CAPA Status
-            <select id="capaStatus">
-              <option>N/A</option>
-              <option>In Progress</option>
-              <option>Pending</option>
-              <option>Closed</option>
-              <option>Cancelled</option>
-              <option>Overdue</option>
-            </select>
-          </label>
-          <label>Action Owner<input type="text" id="actionOwner" placeholder="N/A" /></label>
-          <label>Accountable<input type="text" id="accountable" placeholder="N/A" /></label>
-          <label>Start Date<input type="date" id="startDate" /></label>
-          <label>End Date<input type="date" id="endDate" /></label>
-          <label>Closure Date<input type="date" id="closureDate" /></label>
-          <label>Overdue Dates<input type="text" id="overdueDates" placeholder="e.g. 5 days" /></label>
-          <label class="full">Effectiveness Criteria<input type="text" id="effectivenessCriteria" placeholder="N/A" /></label>
-          <label>Effectiveness
-            <select id="effectiveness">
-              <option>N/A</option><option>Effective</option>
-              <option>Partially Effective</option><option>Ineffective</option>
-            </select>
-          </label>
-          <label id="rcCategoryLabel">RC Category
-            <select id="rcCategory">
-              <option>N/A</option>
-              <option>Improper Root Cause Analysis</option>
-              <option>CAPA Design Failure</option>
-              <option>CAPA Implementation Failure</option>
-              <option>Effectiveness Verification Failure</option>
-            </select>
-          </label>
-          <label id="rcSubCategoryLabel">RC Sub-Category
-            <select id="rcSubCategory">
-              <option>N/A</option>
-            </select>
-          </label>
-          <label class="full">Comments<textarea id="comments" rows="2" placeholder="N/A"></textarea></label>
-          <div class="full" style="display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:4px;">
-            <button type="button" class="btn primary" id="capaSendNotification">📧 Send Notification</button>
-          </div>
-        </div>
-
-        <h3 class="form-section">Risk</h3>
-        <div class="grid">
-          <label>Risk ID<input type="text" id="riskId" placeholder="Auto-generated" readonly style="background:#f3f4f6;color:#374151;" /></label>
-          <label>Risk Exist
-            <select id="riskExist"><option>N/A</option><option>Yes</option><option>No</option></select>
-          </label>
-          <label>Risk Type
-            <select id="riskType">
-              <option>N/A</option><option>Operational</option><option>Compliance</option>
-              <option>Financial</option><option>Reputational</option>
-            </select>
-          </label>
-          <label>Risk Level
-            <select id="riskLevel">
-              <option>N/A</option><option>High</option><option>Medium</option><option>Low</option>
-            </select>
-          </label>
-          <label>Affected Department<input type="text" id="affectedDepartment" placeholder="N/A" /></label>
-          <label>Risk Owner<input type="text" id="riskOwner" placeholder="N/A" /></label>
-          <label>Mitigation Status
-            <select id="mitigation">
-              <option>N/A</option><option>Open</option><option>Mitigated</option>
-              <option>Accepted</option><option>Closed</option>
-            </select>
-          </label>
-          <label>Linked CAPA ID<input type="text" id="linkedCapaId" placeholder="e.g. CA-001" /></label>
-          <label class="full">Control<input type="text" id="control" placeholder="N/A" /></label>
-          <label class="full">Findings / Gaps<textarea id="findings" rows="2" placeholder="N/A"></textarea></label>
-        </div>
-
-        <h3 class="form-section">Attachments</h3>
-        <p class="muted" style="margin:0 0 8px">
-          Allowed: .msg, .eml, .xlsx, .xls, .docx, .doc, .pdf · Max 10 MB per file.
-          Files are stored in Firebase Storage and shared across all devices.
-        </p>
-        <div id="dropzone" class="dropzone">
-          <p><strong>Drag &amp; drop</strong> files here, or
-            <label class="link-btn">browse<input type="file" id="fileAttach" multiple
-              accept=".msg,.eml,.xlsx,.xls,.docx,.doc,.pdf" hidden /></label>
-          </p>
-          <div id="uploadProgress" class="upload-progress" hidden>
-            <div class="bar"><div class="fill" id="uploadFill"></div></div>
-            <span id="uploadText" class="muted"></span>
-          </div>
-        </div>
-        <ul id="attachmentList" class="attach-list"></ul>
-
-        <div class="form-actions">
-          <button type="submit" class="btn primary">Save Record</button>
-          <button type="button" id="btnReset" class="btn ghost">Reset</button>
-        </div>
-      </form>
-      </div>
-    </section>
-
-    <!-- ==================== NC / RISK & CAPA (derived from Audit form) ==================== -->
-    <section id="ncrc" class="tab-panel">
-      <div class="subtabs">
-        <button class="subtab active" data-sub="sub-nc">NC Register</button>
-        <button class="subtab" data-sub="sub-capa">CAPA Register</button>
-        <button class="subtab" data-sub="sub-risk">Risk Register</button>
-      </div>
-
-      <!-- NC sub-page: table + filters -->
-      <div id="sub-nc" class="sub-panel active">
-        <div class="filters">
-          <input type="search" id="ncrcNcSearch" placeholder="Search…" />
-          <select id="ncrcNcType"><option value="">All NC Types</option><option>Major</option><option>Minor</option><option>Enhancement</option></select>
-          <select id="ncrcNcSeverity"><option value="">All Severities</option><option>Low</option><option>Medium</option><option>High</option><option>Critical</option></select>
-          <select id="ncrcNcCompliance"><option value="">All Compliance</option><option>Non-Compliant</option><option>Observation</option><option>Compliant</option></select>
-          <span class="spacer"></span>
-          <button class="btn" data-export="nc-excel">Export Excel</button>
-          <button class="btn primary" data-export="nc-pdf">Export PDF</button>
-        </div>
-        <div class="table-wrap">
-          <table id="ncrcNcTable">
-            <thead><tr>
-              <th>NC ID</th><th>Review ID</th><th>Review Date</th><th>Process</th><th>Phase</th>
-              <th>Compliance</th><th>NC Type</th><th>Severity</th><th>Category</th>
-              <th>Resp. Dept</th><th>Root Cause</th><th>Verified By</th>
-            </tr></thead>
-            <tbody></tbody>
-          </table>
-        </div>
-        <p class="muted" id="ncrcNcCount" style="margin-top:8px;"></p>
-      </div>
-
-      <!-- CAPA sub-page: kanban + table -->
-      <div id="sub-capa" class="sub-panel">
-        <div class="filters">
-          <input type="search" id="ncrcCapaSearch" placeholder="Search…" />
-          <select id="ncrcCapaType"><option value="">All CAPA Types</option><option>Corrective</option><option>Preventive</option></select>
-          <select id="ncrcCapaStatus"><option value="">All Statuses</option><option>In Progress</option><option>Pending</option><option>Closed</option><option>Cancelled</option><option>Overdue</option></select>
-          <span class="spacer"></span>
-          <button class="btn" data-export="capa-excel">Export Excel</button>
-          <button class="btn primary" data-export="capa-pdf">Export PDF</button>
-        </div>
-        <div class="kanban" id="ncrcCapaKanban"></div>
-        <div class="table-wrap">
-          <table id="ncrcCapaTable">
-            <thead><tr>
-              <th>CAPA ID</th><th>Review ID</th><th>NC ID</th><th>Process</th><th>Phase</th>
-              <th>CAPA Type</th><th>RC Category</th><th>Status</th>
-              <th>Owner</th><th>Accountable</th><th>Start</th><th>End</th><th>Effectiveness</th>
-            </tr></thead>
-            <tbody></tbody>
-          </table>
-        </div>
-        <p class="muted" id="ncrcCapaCount" style="margin-top:8px;"></p>
-      </div>
-
-      <!-- Risk sub-page: cards + full table -->
-      <div id="sub-risk" class="sub-panel">
-        <div class="filters">
-          <input type="search" id="ncrcRiskSearch" placeholder="Search…" />
-          <select id="ncrcRiskLevel"><option value="">All Risk Levels</option><option>High</option><option>Medium</option><option>Low</option></select>
-          <select id="ncrcRiskMitigation"><option value="">All Mitigation</option><option>Open</option><option>Mitigated</option><option>Accepted</option><option>Closed</option></select>
-          <span class="spacer"></span>
-          <button class="btn" data-export="risk-excel">Export Excel</button>
-          <button class="btn primary" data-export="risk-pdf">Export PDF</button>
-        </div>
-        <div class="filters">
-          <input type="search" id="ncrcRiskAuditId" placeholder="Review ID" />
-          <input type="date" id="ncrcRiskAuditDate" />
-          <input type="search" id="ncrcRiskProcessName" placeholder="Process Name" />
-          <input type="search" id="ncrcRiskProcessPhase" placeholder="Process Phase" />
-          <input type="search" id="ncrcRiskRiskId" placeholder="Risk ID" />
-          <input type="search" id="ncrcRiskLinkedCapaId" placeholder="Linked CAPA ID" />
-        </div>
-        <div class="risk-cards" id="ncrcRiskCards"></div>
-        <div class="table-wrap" style="margin-top:12px;">
-          <table id="ncrcRiskTable">
-            <thead><tr>
-              <th>Risk ID</th><th>Review ID</th><th>Review Date</th><th>Process</th><th>Phase</th>
-              <th>Risk Exist</th><th>Risk Type</th><th>Risk Level</th>
-              <th>Affected Dept</th><th>Risk Owner</th><th>Mitigation</th>
-              <th>Linked CAPA ID</th><th>Control</th><th>Findings</th>
-            </tr></thead>
-            <tbody></tbody>
-          </table>
-        </div>
-        <p class="muted" id="ncrcRiskCount" style="margin-top:8px;"></p>
-      </div>
-    </section>
-
-
-
-    <!-- ==================== DOCUMENT CONTROL ==================== -->
-    <section id="documentControl" class="tab-panel">
-      <style>
-        #documentControl .dc-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px;}
-        #documentControl .dc-kpi{background:#fff;border:1px solid #e3e8ef;border-radius:8px;padding:14px 16px;box-shadow:0 1px 3px rgba(0,0,0,.04);}
-        #documentControl .dc-kpi .lbl{font-size:11px;font-weight:700;color:#6b7280;letter-spacing:.5px;text-transform:uppercase;}
-        #documentControl .dc-kpi .val{font-size:28px;font-weight:700;margin-top:6px;color:#1f3a8a;}
-        #documentControl .dc-kpi.warn .val{color:#f59e0b;}
-        #documentControl .dc-kpi.danger .val{color:#d12027;}
-        #documentControl .dc-toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px;}
-        #documentControl .dc-toolbar input,#documentControl .dc-toolbar select{padding:8px 10px;border:1px solid #cfd6df;border-radius:6px;font-size:13px;background:#fff;}
-        #documentControl .dc-toolbar .spacer{flex:1;}
-        #documentControl table{width:100%;border-collapse:collapse;background:#fff;font-size:13px;}
-        #documentControl th,#documentControl td{padding:8px 10px;border-bottom:1px solid #eef1f5;text-align:left;vertical-align:middle;}
-        #documentControl th{font-size:11px;letter-spacing:.5px;text-transform:uppercase;color:#6b7280;background:#f8fafc;}
-        #documentControl tr:hover{background:#fafbfd;}
-        #documentControl .pill{display:inline-block;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:600;}
-        #documentControl .pill.draft{background:#e5e7eb;color:#374151;}
-        #documentControl .pill.approved{background:#d1fae5;color:#065f46;}
-        #documentControl .pill.review{background:#fef3c7;color:#92400e;}
-        #documentControl .pill.obsolete{background:#fee2e2;color:#991b1b;}
-        #documentControl .link-open{display:inline-block;padding:4px 14px;background:#d12027;color:#fff;border-radius:6px;text-decoration:none;font-size:12px;font-weight:600;}
-        #documentControl .link-open.disabled{background:#cbd5e1;pointer-events:none;}
-        /* Modal */
-        .dc-modal{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:flex-start;justify-content:center;z-index:1000;overflow-y:auto;padding:40px 16px;}
-        .dc-modal.open{display:flex;}
-        .dc-modal .box{background:#fff;border-radius:10px;width:100%;max-width:920px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.25);}
-        .dc-modal h3{margin:0 0 18px;color:#1f3a8a;}
-        .dc-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px 14px;}
-        .dc-grid label{display:flex;flex-direction:column;font-size:12px;font-weight:600;color:#374151;gap:4px;}
-        .dc-grid label.full{grid-column:1/-1;}
-        .dc-grid input,.dc-grid select,.dc-grid textarea{padding:8px 10px;border:1px solid #cfd6df;border-radius:6px;font-size:13px;font-family:inherit;}
-        .dc-grid textarea{min-height:60px;resize:vertical;}
-        .dc-grid .hint{font-weight:400;color:#6b7280;font-size:11px;margin-top:-2px;}
-        .dc-modal .actions{display:flex;justify-content:flex-end;gap:8px;margin-top:20px;}
-        .dc-modal .actions .btn-cancel{background:#fff;color:#374151;border:1px solid #cfd6df;padding:8px 18px;border-radius:6px;cursor:pointer;font-weight:600;}
-        .dc-modal .actions .btn-save{background:#d12027;color:#fff;border:none;padding:8px 18px;border-radius:6px;cursor:pointer;font-weight:600;}
-        #documentControl .row-overdue{background:#fef2f2;}
-        #documentControl .row-due{background:#fffbeb;}
-      </style>
-
-      <div class="dc-kpis">
-        <div class="dc-kpi"><div class="lbl">Total</div><div class="val" id="dcKpiTotal">0</div></div>
-        <div class="dc-kpi"><div class="lbl">Active (Approved)</div><div class="val" id="dcKpiApproved">0</div></div>
-        <div class="dc-kpi"><div class="lbl">Under Review</div><div class="val" id="dcKpiReview">0</div></div>
-        <div class="dc-kpi"><div class="lbl">Obsolete</div><div class="val" id="dcKpiObsolete">0</div></div>
-        <div class="dc-kpi warn"><div class="lbl">Due in 30 Days</div><div class="val" id="dcKpiDue">0</div></div>
-        <div class="dc-kpi danger"><div class="lbl">Overdue Review</div><div class="val" id="dcKpiOverdue">0</div></div>
-      </div>
-
-      <div class="dc-toolbar">
-        <input type="search" id="dcSearch" placeholder="Search by ID or name…" style="min-width:220px;" />
-        <select id="dcFilterDept"><option value="">Department Name</option></select>
-        <select id="dcFilterType">
-          <option value="">Document Type</option>
-          <option>Policy</option><option>Procedure</option><option>Process</option><option>Work Instruction</option>
-          <option>Form</option><option>Manual</option><option>Record</option><option>Other</option>
-        </select>
-        <select id="dcFilterStatus">
-          <option value="">All Statuses</option>
-          <option>Draft</option><option>Under Review</option><option>Approved</option><option>Obsolete</option>
-        </select>
-        <select id="dcSort">
-          <option value="review">Sort: Review Date</option>
-          <option value="updated">Sort: Updated</option>
-          <option value="name">Sort: Name</option>
-          <option value="id">Sort: Doc ID</option>
-        </select>
-        <div class="spacer"></div>
-        <button id="dcBtnAdd" class="btn primary">+ Add Document</button>
-      </div>
-
-      <div class="table-wrap">
-        <table id="dcTable">
-          <thead>
-            <tr>
-              <th>Doc ID</th><th>Name</th><th>Dept</th><th>Type</th><th>Ver</th>
-              <th>Owner</th><th>Status</th><th>Effective</th><th>Review</th>
-              <th>Updated</th><th>Link</th><th>Files</th><th>Actions</th>
-            </tr>
-          </thead>
-          <tbody><tr><td colspan="12" style="text-align:center;color:#6b7280;padding:24px">No documents yet.</td></tr></tbody>
-        </table>
-      </div>
-    </section>
-
-    <!-- ==================== DOCUMENT MODAL ==================== -->
-    <div id="dcModal" class="dc-modal" role="dialog" aria-modal="true">
-      <div class="box">
-        <h3 id="dcModalTitle">Add Document</h3>
-        <form id="dcForm">
-          <div class="dc-grid">
-            <label>Document ID *<input name="docId" required maxlength="60" /></label>
-            <label>Document Name *<input name="name" required maxlength="200" /></label>
-            <label>Department<input name="department" /></label>
-
-            <label>Document Type
-              <select name="type">
-                <option>Policy</option><option>Procedure</option><option>Process</option><option>Work Instruction</option>
-                <option>Form</option><option>Manual</option><option>Record</option><option>Other</option>
-              </select>
-            </label>
-            <label>Version *<input name="version" required value="1.0" /></label>
-            <label>Document Owner<input name="owner" /></label>
-
-            <label>Effective Date<input type="date" name="effectiveDate" /></label>
-            <label>Review Date<input type="date" name="reviewDate" /></label>
-            <label>Status
-              <select name="status">
-                <option>Draft</option><option>Under Review</option><option>Approved</option><option>Obsolete</option>
-              </select>
-            </label>
-
-            <label class="full">Shared Document URL
-              <span class="hint">(SharePoint / OneDrive / Google Drive — optional if you upload files below)</span>
-              <input type="url" name="link" placeholder="https://…" />
-            </label>
-
-            <label class="full">Attach Files
-              <span class="hint">PDF, Excel, Word, Email (.msg / .eml) — multiple files allowed. Stored locally in your browser.</span>
-              <input type="file" id="dcFileInput" multiple
-                     accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.msg,.eml,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,message/rfc822" />
-              <div id="dcFileList" style="margin-top:6px;display:flex;flex-direction:column;gap:4px;font-weight:400;"></div>
-            </label>
-
-            <label>Prepared By<input name="preparedBy" /></label>
-            <label>Reviewed By<input name="reviewedBy" /></label>
-            <label>Approved By<input name="approvedBy" /></label>
-
-            <label>Approval Date<input type="date" name="approvalDate" /></label>
-
-            <label class="full">Change Description<textarea name="changeDescription"></textarea></label>
-            <label class="full">Remarks<textarea name="remarks"></textarea></label>
-          </div>
-          <div class="actions">
-            <button type="button" class="btn-cancel" id="dcCancel">Cancel</button>
-            <button type="submit" class="btn-save" id="dcSaveBtn">Create Document</button>
-          </div>
-        </form>
-      </div>
-    </div>
-
-    <!-- ==================== HISTORY / FILES MODAL ==================== -->
-    <div id="dcHistoryModal" class="dc-modal" role="dialog" aria-modal="true">
-      <div class="box" style="max-width:760px;">
-        <h3 id="dcHistoryTitle">Version History</h3>
-        <div id="dcHistoryBody" style="max-height:60vh;overflow:auto;"></div>
-        <div class="actions"><button type="button" class="btn-cancel" id="dcHistoryClose">Close</button></div>
-      </div>
-    </div>
-
-    <!-- ==================== FILE VIEWER MODAL ==================== -->
-    <div id="dcViewerModal" class="dc-modal" role="dialog" aria-modal="true">
-      <div class="box" style="max-width:960px; padding:0; display:flex; flex-direction:column; max-height:90vh;">
-        <div style="padding:16px 24px; border-bottom:1px solid #e3e8ef; display:flex; align-items:center; justify-content:space-between; background:#f8fafc; border-radius:10px 10px 0 0;">
-          <h3 id="dcViewerTitle" style="margin:0; color:#1f3a8a; font-size:16px;">View File</h3>
-          <button type="button" class="btn-cancel" id="dcViewerClose" style="padding:6px 14px; font-size:13px;">Close</button>
-        </div>
-        <div id="dcViewerBody" style="flex:1; overflow:auto; padding:16px; background:#f5f7fa; min-height:300px; display:flex; align-items:center; justify-content:center;">
-          <p style="color:#6b7280;">Loading preview…</p>
-        </div>
-        <div id="dcViewerFooter" style="padding:12px 24px; border-top:1px solid #e3e8ef; display:flex; justify-content:flex-end; gap:8px; background:#fff; border-radius:0 0 10px 10px;">
-          <a id="dcViewerDownload" class="btn primary" style="text-decoration:none; display:inline-block; padding:8px 18px; border-radius:6px; font-weight:600; font-size:13px;" href="#" download>Download</a>
-        </div>
-      </div>
-    </div>
-
-    <!-- ==================== PROCESS INVENTORY ==================== -->
-    <section id="processInventory" class="tab-panel">
-      <style>
-        #processInventory .pi-toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px;}
-        #processInventory .pi-toolbar input,
-        #processInventory .pi-toolbar select{padding:6px 10px;border:1px solid #cfd6df;border-radius:6px;font-size:13px;min-height:34px;background:#fff;}
-        #processInventory .pi-toolbar #piSearch{flex:1;min-width:220px;}
-        #processInventory .pi-table-wrap{overflow:auto;background:#fff;border:1px solid #e3e8ef;border-radius:8px;}
-        #processInventory table{width:100%;border-collapse:collapse;font-size:13px;}
-        #processInventory th,#processInventory td{padding:8px 10px;border-bottom:1px solid #eef1f5;text-align:left;vertical-align:top;}
-        #processInventory th{background:#f5f7fa;color:#1f3a8a;font-weight:700;position:sticky;top:0;}
-        #processInventory tr:hover td{background:#fafbfc;}
-        #processInventory #piPager{display:flex;gap:10px;align-items:center;justify-content:flex-end;padding:10px 4px;}
-        #processInventory .pi-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;margin:12px 0;}
-        #processInventory .pi-form-grid label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:#374151;font-weight:600;}
-        #processInventory .pi-form-grid label.full{grid-column:1 / -1;}
-        #processInventory .pi-form-grid input{padding:7px 10px;border:1px solid #cfd6df;border-radius:6px;font-size:13px;}
-        #processInventory .btn{padding:6px 14px;border:1px solid #cfd6df;background:#fff;border-radius:6px;cursor:pointer;font-weight:600;font-size:13px;}
-        #processInventory .btn.primary{background:#1f3a8a;color:#fff;border-color:#1f3a8a;}
-        #processInventory .btn.danger{background:#d12027;color:#fff;border-color:#d12027;}
-        /* Sub-tabs */
-        #processInventory .pi-subtabs{display:flex;gap:6px;border-bottom:1px solid #e3e8ef;margin-bottom:14px;}
-        #processInventory .pi-subtab{padding:8px 16px;border:none;background:transparent;cursor:pointer;font-weight:600;font-size:13px;color:#6b7280;border-bottom:2px solid transparent;}
-        #processInventory .pi-subtab.active{color:#1f3a8a;border-bottom-color:#1f3a8a;}
-        #processInventory .pi-subpanel{display:none;}
-        #processInventory .pi-subpanel.active{display:block;}
-
-        /* Dashboard */
-        #piDash .kpi-row{display:grid;grid-template-columns:repeat(7,1fr);gap:12px;margin-bottom:16px;}
-        @media(max-width:1200px){#piDash .kpi-row{grid-template-columns:repeat(4,1fr);}}
-        @media(max-width:640px){#piDash .kpi-row{grid-template-columns:repeat(2,1fr);}}
-        #piDash .kpi-card{background:#fff;border:1px solid #e3e8ef;border-radius:12px;padding:14px;display:flex;gap:12px;align-items:center;box-shadow:0 1px 2px rgba(15,23,42,.04);transition:transform .2s;}
-        #piDash .kpi-card:hover{transform:translateY(-2px);box-shadow:0 4px 12px rgba(15,23,42,.08);}
-        #piDash .kpi-ico{width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
-        #piDash .kpi-meta{flex:1;min-width:0;}
-        #piDash .kpi-meta .lbl{font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.3px;}
-        #piDash .kpi-meta .val{font-size:22px;font-weight:700;color:#0f172a;line-height:1.2;}
-        #piDash .kpi-meta .sub{font-size:11px;color:#6b7280;margin-top:2px;}
-        #piDash .grid-1{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;margin-bottom:16px;}
-        #piDash .grid-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:16px;}
-        #piDash .grid-3{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,2fr) minmax(0,1fr);gap:12px;margin-bottom:16px;}
-        #piDash .grid-4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px;}
-        @media(max-width:1100px){#piDash .grid-2,#piDash .grid-3,#piDash .grid-4{grid-template-columns:1fr;}}
-        #piDash .card{background:#fff;border:1px solid #e3e8ef;border-radius:12px;padding:14px;box-shadow:0 1px 2px rgba(15,23,42,.04);min-width:0;overflow:hidden;}
-        #piDash .card h3{margin:0 0 10px;font-size:13px;color:#1f3a8a;font-weight:700;display:flex;justify-content:space-between;align-items:center;}
-        #piDash .card canvas{max-height:260px;}
-        #piDash .mini-table{width:100%;font-size:12px;border-collapse:collapse;table-layout:fixed;}
-        #piDash .mini-table th{text-align:left;color:#6b7280;font-weight:600;padding:6px 4px;border-bottom:1px solid #eef1f5;text-transform:uppercase;font-size:10px;letter-spacing:.3px;}
-        #piDash .mini-table th:first-child{width:68%;}
-        #piDash .mini-table th:nth-child(2){width:20%;}
-        #piDash .mini-table th:nth-child(3){width:12%;}
-        #piDash .mini-table td{padding:6px 4px;border-bottom:1px solid #f4f5f7;color:#374151;overflow-wrap:anywhere;word-break:break-word;}
-        #piDash .mini-table tr:last-child td{border-bottom:none;}
-        #piDash .insight-list{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:10px;}
-        #piDash .insight-list li{padding:8px 10px;background:#f8fafc;border-left:3px solid #1f3a8a;border-radius:4px;font-size:12px;color:#374151;line-height:1.4;}
-        #piDash .full-report-btn{width:100%;margin-top:12px;padding:10px;background:#1f3a8a;color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:13px;}
-        #piDash .full-report-btn:hover{background:#152a66;}
-      </style>
-
-      <div class="pi-subtabs" role="tablist">
-        <button class="pi-subtab active" data-pi-sub="search" role="tab">Inventory Searching</button>
-        <button class="pi-subtab" data-pi-sub="dash" role="tab">Process Inventory Dashboard</button>
-      </div>
-
-      <!-- === Sub-panel: Inventory Searching === -->
-      <div class="pi-subpanel active" id="piPanelSearch">
-        <div class="pi-toolbar">
-          <input id="piSearch" placeholder="Search title, code, type, department, company…" />
-          <select id="piFilterCompany"><option value="">Company Name</option></select>
-          <select id="piFilterDept"><option value="">Department Name</option></select>
-          <select id="piFilterType"><option value="">Document Type</option></select>
-          <input id="piFilterIssue" placeholder="Issue No" style="width:110px;" />
-          <input id="piFilterFrom" type="date" title="Issue Date from" />
-          <input id="piFilterTo"   type="date" title="Issue Date to" />
-          <button class="btn" id="piClearFilters">Clear</button>
-          <button class="btn primary" id="piAddBtn">+ Add Process</button>
-          <button class="btn" id="piImportBtn">Import Excel</button>
-          <button class="btn" id="piExportBtn">Export Excel</button>
-          <button class="btn danger" id="piBulkDelBtn" style="display:none;">Delete Selected (<span id="piBulkDelCount">0</span>)</button>
-          <button class="btn" id="piSelectAllFiltered" style="display:none;">Select all <span id="piSelectAllFilteredCount"></span> filtered</button>
-          <input type="file" id="piImportFile" accept=".xlsx,.xls" style="display:none;" />
-        </div>
-
-        <div class="pi-table-wrap">
-          <table id="piTable">
-            <thead>
-              <tr>
-                <th style="width:32px;"><input type="checkbox" id="piSelectAll" title="Select all on this page" /></th>
-                <th data-pi-sort="documentTitle">Document Title</th>
-                <th data-pi-sort="documentType">Document Type</th>
-                <th data-pi-sort="documentCode">Document Code</th>
-                <th data-pi-sort="issueNo">Issue No</th>
-                <th data-pi-sort="issueDate">Issue Date</th>
-                <th data-pi-sort="expiryDate">Expiry Date</th>
-                <th>Company 1</th>
-                <th>Company 2</th>
-                <th>Company 3</th>
-                <th>Company 4</th>
-                <th data-pi-sort="department">Department</th>
-                <th data-pi-sort="subDepartment">Sub-Department</th>
-                <th style="width:120px;">Actions</th>
-              </tr>
-            </thead>
-            <tbody id="piTableBody">
-              <tr><td colspan="14" style="text-align:center;color:#6b7280;padding:24px;">Loading processes…</td></tr>
-            </tbody>
-          </table>
-        </div>
-        <div id="piPager"></div>
-
-        <datalist id="piTypeList"></datalist>
-        <datalist id="piDeptList"></datalist>
-        <datalist id="piCompanyDatalist"></datalist>
-      </div>
-
-      <!-- === Sub-panel: Dashboard === -->
-      <div class="pi-subpanel" id="piPanelDash">
-        <div id="piDash">
-          <!-- Dashboard filters -->
-          <div class="pi-toolbar" style="margin-bottom:14px;">
-            <input id="pidSearch" placeholder="Search title, code, company, department…" />
-            <select id="pidCompany"><option value="">Company Name</option></select>
-            <select id="pidDept"><option value="">Department Name</option></select>
-            <select id="pidType"><option value="">Document Type</option></select>
-            <select id="pidIssue"><option value="">Issue Number</option></select>
-            <input id="pidFrom" type="date" title="Issue Date from" />
-            <input id="pidTo"   type="date" title="Issue Date to" />
-            <button class="btn" id="pidClear">Clear Filters</button>
-          </div>
-
-          <!-- KPI cards -->
-          <div class="kpi-row">
-            <div class="kpi-card"><div class="kpi-ico" style="background:#e0edff;color:#1f3a8a;">📄</div><div class="kpi-meta"><div class="lbl">Total Processes</div><div class="val" id="pidKpiTotal">0</div><div class="sub">All documented processes</div></div></div>
-            <div class="kpi-card"><div class="kpi-ico" style="background:#dcfce7;color:#166534;">🏢</div><div class="kpi-meta"><div class="lbl">Total Companies</div><div class="val" id="pidKpiCompanies">0</div><div class="sub">Companies using processes</div></div></div>
-            <div class="kpi-card"><div class="kpi-ico" style="background:#ede9fe;color:#5b21b6;">🏛️</div><div class="kpi-meta"><div class="lbl">Total Departments</div><div class="val" id="pidKpiDepts">0</div><div class="sub">Across all companies</div></div></div>
-            <div class="kpi-card"><div class="kpi-ico" style="background:#fef3c7;color:#92400e;">📁</div><div class="kpi-meta"><div class="lbl">Document Types</div><div class="val" id="pidKpiTypes">0</div><div class="sub" id="pidKpiTypesSub">Procedure, Policy, SOP…</div></div></div>
-            <div class="kpi-card"><div class="kpi-ico" style="background:#fee2e2;color:#991b1b;">🤝</div><div class="kpi-meta"><div class="lbl">Shared Processes</div><div class="val" id="pidKpiShared">0 (0%)</div><div class="sub" id="pidKpiSharedSub">shared by 2 or more companies</div></div></div>
-          </div>
-
-          <!-- Analytics charts -->
-          <div class="grid-4">
-            <div class="card"><h3>Processes by Company</h3><canvas id="pidChartCompany"></canvas></div>
-            <div class="card"><h3>Document Type Distribution</h3><canvas id="pidChartType"></canvas></div>
-            <div class="card"><h3>Processes by Department</h3><canvas id="pidChartDept"></canvas></div>
-            <div class="card"><h3>Document Revision Status</h3><canvas id="pidChartIssue"></canvas></div>
-          </div>
-
-          <!-- Management KPIs -->
-          <div class="grid-1">
-            <div class="card">
-              <h3>Dashboard Insights</h3>
-              <ul class="insight-list" id="pidInsights"><li>Loading insights…</li></ul>
-              <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                <button class="full-report-btn" id="pidExportPdf" style="background:#2563eb;color:#fff;border-color:#2563eb;">Export to PDF</button>
-              </div>
-            </div>
-          </div>
-
-
-        </div>
-      </div>
-    </section>
-
-    <!-- Process Inventory: Add / Edit modal -->
-    <div id="piModal" class="detail-overlay" style="display:none;">
-      <div class="detail-card" style="max-width:640px;">
-        <h3 id="piModalTitle">Add Process</h3>
-        <form id="piForm">
-          <div class="pi-form-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;">
-            <label class="full" style="grid-column:1 / -1;">Document Title
-              <input name="documentTitle" required />
-            </label>
-            <label>Document Type
-              <input name="documentType" required list="piTypeList" />
-            </label>
-            <label>Document Code
-              <input name="documentCode" required />
-            </label>
-            <label>Issue No
-              <input name="issueNo" required />
-            </label>
-            <label>Issue Date
-              <input name="issueDate" type="date" required />
-            </label>
-            <label class="full" style="grid-column:1 / -1;">Department
-              <input name="department" required list="piDeptList" />
-            </label>
-          </div>
-
-          <div style="border-top:1px solid #eef1f5;padding-top:10px;">
-            <div style="font-weight:600;color:#374151;font-size:13px;margin-bottom:6px;">Companies</div>
-            <div id="piCompanyList" style="margin-bottom:8px;"></div>
-            <div style="display:flex;gap:6px;">
-              <input id="piNewCompany" placeholder="Add a company…" list="piCompanyDatalist"
-                     style="flex:1;padding:6px 10px;border:1px solid #cfd6df;border-radius:6px;font-size:13px;" />
-              <button type="button" class="btn" id="piAddCompanyBtn">Add</button>
-            </div>
-          </div>
-
-          <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;">
-            <button type="button" class="btn" id="piCancelBtn">Cancel</button>
-            <button type="submit" class="btn primary">Save</button>
-          </div>
-        </form>
-      </div>
-    </div>
-
-    <!-- Process Inventory: Full companies popup -->
-    <div id="piCompaniesModal" class="detail-overlay" style="display:none;">
-      <div class="detail-card" style="max-width:480px;">
-        <h3 id="piCompaniesFullTitle">Companies</h3>
-        <ul id="piCompaniesFullList" style="padding-left:20px;margin:8px 0;"></ul>
-        <div style="text-align:right;"><button class="btn" id="piCompaniesClose">Close</button></div>
-      </div>
-    </div>
-
-    <!-- ==================== ADMIN ==================== -->
-    <section id="admin" class="tab-panel" data-admin-only style="display:none;">
-      <div class="toolbar">
-        <input type="email" id="newUserEmail" placeholder="user@company.com" />
-        <button id="btnAddUser" class="btn primary">Approve User</button>
-      </div>
-
-      <div class="table-wrap" style="margin-bottom:16px;">
-        <h3 class="form-section">Approved Users</h3>
-        <table id="usersTable">
-          <thead>
-            <tr><th>Email</th><th>Status</th><th>Actions</th></tr>
-          </thead>
-          <tbody>
-            <tr><td colspan="3" style="text-align:center;color:#6b7280;padding:16px">Loading users…</td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div class="table-wrap">
-        <h3 class="form-section">Audit Trail</h3>
-        <table id="auditTable">
-          <thead>
-            <tr><th>Time</th><th>User</th><th>Action</th><th>Details</th></tr>
-          </thead>
-          <tbody>
-            <tr><td colspan="4" style="text-align:center;color:#6b7280;padding:16px">Loading audit trail…</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-
-    <!-- ==================== GAP ANALYSIS ==================== -->
-    <section id="gapAnalysis" class="tab-panel">
-      <div class="subtabs">
-        <button class="subtab active" data-gasub="gapAssessment">Gap Assessment</button>
-        <button class="subtab" data-gasub="gapAssessmentDashboard">Gap Assessment Dashboard</button>
-        <button class="subtab" data-gasub="processValidation">Process Validation Interviews</button>
-        <button class="subtab" data-gasub="gapDashboard">Process Validation Dashboard</button>
-      </div>
-
-      <div id="gapAssessment" class="ga-sub-panel active">
-        <div class="filters" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0;">
-          <label class="btn primary" style="cursor:pointer;">
-            Import Excel
-            <input type="file" id="gaImportFile" accept=".xlsx,.xls" style="display:none;" />
-          </label>
-          <button id="gaAddRow" class="btn">+ Add Row</button>
-          <button id="gaExport" class="btn ghost">Export to Excel</button>
-          <button id="gaClear" class="btn ghost" style="color:#b91c1c;">Clear All</button>
-          <input type="search" id="gaSearch" placeholder="Search…" style="margin-left:auto;min-width:220px;" />
-          <select id="gaFilterGapId" data-ga-filter="gapId" style="min-width:130px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;"><option value="">All Gap ID</option></select>
-          <select id="gaFilterProcessName" data-ga-filter="processName2" style="min-width:160px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;"><option value="">All Process Name</option></select>
-          <select id="gaFilterProcessDesc" data-ga-filter="processDesc" style="min-width:190px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;"><option value="">All Process Description</option></select>
-          <select id="gaFilterProcessOwner" data-ga-filter="processOwner" style="min-width:160px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;"><option value="">All Process Owner</option></select>
-          <select id="gaFilterExists" data-ga-filter="exists" style="min-width:120px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;"><option value="">All Exists?</option></select>
-          <select id="gaFilterSeverity" data-ga-filter="severity" style="min-width:130px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;"><option value="">All Severity</option></select>
-          <button id="gaResetFilters" class="btn ghost">Reset Filters</button>
-        </div>
-
-        <style>
-          #gaTable td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-          #gaTable td:last-child { overflow: visible; text-overflow: clip; white-space: nowrap; }
-          #gaTable td .ga-edit, #gaTable td .ga-save, #gaTable td .ga-cancel, #gaTable td .ga-del { white-space: nowrap; }
-        </style>
-        <div style="overflow-x:auto;border:1px solid #cbd5e1;border-radius:8px;background:#fff;">
-          <table id="gaTable" style="width:100%;border-collapse:collapse;font-size:13px;min-width:1430px;table-layout:fixed;">
-            <thead style="background:#1f3a8a;color:#fff;">
-              <tr>
-                <th style="padding:10px;text-align:left;width:100px;border-right:1px solid #3b82f6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Gap ID</th>
-                <th style="padding:10px;text-align:left;width:140px;border-right:1px solid #3b82f6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Process Name</th>
-                <th style="padding:10px;text-align:left;width:220px;border-right:1px solid #3b82f6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Process Description</th>
-                <th style="padding:10px;text-align:left;width:140px;border-right:1px solid #3b82f6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Process Owner</th>
-                <th style="padding:10px;text-align:center;width:80px;border-right:1px solid #3b82f6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Exists?</th>
-                <th style="padding:10px;text-align:center;width:110px;border-right:1px solid #3b82f6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Severity</th>
-                <th style="padding:10px;text-align:left;width:180px;border-right:1px solid #3b82f6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Recommended Action</th>
-                <th style="padding:10px;text-align:left;width:150px;border-right:1px solid #3b82f6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Comment</th>
-                <th style="padding:10px;text-align:center;width:230px;overflow:visible;text-overflow:clip;white-space:nowrap;">Actions</th>
-              </tr>
-            </thead>
-            <tbody id="gaTbody"></tbody>
-          </table>
-        </div>
-        <div id="gaEmpty" style="text-align:center;padding:24px;color:#6b7280;">
-          No rows yet. Import an Excel file or add a row to get started.
-        </div>
-      </div>
-
-      <!-- ==================== PROCESS VALIDATION INTERVIEWS ==================== -->
-      <div id="processValidation" class="ga-sub-panel" style="display:none;">
-        <style>
-          #pvTable td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-          #pvTable td:last-child { overflow: visible; text-overflow: clip; white-space: nowrap; }
-          #pvTable td .pv-edit, #pvTable td .pv-save, #pvTable td .pv-cancel, #pvTable td .pv-del { white-space: nowrap; }
-        </style>
-        <div class="filters" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0;">
-          <label class="btn primary" style="cursor:pointer;">
-            Import Excel
-            <input type="file" id="pvImportFile" accept=".xlsx,.xls" style="display:none;" />
-          </label>
-          <button id="pvAddRow" class="btn">+ Add Row</button>
-          <button id="pvExport" class="btn ghost">Export to Excel</button>
-          <button id="pvClear" class="btn ghost" style="color:#b91c1c;">Clear All</button>
-          <button id="pvRemoveDuplicates" class="btn ghost">Remove Duplicates</button>
-          <input type="search" id="pvSearch" placeholder="Search…" style="margin-left:auto;min-width:220px;" />
-          <select id="pvFilterDocTitle" data-pv-filter="docTitle" style="min-width:170px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;"><option value="">All Document Title</option></select>
-          <select id="pvFilterDocType" data-pv-filter="docType" style="min-width:145px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;"><option value="">All Document Type</option></select>
-          <select id="pvFilterDocCode" data-pv-filter="docCode" style="min-width:145px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;"><option value="">All Document Code</option></select>
-          <select id="pvFilterProcessOwner" data-pv-filter="processOwner" style="min-width:155px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;"><option value="">All Process Owner</option></select>
-          <select id="pvFilterCompanyName" data-pv-filter="companyName" style="min-width:155px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;"><option value="">All Company Name</option></select>
-          <button id="pvResetFilters" class="btn ghost">Reset Filters</button>
-        </div>
-
-        <div style="overflow-x:auto;border:1px solid #cbd5e1;border-radius:8px;background:#fff;">
-          <table id="pvTable" style="width:100%;border-collapse:collapse;font-size:13px;min-width:1215px;table-layout:fixed;">
-            <thead style="background:#1f3a8a;color:#fff;">
-              <tr>
-                <th style="padding:10px;text-align:left;width:170px;border-right:1px solid #3b82f6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Document Title</th>
-                <th style="padding:10px;text-align:left;width:95px;border-right:1px solid #3b82f6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Document Type</th>
-                <th style="padding:10px;text-align:left;width:85px;border-right:1px solid #3b82f6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Document Code</th>
-                <th style="padding:10px;text-align:left;width:115px;border-right:1px solid #3b82f6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Process Owner</th>
-                <th style="padding:10px;text-align:left;width:115px;border-right:1px solid #3b82f6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Company Name</th>
-                <th style="padding:10px;text-align:center;width:105px;border-right:1px solid #3b82f6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Process Exists?</th>
-                <th style="padding:10px;text-align:center;width:110px;border-right:1px solid #3b82f6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Evidence Exists?</th>
-                <th style="padding:10px;text-align:center;width:100px;border-right:1px solid #3b82f6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Automated?</th>
-                <th style="padding:10px;text-align:left;width:145px;border-right:1px solid #3b82f6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Status</th>
-                <th style="padding:10px;text-align:left;width:170px;border-right:1px solid #3b82f6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Comments</th>
-                <th style="padding:10px;text-align:center;width:160px;overflow:visible;text-overflow:clip;white-space:nowrap;">Actions</th>
-              </tr>
-            </thead>
-            <tbody id="pvTbody"></tbody>
-          </table>
-        </div>
-        <div id="pvEmpty" style="text-align:center;padding:24px;color:#6b7280;">
-          No rows yet. Import an Excel file (Document Title, Document Type, Document Code, Process Owner, Company Name) or add a row to get started.
-        </div>
-      </div>
-
-      <!-- ==================== PROCESS VALIDATION DASHBOARD ==================== -->
-      <div id="gapDashboard" class="ga-sub-panel" style="display:none;">
-        <div class="filters" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0;">
-          <strong style="color:#1f3a8a;font-size:15px;">Process Validation Interviews — Analytics</strong>
-          <span id="gdCount" style="color:#6b7280;font-size:13px;"></span>
-          <button id="gdRefresh" class="btn ghost" style="margin-left:auto;">Refresh</button>
-          <button id="gdExportPdf" class="btn ghost" data-export-pdf="gdCharts" data-pdf-title="Process Validation Dashboard" data-pdf-file="process-validation-dashboard.pdf">📄 Export to PDF</button>
-        </div>
-
-        <div id="gdEmpty" style="display:none;text-align:center;padding:24px;color:#6b7280;border:1px dashed #cbd5e1;border-radius:8px;background:#fff;">
-          No Process Validation Interviews data yet. Add rows in the Process Validation Interviews tab to see the dashboard.
-        </div>
-
-        <div id="gdCharts" style="display:block;">
-          <!-- KPI CARDS -->
-          <div id="gdKpis" style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:16px;">
-            <div class="gd-kpi" style="background:#fff;border:1px solid #cbd5e1;border-radius:10px;padding:18px;display:flex;align-items:center;gap:16px;">
-              <div style="width:64px;height:64px;border-radius:50%;background:#16a34a;display:flex;align-items:center;justify-content:center;color:#fff;font-size:28px;flex-shrink:0;">✅</div>
-              <div style="flex:1;text-align:center;">
-                <div style="color:#16a34a;font-size:13px;font-weight:700;letter-spacing:.5px;">PROCESS EXISTS</div>
-                <div id="gdPePct" style="color:#16a34a;font-size:34px;font-weight:800;line-height:1;margin:4px 0;">0%</div>
-                <div style="font-size:12px;"><span style="color:#16a34a;font-weight:600;">Yes: <span id="gdPeYes">0%</span></span> &nbsp;|&nbsp; <span style="color:#dc2626;font-weight:600;">No: <span id="gdPeNo">0%</span></span></div>
-                <div style="color:#6b7280;font-size:12px;margin-top:2px;">of total processes</div>
-              </div>
-            </div>
-            <div class="gd-kpi" style="background:#fff;border:1px solid #cbd5e1;border-radius:10px;padding:18px;display:flex;align-items:center;gap:16px;">
-              <div style="width:64px;height:64px;border-radius:50%;background:#1d4ed8;display:flex;align-items:center;justify-content:center;color:#fff;font-size:28px;flex-shrink:0;">📁</div>
-              <div style="flex:1;text-align:center;">
-                <div style="color:#1d4ed8;font-size:13px;font-weight:700;letter-spacing:.5px;">EVIDENCE EXISTS</div>
-                <div id="gdEvPct" style="color:#1d4ed8;font-size:34px;font-weight:800;line-height:1;margin:4px 0;">0%</div>
-                <div style="font-size:12px;"><span style="color:#1d4ed8;font-weight:600;">Yes: <span id="gdEvYes">0%</span></span> &nbsp;|&nbsp; <span style="color:#dc2626;font-weight:600;">No: <span id="gdEvNo">0%</span></span></div>
-                <div style="color:#6b7280;font-size:12px;margin-top:2px;">of total processes</div>
-              </div>
-            </div>
-            <div class="gd-kpi" style="background:#fff;border:1px solid #cbd5e1;border-radius:10px;padding:18px;display:flex;align-items:center;gap:16px;">
-              <div style="width:64px;height:64px;border-radius:50%;background:#7c3aed;display:flex;align-items:center;justify-content:center;color:#fff;font-size:28px;flex-shrink:0;">⚙️</div>
-              <div style="flex:1;text-align:center;">
-                <div style="color:#7c3aed;font-size:13px;font-weight:700;letter-spacing:.5px;">AUTOMATED</div>
-                <div id="gdAuPct" style="color:#7c3aed;font-size:34px;font-weight:800;line-height:1;margin:4px 0;">0%</div>
-                <div style="font-size:12px;"><span style="color:#7c3aed;font-weight:600;">Yes: <span id="gdAuYes">0%</span></span> &nbsp;|&nbsp; <span style="color:#dc2626;font-weight:600;">No: <span id="gdAuNo">0%</span></span></div>
-                <div style="color:#6b7280;font-size:12px;margin-top:2px;">of total processes</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- 100% STACKED BAR TABLE -->
-          <div style="background:#fff;border:1px solid #cbd5e1;border-radius:10px;padding:20px;margin-bottom:16px;">
-            <div style="text-align:center;font-weight:700;color:#0f172a;font-size:20px;">Performance by Process Owner – 100% Stacked Bar Chart</div>
-            <div style="text-align:center;color:#6b7280;font-size:13px;margin-bottom:14px;">(Percentage of Processes)</div>
-            <div style="text-align:right;font-size:13px;margin-bottom:10px;">
-              <span style="display:inline-block;width:14px;height:14px;background:#16a34a;vertical-align:middle;margin-right:4px;"></span>Yes
-              &nbsp;&nbsp;
-              <span style="display:inline-block;width:14px;height:14px;background:#dc2626;vertical-align:middle;margin-right:4px;"></span>No
-            </div>
-            <div style="overflow-x:auto;">
-              <table id="gdStackTable" class="gd-stack" style="width:100%;border-collapse:collapse;font-size:14px;table-layout:fixed;">
-                <colgroup>
-                  <col style="width:100px;min-width:100px;max-width:100px;">
-                  <col style="width:auto;">
-                  <col style="width:auto;">
-                  <col style="width:auto;">
-                </colgroup>
-                <thead>
-                  <tr style="background:#0f172a;color:#fff;">
-                    <th style="padding:10px 8px;text-align:left;font-size:12px;white-space:normal;word-break:break-word;line-height:1.2;">PROCESS OWNER</th>
-                    <th style="padding:10px 8px;font-size:12px;">PROCESS EXISTS (%)</th>
-                    <th style="padding:10px 8px;font-size:12px;">EVIDENCE EXISTS (%)</th>
-                    <th style="padding:10px 8px;font-size:12px;">AUTOMATED (%)</th>
-                  </tr>
-                </thead>
-                <tbody id="gdStackBody"></tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ==================== GAP ASSESSMENT DASHBOARD ==================== -->
-      <div id="gapAssessmentDashboard" class="ga-sub-panel" style="display:none;">
-        <div class="filters" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0;">
-          <strong style="color:#1f3a8a;font-size:15px;">Gap Assessment — Analytics & Executive View</strong>
-          <span id="gadCount" style="color:#6b7280;font-size:13px;"></span>
-          <button id="gadRefresh" class="btn ghost" style="margin-left:auto;">Refresh</button>
-          <button id="gadExportPdf" class="btn ghost" data-export-pdf="gadContent" data-pdf-title="Gap Assessment Dashboard" data-pdf-file="gap-assessment-dashboard.pdf">📄 Export to PDF</button>
-        </div>
-
-        <div id="gadEmpty" style="display:none;text-align:center;padding:24px;color:#6b7280;border:1px dashed #cbd5e1;border-radius:8px;background:#fff;">
-          No Gap Assessment data yet. Add rows in the Gap Assessment tab to see the dashboard.
-        </div>
-
-        <div id="gadContent">
-          <!-- KPI ROW: 4 cards -->
-          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;">
-            <div class="gad-kpi" style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:14px;box-shadow:0 1px 2px rgba(0,0,0,0.04);display:flex;align-items:center;gap:10px;">
-              <div style="width:40px;height:40px;border-radius:10px;background:#eef2ff;display:flex;align-items:center;justify-content:center;font-size:20px;">📄</div>
-              <div>
-                <div style="font-size:10px;font-weight:700;color:#6b7280;letter-spacing:.5px;">TOTAL PROCESSES</div>
-                <div id="gadKpiTotal" style="font-size:22px;font-weight:800;color:#111827;line-height:1.1;">0</div>
-                <div style="font-size:11px;color:#6b7280;">All gap records</div>
-              </div>
-            </div>
-            <div class="gad-kpi" style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:14px;box-shadow:0 1px 2px rgba(0,0,0,0.04);display:flex;align-items:center;gap:10px;">
-              <div style="width:40px;height:40px;border-radius:10px;background:#fee2e2;display:flex;align-items:center;justify-content:center;font-size:20px;">⚠️</div>
-              <div>
-                <div style="font-size:10px;font-weight:700;color:#6b7280;letter-spacing:.5px;">MISSING PROCESSES</div>
-                <div id="gadKpiMissing" style="font-size:22px;font-weight:800;color:#dc2626;line-height:1.1;">0</div>
-                <div id="gadKpiMissingSub" style="font-size:11px;color:#6b7280;">0% of total</div>
-              </div>
-            </div>
-            <div class="gad-kpi" style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:14px;box-shadow:0 1px 2px rgba(0,0,0,0.04);display:flex;align-items:center;gap:10px;">
-              <div style="width:40px;height:40px;border-radius:10px;background:#fee2e2;display:flex;align-items:center;justify-content:center;font-size:20px;">🛡️</div>
-              <div>
-                <div style="font-size:10px;font-weight:700;color:#6b7280;letter-spacing:.5px;">CRITICAL GAPS</div>
-                <div id="gadKpiCritical" style="font-size:22px;font-weight:800;color:#dc2626;line-height:1.1;">0</div>
-                <div style="font-size:11px;color:#6b7280;">Critical severity</div>
-              </div>
-            </div>
-            <div class="gad-kpi" style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:14px;box-shadow:0 1px 2px rgba(0,0,0,0.04);display:flex;align-items:center;gap:10px;">
-              <div style="width:40px;height:40px;border-radius:10px;background:#dcfce7;display:flex;align-items:center;justify-content:center;font-size:20px;">✅</div>
-              <div>
-                <div style="font-size:10px;font-weight:700;color:#6b7280;letter-spacing:.5px;">COMPLIANCE RATE</div>
-                <div id="gadKpiCompliance" style="font-size:22px;font-weight:800;color:#16a34a;line-height:1.1;">0%</div>
-                <div style="font-size:11px;color:#6b7280;">Processes exist</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Section 1: Gap Risk Heatmap -->
-          <div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:10px;margin-bottom:16px;">
-            <h3 style="margin:0 0 4px;color:#1f3a8a;font-size:13px;font-weight:800;">1. GAP RISK HEATMAP BY PROCESS OWNER</h3>
-            <div style="color:#6b7280;font-size:11px;margin-bottom:8px;">Count of missing processes by severity</div>
-            <div style="overflow-x:auto;">
-              <table id="gadHeatTable" style="width:100%;border-collapse:collapse;font-size:11px;">
-                <thead>
-                  <tr style="background:#f8fafc;color:#0f172a;">
-                    <th style="padding:5px;text-align:left;border:1px solid #e5e7eb;">OWNER</th>
-                    <th style="padding:5px;border:1px solid #e5e7eb;">CRIT</th>
-                    <th style="padding:5px;border:1px solid #e5e7eb;">HIGH</th>
-                    <th style="padding:5px;border:1px solid #e5e7eb;">MED</th>
-                    <th style="padding:5px;border:1px solid #e5e7eb;">LOW</th>
-                    <th style="padding:5px;border:1px solid #e5e7eb;">TOTAL</th>
-                  </tr>
-                </thead>
-                <tbody id="gadHeatBody"></tbody>
-              </table>
-            </div>
-          </div>
-
-          <!-- Section 2: Missing Processes + Key Insights -->
-          <div style="display:grid;grid-template-columns:1fr 0.75fr;gap:12px;margin-bottom:16px;align-items:start;">
-            <div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:14px;">
-              <h3 style="margin:0 0 4px;color:#1f3a8a;font-size:14px;font-weight:800;">2. MISSING PROCESSES BY PROCESS OWNER</h3>
-              <div style="color:#6b7280;font-size:12px;margin-bottom:10px;">Sorted by missing count (High to Low)</div>
-              <div style="position:relative;height:300px;"><canvas id="gadChart3"></canvas></div>
-            </div>
-            <div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:14px;">
-              <h3 style="margin:0 0 10px;color:#1f3a8a;font-size:14px;font-weight:800;">💡 KEY INSIGHTS</h3>
-              <div id="gadInsights" style="display:flex;flex-direction:column;gap:10px;"></div>
-            </div>
-          </div>
-
-        </div>
-      </div>
-    </section>
-
-    <!-- ==================== PROCESS MAP GENERATOR ==================== -->
-    <section id="processMap" class="tab-panel">
-      <style>
-        #processMap .pm-panel{background:#fff;border:1px solid #e3e8ef;border-radius:8px;padding:16px;margin-bottom:16px;}
-        #processMap .pm-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;}
-        #processMap .pm-row > div{flex:1;min-width:200px;}
-        #processMap label{display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:4px;}
-        #processMap input[type=text]{width:100%;padding:7px 10px;border:1px solid #cfd6df;border-radius:6px;font-size:13px;}
-        #processMap textarea{width:100%;height:200px;font-family:Consolas,monospace;font-size:12px;padding:8px;border:1px solid #cfd6df;border-radius:6px;resize:vertical;}
-        #processMap .pm-btn{padding:8px 16px;border:1px solid #cfd6df;background:#fff;border-radius:6px;cursor:pointer;font-weight:600;font-size:13px;margin-right:8px;}
-        #processMap .pm-btn.primary{background:#1f3a8a;color:#fff;border-color:#1f3a8a;}
-        #processMap .pm-btn:hover{opacity:.9;}
-        #processMap .pm-hint{font-size:11px;color:#6b7280;margin-top:4px;}
-        #processMap #pmMapWrap{overflow:auto;background:#fff;border:1px solid #e3e8ef;border-radius:8px;padding:12px;}
-        #processMap #pmMap{display:block;background:#fff;}
-      </style>
-      <div class="pm-panel">
-        <div class="pm-row">
-          <div><label>Process Title</label><input id="pmTitle" type="text" placeholder="Enter process title"></div>
-          <div><label>Process No.</label><input id="pmNo" type="text" placeholder="e.g. MD-PS003"></div>
-          <div><label>Version</label><input id="pmVer" type="text" placeholder="e.g. 01"></div>
-        </div>
-        <label>Upload Excel with columns: Process ID, Process Name, Process No, Version, Step ID, Step Name, Step Type, Swimlane, Sequence, Parent Step, Next Step(s), Branch Label, Annotation, Shape (optional: Previous Step(s)). Legacy TSV paste still supported.</label>
-        <textarea id="pmData" autocomplete="off" placeholder="Optional: paste legacy TSV rows here, or use Upload Excel (.xlsx)."></textarea>
-        <div class="pm-hint">Tip: Upload the .xlsx directly. When the file contains multiple Process IDs, a selector will appear above the map.</div>
-        <div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
-          <button class="pm-btn primary" id="pmGenerate">Generate Process Map</button>
-          <label class="pm-btn" style="display:inline-block;margin:0;">
-            Upload Excel (.xlsx)
-            <input type="file" id="pmExcelFile" accept=".xlsx,.xls" style="display:none;" />
-          </label>
-          <button class="pm-btn" id="pmDownloadPdf">Export PDF</button>
-          <button class="pm-btn" id="pmDownloadPng">Download PNG</button>
-          <button class="pm-btn" id="pmDownloadSvg">Download SVG</button>
-          <button class="pm-btn" id="pmDownloadVsdx">Export Visio (.vdx)</button>
-        </div>
-      </div>
-      <div id="pmMapWrap"><svg id="pmMap"></svg></div>
-    </section>
-  </main>
-
-
-  <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script src="findings-engine.js?v=20260609-1"></script>
-  <script type="module" src="app.js?v=20261015-dashboard-search-filters"></script>
-  <script type="module" src="nc-risk-capa.js?v=20260527-multi"></script>
-  <script type="module" src="document-control.js?v=20260608-1"></script>
-  <script type="module" src="process-inventory.js?v=20260705-7"></script>
-  <script src="process-inventory-dashboard.js?v=20260705-8"></script>
-  <script type="module" src="gap-analysis.js?v=20260712-3"></script>
-  <script type="module" src="process-validation.js?v=20260712-1"></script>
-  <script type="module" src="process-validation-dashboard.js?v=20260712-1"></script>
-  <script type="module" src="gap-assessment-dashboard.js?v=20260712-3"></script>
-  <script src="process-map.js?v=20260715-v3"></script>
-
-  <script>
-  // Export-to-PDF handler (shared for dashboard sub-pages)
-  document.addEventListener('click', async (ev) => {
-    const btn = ev.target.closest('[data-export-pdf]');
-    if (!btn) return;
-    ev.preventDefault();
-    const targetId = btn.getAttribute('data-export-pdf');
-    const title = btn.getAttribute('data-pdf-title') || 'Dashboard';
-    const filename = btn.getAttribute('data-pdf-file') || 'dashboard.pdf';
-    const target = document.getElementById(targetId);
-    if (!target) { alert('Nothing to export.'); return; }
-    if (!window.html2canvas || !window.jspdf) { alert('PDF libraries not loaded.'); return; }
-    const originalText = btn.textContent;
-    btn.textContent = 'Generating PDF…';
-    btn.disabled = true;
-    try {
-      // Give charts a tick to settle
-      await new Promise(r => setTimeout(r, 100));
-      const canvas = await html2canvas(target, {
-        backgroundColor: '#ffffff',
-        scale: 2,
-        useCORS: true,
-        windowWidth: target.scrollWidth,
-        windowHeight: target.scrollHeight
+/* Compliance & Risk Tracker — Firestore + Firebase Storage backend
+   Records: Firestore collection "compliance_records"
+   Attachments: Firebase Storage at attachments/{recordId}/{attachmentId}_{filename}
+                Metadata (name, size, url, path) stored on the record.
+*/
+import * as firebase from "./firebase.js";
+
+const firebaseApi = (() => {
+  const mod = firebase && typeof firebase === "object" ? firebase : {};
+  const def = mod.default && typeof mod.default === "object" ? mod.default : {};
+  const globalFb = typeof window !== "undefined" && window.firebase && typeof window.firebase === "object"
+    ? window.firebase
+    : {};
+  return { ...globalFb, ...def, ...mod };
+})();
+
+const {
+  db,
+  storage,
+  auth,
+  collection,
+  doc,
+  setDoc,
+  getDoc,
+  addDoc,
+  deleteDoc,
+  onSnapshot,
+  writeBatch,
+  serverTimestamp,
+  query,
+  orderBy,
+  limit,
+  ref,
+  uploadBytes,
+  getDownloadURL,
+  deleteObject,
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+  sendPasswordResetEmail,
+} = firebaseApi;
+
+const ADMIN_EMAILS = Array.isArray(firebaseApi.ADMIN_EMAILS) ? firebaseApi.ADMIN_EMAILS : [];
+const VIEWER_EMAILS = (Array.isArray(firebaseApi.VIEWER_EMAILS) ? firebaseApi.VIEWER_EMAILS : [])
+  .map(e => String(e).trim().toLowerCase())
+  .filter(Boolean);
+const safeCall = (fn) => {
+  try { return fn(); } catch (_) { return null; }
+};
+const authInstance = auth
+  || safeCall(() => typeof firebaseApi.getAuth === "function" ? firebaseApi.getAuth() : null)
+  || safeCall(() => typeof firebaseApi.auth === "function" ? firebaseApi.auth() : null)
+  || (firebaseApi.auth && typeof firebaseApi.auth === "object" ? firebaseApi.auth : null)
+  || safeCall(() => typeof window !== "undefined" && window.auth && typeof window.auth === "object" ? window.auth : null);
+
+function observeAuthState(handler) {
+  if (typeof onAuthStateChanged === "function" && authInstance) {
+    return onAuthStateChanged(authInstance, handler);
+  }
+  if (authInstance && typeof authInstance.onAuthStateChanged === "function") {
+    return authInstance.onAuthStateChanged(handler);
+  }
+  console.error("Firebase auth listener unavailable");
+  return () => {};
+}
+function signInUser(email, password) {
+  const cleanEmail = String(email || "").trim();
+  if (typeof signInWithEmailAndPassword === "function" && authInstance) {
+    return signInWithEmailAndPassword(authInstance, cleanEmail, password);
+  }
+  if (authInstance && typeof authInstance.signInWithEmailAndPassword === "function") {
+    return authInstance.signInWithEmailAndPassword(cleanEmail, password);
+  }
+  throw new Error("Login is not configured correctly. Firebase email sign-in helper is missing.");
+}
+function signOutUser() {
+  if (typeof signOut === "function" && authInstance) {
+    return signOut(authInstance);
+  }
+  if (authInstance && typeof authInstance.signOut === "function") {
+    return authInstance.signOut();
+  }
+  return Promise.resolve();
+}
+async function sendResetEmail(email) {
+  const cleanEmail = String(email || "").trim().toLowerCase();
+  if (!cleanEmail) {
+    throw new Error("Please enter your email address.");
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+    throw new Error("That email address is not valid.");
+  }
+  if (!authInstance) {
+    throw new Error("Password reset is unavailable because Firebase Authentication did not load.");
+  }
+  if (typeof sendPasswordResetEmail === "function") {
+    await sendPasswordResetEmail(authInstance, cleanEmail);
+    return;
+  }
+  if (typeof authInstance.sendPasswordResetEmail === "function") {
+    await authInstance.sendPasswordResetEmail(cleanEmail);
+    return;
+  }
+  throw new Error("Password reset is not configured correctly. Export sendPasswordResetEmail from firebase.js.");
+}
+async function getApprovedUserDoc(email) {
+  if (typeof getDoc === "function" && typeof doc === "function" && db) {
+    return getDoc(doc(db, "approved_users", email));
+  }
+  const compatDocRef = safeCall(() => db && typeof db.collection === "function"
+    ? db.collection("approved_users").doc(email)
+    : null);
+  if (compatDocRef && typeof compatDocRef.get === "function") {
+    return compatDocRef.get();
+  }
+  return null;
+}
+
+// Current session info — populated by auth gate at bottom of file
+window.__session = { user: null, email: null, isAdmin: false, isViewer: false };
+
+/* ===== Dashboard-only (limited access) users ===== */
+const VIEWER_ALLOWED_TABS = ["dashboard", "gapAnalysis"];
+const VIEWER_ALLOWED_GASUB = ["gapAssessmentDashboard", "gapDashboard"];
+function isViewerOnly() { return !!(window.__session && window.__session.isViewer); }
+
+/* Always land on the Home tab (used right after a successful login) */
+function goToHomeTab() {
+  const homeTab = document.querySelector('.tab[data-tab="home"]');
+  const homePanel = document.getElementById("home");
+  if (!homeTab || !homePanel) return false;
+
+  // Use the same navigation path as a real click. This is important because
+  // the tab handler may perform additional work beyond toggling CSS classes.
+  homeTab.click();
+
+  // Keep a direct fallback so Home is still visible if another listener
+  // stops the synthetic click or the markup is initialized asynchronously.
+  document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+  document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+  homeTab.classList.add("active");
+  homePanel.classList.add("active");
+  return true;
+}
+window.__goToHomeTab = goToHomeTab;
+function applyViewerRestrictions(on) {
+  document.querySelectorAll(".tab[data-tab]").forEach(t => {
+    const allowed = !on || VIEWER_ALLOWED_TABS.includes(t.dataset.tab);
+    t.style.display = allowed ? "" : "none";
+  });
+  document.querySelectorAll(".subtab[data-gasub]").forEach(b => {
+    const allowed = !on || VIEWER_ALLOWED_GASUB.includes(b.dataset.gasub);
+    b.style.display = allowed ? "" : "none";
+  });
+  if (on) {
+    const dash = document.querySelector('.tab[data-tab="dashboard"]');
+    if (dash) dash.click();
+    const gaBtn = document.querySelector('.subtab[data-gasub="gapAssessmentDashboard"]');
+    if (gaBtn && !gaBtn.classList.contains("active")) gaBtn.click();
+    const dashTabBtn = document.querySelector('.tab[data-tab="dashboard"]');
+    if (dashTabBtn) dashTabBtn.click();
+  }
+}
+// Block any navigation attempt to restricted areas (capture phase)
+document.addEventListener("click", (e) => {
+  if (!isViewerOnly()) return;
+  const tab = e.target.closest && e.target.closest(".tab[data-tab]");
+  if (tab && !VIEWER_ALLOWED_TABS.includes(tab.dataset.tab)) {
+    e.preventDefault(); e.stopPropagation(); return;
+  }
+  const ga = e.target.closest && e.target.closest(".subtab[data-gasub]");
+  if (ga && !VIEWER_ALLOWED_GASUB.includes(ga.dataset.gasub)) {
+    e.preventDefault(); e.stopPropagation();
+  }
+}, true);
+
+function currentUser() { return window.__session.user; }
+function currentEmail() { return window.__session.email; }
+function isAdmin() { return window.__session.isAdmin; }
+function lockUserNameField(emailOverride) {
+  const email = emailOverride || currentEmail() || "";
+  const unEl = document.getElementById("userName");
+  if (!unEl) return;
+
+  if (email) unEl.value = email;
+  unEl.dataset.lockedEmail = email;
+  unEl.setAttribute("readonly", "readonly");
+  unEl.readOnly = true;
+  unEl.setAttribute("disabled", "disabled");
+  unEl.disabled = true;
+  unEl.setAttribute("aria-readonly", "true");
+  unEl.setAttribute("tabindex", "-1");
+  unEl.removeAttribute("list");
+  unEl.style.background = "#f3f4f6";
+  unEl.style.color = "#6b7280";
+  unEl.style.cursor = "not-allowed";
+  unEl.style.pointerEvents = "none";
+  unEl.title = "Auto-filled from your login email — cannot be changed";
+
+  if (!unEl.dataset.locked) {
+    unEl.dataset.locked = "1";
+    const enforce = (ev) => {
+      const lockedEmail = currentEmail() || unEl.dataset.lockedEmail || "";
+      if (lockedEmail) unEl.value = lockedEmail;
+      if (ev?.cancelable) ev.preventDefault();
+      return false;
+    };
+    ["beforeinput", "input", "change", "keydown", "paste", "drop", "cut"]
+      .forEach(type => unEl.addEventListener(type, enforce, true));
+    unEl.addEventListener("focus", () => unEl.blur(), true);
+  }
+}
+async function writeAudit(action, recordId, extra) {
+  try {
+    await addDoc(collection(db, "audit_log"), {
+      action,                                  // "create" | "update" | "delete" | "clear_all" | "user_approve" | "user_revoke"
+      recordId: recordId || null,
+      userEmail: currentEmail() || "(unknown)",
+      userUid: currentUser()?.uid || null,
+      at: serverTimestamp(),
+      ...(extra || {})
+    });
+  } catch (e) { console.warn("audit failed", e); }
+}
+window.__writeAudit = writeAudit;
+
+(function () {
+  "use strict";
+
+  const COLLECTION = "compliance_records";
+  const NA = "N/A";
+  const MAX_FILE_BYTES = 10 * 1024 * 1024;
+  const ALLOWED_EXT = ["msg","eml","xlsx","xls","docx","doc","pdf"];
+
+  const FIELDS = [
+    { id: "auditDate",      label: "Review Date",           kind: "raw"  },
+    { id: "auditId",        label: "Review ID",             kind: "raw"  },
+    { id: "stepNumber",     label: "Step No",              kind: "raw"  },
+    { id: "userName",       label: "User Name",            kind: "text" },
+    { id: "processName",    label: "Process Name",         kind: "text" },
+    { id: "processOwner",   label: "Department",           kind: "text" },
+    { id: "processPreparedBy", label: "Process Owner",     kind: "raw" },
+    { id: "processPhase",   label: "Process Phase",        kind: "text" },
+    { id: "dayWeek",        label: "Day/Week",             kind: "raw"  },
+    { id: "plannedStartDate", label: "Planned Start Date", kind: "raw"  },
+    { id: "actualStartDate",  label: "Actual Start Date",  kind: "raw"  },
+    { id: "plannedEndDate",   label: "Planned End Date",   kind: "raw"  },
+    { id: "actualEndDate",    label: "Actual End Date",    kind: "raw"  },
+    { id: "controlItem",    label: "Control / Checklist",  kind: "raw"  },
+    { id: "department",     label: "Action Owner",         kind: "text" },
+    { id: "subDepartment",  label: "Sub-Department",       kind: "text" },
+    { id: "owner",          label: "Owner",                kind: "text" },
+    { id: "evidence",       label: "Required Evidence",    kind: "raw"  },
+    { id: "targetSla",      label: "Target SLA",           kind: "raw"  },
+    { id: "actualSla",      label: "Actual SLA",           kind: "raw"  },
+    { id: "taskDone",        label: "Task Status",          kind: "raw"  },
+    { id: "taskCorrectness", label: "Task Outcome",         kind: "raw"  },
+    { id: "taskTiming",      label: "Task Timing",          kind: "raw"  },
+    { id: "taskPerformance", label: "Task Performance",     kind: "raw"  },
+    { id: "compliance",     label: "Compliance Status",    kind: "raw"  },
+    { id: "complianceReasonCategory", label: "NC Reason Category", kind: "raw" },
+    { id: "complianceReason", label: "NC Reason",          kind: "raw"  },
+    { id: "ncCategory",     label: "NC Category",          kind: "raw"  },
+    { id: "ncType",         label: "NC Type",              kind: "raw"  },
+    { id: "ncId",           label: "NC ID",                kind: "raw"  },
+    { id: "severityLevel",  label: "Severity Level",       kind: "raw"  },
+    { id: "ncResponsibleDept", label: "Action Owner",      kind: "raw" },
+    { id: "verifiedBy",     label: "Verified By",          kind: "raw"  },
+    { id: "ncDesc",         label: "NC Description",       kind: "raw"  },
+    { id: "rootCause",      label: "Root Cause",           kind: "raw"  },
+    { id: "ncDescription",  label: "Comment",              kind: "raw"  },
+    { id: "riskId",         label: "Risk ID",              kind: "raw"  },
+    { id: "riskExist",      label: "Risk Exist",           kind: "raw"  },
+    { id: "riskType",       label: "Risk Type",            kind: "raw"  },
+    { id: "riskLevel",      label: "Risk Level",           kind: "raw"  },
+    { id: "affectedDepartment", label: "Affected Department", kind: "raw" },
+    { id: "riskOwner",      label: "Risk Owner",           kind: "raw"  },
+    { id: "mitigation",     label: "Mitigation Status",    kind: "raw"  },
+    { id: "linkedCapaId",   label: "Linked CAPA ID",       kind: "raw"  },
+    { id: "control",        label: "Control",              kind: "raw"  },
+    { id: "findings",       label: "Findings / Gaps",      kind: "raw"  },
+    { id: "capaNeeded",     label: "CAPA Needed",          kind: "raw"  },
+    { id: "capaIdField",    label: "CAPA ID",              kind: "raw"  },
+    { id: "capaType",       label: "CAPA Type",            kind: "raw"  },
+    { id: "rcCategory",     label: "RC Category",          kind: "raw"  },
+    { id: "rcSubCategory",  label: "RC Sub-Category",      kind: "raw"  },
+    { id: "capaStatus",     label: "CAPA Status",          kind: "raw"  },
+    { id: "actionOwner",    label: "Action Owner",         kind: "raw"  },
+    { id: "accountable",    label: "Accountable",          kind: "raw"  },
+    { id: "startDate",      label: "Start Date",           kind: "raw"  },
+    { id: "endDate",        label: "End Date",             kind: "raw"  },
+    { id: "closureDate",    label: "Closure Date",         kind: "raw"  },
+    { id: "overdueDates",   label: "Overdue Dates",        kind: "raw"  },
+    { id: "effectivenessCriteria", label: "Effectiveness Criteria", kind: "raw" },
+    { id: "effectiveness",  label: "Effectiveness",        kind: "raw"  },
+    { id: "comments",       label: "Comments",             kind: "raw"  },
+  ];
+
+  let records = [];
+  let pendingAttachments = []; // {id,name,type,size,uploadedAt, file?, path?, url?}
+  let removedAttachments = []; // storage paths to delete on save
+  const charts = {};
+  const colRef = collection(db, COLLECTION);
+
+  /* ---------- Helpers ---------- */
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  const titleCase = s => s.toLowerCase().replace(/\s+/g, " ").trim()
+    .replace(/\b\w/g, c => c.toUpperCase());
+  function normalize(value, kind) {
+    if (value == null) return NA;
+    const v = String(value).trim();
+    if (!v) return NA;
+    if (kind === "text") return titleCase(v);
+    return v.replace(/\s+/g, " ");
+  }
+  function formatBytes(n) {
+    if (n < 1024) return n + " B";
+    if (n < 1024 * 1024) return (n / 1024).toFixed(1) + " KB";
+    return (n / 1024 / 1024).toFixed(2) + " MB";
+  }
+  function fileExt(name) {
+    const m = /\.([^.]+)$/.exec(name || "");
+    return m ? m[1].toLowerCase() : "";
+  }
+  function mimeForExt(ext) {
+    const map = {
+      pdf:  "application/pdf",
+      doc:  "application/msword",
+      docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      xls:  "application/vnd.ms-excel",
+      xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      msg:  "application/vnd.ms-outlook",
+      eml:  "message/rfc822"
+    };
+    return map[ext] || "application/octet-stream";
+  }
+  function iconClass(ext) {
+    if (ext === "pdf") return "pdf";
+    if (ext === "doc" || ext === "docx") return "doc";
+    if (ext === "xls" || ext === "xlsx") return "xls";
+    if (ext === "msg" || ext === "eml") return "eml";
+    return "";
+  }
+  function iconLabel(ext) { return (ext || "?").toUpperCase().slice(0,4); }
+  function toast(msg) {
+    const el = document.getElementById("toast");
+    el.textContent = msg;
+    el.classList.add("show");
+    clearTimeout(toast._t);
+    toast._t = setTimeout(() => el.classList.remove("show"), 2200);
+  }
+  function badgeClass(field, value) {
+    const v = String(value);
+    if (field === "compliance") {
+      if (v === "Compliant") return "green";
+      if (v === "Non-Compliant") return "red";
+      if (v === "Observation") return "amber";
+    }
+    if (field === "riskLevel") {
+      if (v === "Low") return "green";
+      if (v === "Medium") return "amber";
+      if (v === "High") return "red";
+    }
+    if (field === "riskExist" || field === "capaNeeded") {
+      if (v === "Yes") return "red";
+      if (v === "No")  return "green";
+    }
+    if (field === "mitigation") {
+      if (v === "Closed" || v === "Mitigated") return "green";
+      if (v === "Open") return "red";
+      if (v === "Accepted") return "amber";
+    }
+    if (field === "effectiveness") {
+      if (v === "Effective") return "green";
+      if (v === "Partially Effective") return "amber";
+      if (v === "Ineffective") return "red";
+    }
+    if (field === "severityLevel") {
+      if (v === "Low") return "green";
+      if (v === "Medium") return "amber";
+      if (v === "High") return "red";
+      if (v === "Critical") return "red";
+    }
+    if (field === "capaStatus") {
+      if (v === "Closed") return "green";
+      if (v === "In Progress") return "blue";
+      if (v === "Pending") return "amber";
+      if (v === "Cancelled") return "gray";
+      if (v === "Overdue") return "red";
+    }
+    return "gray";
+  }
+  const escHtml = s => String(s ?? "")
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+
+  /* ---------- Tabs ---------- */
+  document.querySelectorAll(".tab[data-tab]").forEach(tab => {
+    tab.addEventListener("click", () => {
+      const panel = document.getElementById(tab.dataset.tab);
+      if (!panel) return;
+      document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+      document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+      tab.classList.add("active");
+      panel.classList.add("active");
+      if (tab.dataset.tab === "dashboard") renderDashboard();
+      if (tab.dataset.tab === "audit") { renderRecords(); setTimeout(() => lockUserNameField(), 0); }
+    });
+  });
+
+  /* ---------- Audit sub-tabs (Form / Records) ---------- */
+  document.querySelectorAll('#audit .subtab').forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll('#audit .subtab').forEach(b => b.classList.remove("active"));
+      document.querySelectorAll('#audit .sub-panel').forEach(p => p.classList.remove("active"));
+      btn.classList.add("active");
+      document.getElementById(btn.dataset.sub).classList.add("active");
+      if (btn.dataset.sub === "records") renderRecords();
+      if (btn.dataset.sub === "form") setTimeout(() => lockUserNameField(), 0);
+    });
+  });
+
+  /* ---------- Dashboard sub-tabs (Findings / Risk) ---------- */
+  document.querySelectorAll('#dashboard .subtab[data-dashsub]').forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll('#dashboard .subtab[data-dashsub]').forEach(b => b.classList.remove("active"));
+      document.querySelectorAll('#dashboard .dash-sub-panel').forEach(p => { p.style.display = "none"; });
+      btn.classList.add("active");
+      const target = document.getElementById(btn.dataset.dashsub);
+      if (target) target.style.display = "";
+    });
+  });
+
+  /* ---------- Datalists ---------- */
+  function fillDataList(id, values) {
+    const dl = document.getElementById(id);
+    if (!dl) return;
+    dl.innerHTML = [...new Set(values.filter(v => v && v !== NA))]
+      .sort().map(v => `<option value="${v.replace(/"/g,'&quot;')}">`).join("");
+  }
+  function updateDataLists() {
+    fillDataList("dlUser",          records.map(r => r.userName));
+    fillDataList("dlProcess",       records.map(r => r.processName));
+    fillDataList("dlProcessOwner",  records.map(r => r.processOwner));
+    fillDataList("dlPhase",         records.map(r => r.processPhase));
+    fillDataList("dlDepartment",    records.map(r => r.department));
+    fillDataList("dlSubDepartment", records.map(r => r.subDepartment));
+    fillDataList("dlOwner",         records.map(r => r.owner));
+    const dsel = document.getElementById("filterDept");
+    if (dsel) {
+      const dcur = Array.from(dsel.selectedOptions).map(o => o.value);
+      const depts2 = [...new Set(records.map(r => r.processOwner).filter(v => v && v !== NA))].sort();
+      dsel.innerHTML = depts2.map(v => `<option ${dcur.includes(v)?'selected':''}>${v.replace(/"/g,'&quot;')}</option>`).join("");
+      if (dsel._msRefresh) dsel._msRefresh();
+    }
+    const sel = document.getElementById("filterDepartment");
+    const cur = Array.from(sel.selectedOptions).map(o => o.value);
+    const deps = [...new Set(records.map(r => r.department).filter(v => v && v !== NA))].sort();
+    sel.innerHTML = deps.map(v => `<option ${cur.includes(v)?'selected':''}>${v}</option>`).join("");
+    if (sel._msRefresh) sel._msRefresh();
+    const psel = document.getElementById("filterProcess");
+    if (psel) {
+      const pcur = Array.from(psel.selectedOptions).map(o => o.value);
+      const procs = [...new Set(records.map(r => r.processName).filter(v => v && v !== NA))].sort();
+      psel.innerHTML = procs.map(v => `<option ${pcur.includes(v)?'selected':''}>${v.replace(/"/g,'&quot;')}</option>`).join("");
+      if (psel._msRefresh) psel._msRefresh();
+    }
+    const posel = document.getElementById("filterProcessOwner");
+    if (posel) {
+      const pocur = Array.from(posel.selectedOptions).map(o => o.value);
+      const owners = [...new Set(records.map(r => r.processPreparedBy).filter(v => v && v !== NA))].sort();
+      posel.innerHTML = owners.map(v => `<option ${pocur.includes(v)?'selected':''}>${v.replace(/"/g,'&quot;')}</option>`).join("");
+      if (posel._msRefresh) posel._msRefresh();
+    }
+    const rpsel = document.getElementById("recFilterProcess");
+    if (rpsel) {
+      const rpcur = Array.from(rpsel.selectedOptions).map(o => o.value);
+      const rprocs = [...new Set(records.map(r => r.processName).filter(v => v && v !== NA))].sort();
+      rpsel.innerHTML = rprocs.map(v => `<option ${rpcur.includes(v)?'selected':''}>${v.replace(/"/g,'&quot;')}</option>`).join("");
+      initMultiSelect(rpsel);
+      if (rpsel._msRefresh) rpsel._msRefresh();
+    }
+  }
+
+  /* ---------- Attachments (staged in form, uploaded on save) ---------- */
+  function isAllowed(file) {
+    return ALLOWED_EXT.includes(fileExt(file.name));
+  }
+  function handleFiles(files) {
+    const list = Array.from(files);
+    if (!list.length) return;
+    for (const file of list) {
+      if (!isAllowed(file)) { toast(`Unsupported file type: ${file.name}`); continue; }
+      if (file.size > MAX_FILE_BYTES) { toast(`${file.name} exceeds 10 MB limit`); continue; }
+      pendingAttachments.push({
+        id: uid(),
+        name: file.name,
+        type: file.type || "",
+        size: file.size,
+        uploadedAt: new Date().toISOString(),
+        file,         // pending upload
+        url: null,
+        path: null
       });
+    }
+    renderAttachmentList();
+  }
+  function renderAttachmentList() {
+    const ul = document.getElementById("attachmentList");
+    if (!pendingAttachments.length) { ul.innerHTML = ""; return; }
+    ul.innerHTML = pendingAttachments.map(a => {
+      const ext = fileExt(a.name);
+      const date = a.uploadedAt ? new Date(a.uploadedAt).toLocaleString() : "";
+      const status = a.file ? " · pending upload" : "";
+      const viewBtn = a.url
+        ? `<a class="btn sm" href="${escHtml(a.url)}" target="_blank" rel="noopener">View</a>`
+        : `<button type="button" class="btn sm" disabled>View</button>`;
+      return `<li class="attach-item">
+        <div class="attach-icon ${iconClass(ext)}">${iconLabel(ext)}</div>
+        <div class="attach-meta">
+          <div class="attach-name">${escHtml(a.name)}</div>
+          <div class="attach-sub">${formatBytes(a.size)} · ${date}${status}</div>
+        </div>
+        <div class="attach-actions">
+          ${viewBtn}
+          <button type="button" class="btn sm danger" data-rm="${a.id}">Remove</button>
+        </div>
+      </li>`;
+    }).join("");
+    ul.querySelectorAll("[data-rm]").forEach(b =>
+      b.addEventListener("click", () => {
+        const a = pendingAttachments.find(x => x.id === b.dataset.rm);
+        if (a && a.path) removedAttachments.push(a.path);
+        pendingAttachments = pendingAttachments.filter(x => x.id !== b.dataset.rm);
+        renderAttachmentList();
+      }));
+  }
+
+  // Drag & drop
+  const dz = document.getElementById("dropzone");
+  ["dragenter","dragover"].forEach(ev => dz.addEventListener(ev, e => {
+    e.preventDefault(); e.stopPropagation(); dz.classList.add("drag");
+  }));
+  ["dragleave","drop"].forEach(ev => dz.addEventListener(ev, e => {
+    e.preventDefault(); e.stopPropagation(); dz.classList.remove("drag");
+  }));
+  dz.addEventListener("drop", e => handleFiles(e.dataTransfer.files));
+  document.getElementById("fileAttach").addEventListener("change", e => {
+    handleFiles(e.target.files); e.target.value = "";
+  });
+
+  async function uploadPending(recordId) {
+    const out = [];
+    const prog = document.getElementById("uploadProgress");
+    const fill = document.getElementById("uploadFill");
+    const text = document.getElementById("uploadText");
+    const toUpload = pendingAttachments.filter(a => a.file);
+    if (toUpload.length) prog.hidden = false;
+    let i = 0;
+    for (const a of pendingAttachments) {
+      if (!a.file) { out.push({ id:a.id, name:a.name, type:a.type, size:a.size, uploadedAt:a.uploadedAt, url:a.url, path:a.path }); continue; }
+      // Strip any path separators from filename for safety
+      const safeName = a.name.replace(/[\\/]/g, "_");
+      const path = `attachments/${recordId}/${a.id}_${safeName}`;
+      text.textContent = `Uploading ${a.name}…`;
+      const ext = fileExt(a.name);
+      const contentType = a.type && a.type !== "application/octet-stream" ? a.type : mimeForExt(ext);
+      // Quote-safe filename for Content-Disposition (RFC 5987 fallback for unicode)
+      const asciiName = safeName.replace(/[^\x20-\x7E]/g, "_").replace(/"/g, "");
+      const encodedName = encodeURIComponent(safeName);
+      const contentDisposition = `attachment; filename="${asciiName}"; filename*=UTF-8''${encodedName}`;
+      const storageRef = ref(storage, path);
+      await uploadBytes(storageRef, a.file, { contentType, contentDisposition });
+      // Also persist the resolved contentType on the record so re-saves keep it
+      a.type = contentType;
+      const url = await getDownloadURL(storageRef);
+      i++;
+      fill.style.width = ((i / toUpload.length) * 100).toFixed(0) + "%";
+      out.push({ id:a.id, name:a.name, type:a.type, size:a.size, uploadedAt:a.uploadedAt, url, path });
+    }
+    if (toUpload.length) {
+      text.textContent = `${toUpload.length} uploaded`;
+      setTimeout(() => { prog.hidden = true; fill.style.width = "0%"; }, 1200);
+    }
+    // delete removed files from storage
+    for (const p of removedAttachments) {
+      try { await deleteObject(ref(storage, p)); } catch (e) { /* ignore */ }
+    }
+    removedAttachments = [];
+    return out;
+  }
+
+  /* ---------- Form ---------- */
+  const form = document.getElementById("recordForm");
+
+  // Dependent dropdown: NC Reason Category -> NC Reason (sub-category)
+  const NC_REASON_MAP = {
+    "Evidence & Documentation": [
+      "Missing Evidence",
+      "Missing Ticket Resolution",
+      "Incomplete Forms",
+      "Missing Signatures or Approvals",
+      "Unapproved Documents Used"
+    ],
+    "Process Compliance": [
+      "Outdated SOPs",
+      "Version Control Problems"
+    ],
+    "Process Execution": [
+      "Step Skipped",
+      "Incorrect Sequence",
+      "Incorrect Execution",
+      "Incorrect Process Applied",
+      "Unauthorized Action",
+      "Control Bypassed"
+    ],
+    "SLA Adherence": [
+      "SLA Breach"
+    ]
+  };
+  function populateNcReasonOptions(category, selected) {
+    const sel = document.getElementById("complianceReason");
+    if (!sel) return;
+    const subs = NC_REASON_MAP[category] || [];
+    sel.innerHTML = '<option>N/A</option>' +
+      subs.map(s => `<option${s === selected ? " selected" : ""}>${s}</option>`).join("");
+    if (selected && subs.includes(selected)) sel.value = selected;
+  }
+  const ncCatEl = document.getElementById("complianceReasonCategory");
+  if (ncCatEl) {
+    ncCatEl.addEventListener("change", () => populateNcReasonOptions(ncCatEl.value, ""));
+  }
+
+  // Dependent dropdown: RC Category -> RC Sub-Category
+  const RC_SUBCATEGORY_MAP = {
+    "Improper Root Cause Analysis": [
+      "Incorrect root cause identified",
+      "Superficial analysis (symptom only)",
+      "No structured method (5 Why, Fishbone not used)",
+      "Missing contributing/systemic causes",
+      "Investigation based on assumptions"
+    ],
+    "CAPA Design Failure": [
+      "Actions not linked to root cause",
+      "Weak Actions",
+      "No preventive actions included",
+      "Over-reliance on human controls",
+      "No error-proofing"
+    ],
+    "CAPA Implementation Failure": [
+      "Actions not fully implemented",
+      "Delayed execution",
+      "Responsibilities unclear",
+      "Insufficient resources",
+      "Poor follow-up/tracking"
+    ],
+    "Effectiveness Verification Failure": [
+      "No defined effectiveness criteria",
+      "Early CAPA closure",
+      "No data/evidence to confirm effectiveness",
+      "Monitoring period too short",
+      "No check for recurrence/trending"
+    ]
+  };
+  function populateRcSubOptions(category, selected) {
+    const sel = document.getElementById("rcSubCategory");
+    if (!sel) return;
+    const subs = RC_SUBCATEGORY_MAP[category] || [];
+    sel.innerHTML = '<option>N/A</option>' +
+      subs.map(s => `<option${s === selected ? " selected" : ""}>${s}</option>`).join("");
+    if (selected && subs.includes(selected)) sel.value = selected;
+  }
+  const rcCatEl = document.getElementById("rcCategory");
+  if (rcCatEl) {
+    rcCatEl.addEventListener("change", () => populateRcSubOptions(rcCatEl.value, ""));
+  }
+
+  // RC Category / RC Sub-Category are only active when Effectiveness is
+  // "Partially Effective" or "Ineffective".
+  function applyRcGating(reset) {
+    const effEl = document.getElementById("effectiveness");
+    const catEl = document.getElementById("rcCategory");
+    const subEl = document.getElementById("rcSubCategory");
+    if (!effEl || !catEl || !subEl) return;
+    const v = (effEl.value || "").trim();
+    const enabled = v === "Partially Effective" || v === "Ineffective";
+    [catEl, subEl].forEach(el => {
+      el.disabled = !enabled;
+      const lbl = document.getElementById(el.id + "Label");
+      if (lbl) { lbl.style.opacity = enabled ? "" : "0.55"; }
+      el.style.background = enabled ? "" : "#f3f4f6";
+      el.style.cursor = enabled ? "" : "not-allowed";
+    });
+    if (!enabled && reset) {
+      catEl.value = "N/A";
+      populateRcSubOptions("", "");
+    }
+  }
+  const effEl = document.getElementById("effectiveness");
+  if (effEl) effEl.addEventListener("change", () => applyRcGating(true));
+  applyRcGating(false);
+
+  form.addEventListener("submit", async e => {
+    e.preventDefault();
+    const id = document.getElementById("recordId").value || uid();
+    const rec = { id };
+    FIELDS.forEach(f => {
+      const el = document.getElementById(f.id);
+      rec[f.id] = normalize(el ? el.value : "", f.kind);
+    });
+    // Auto-fill User Name with the logged-in user's email
+    rec.userName = currentEmail() || rec.userName;
+    try {
+      const submitBtn = form.querySelector('button[type="submit"]');
+      submitBtn.disabled = true;
+      rec.attachments = await uploadPending(id);
+      const existing = records.find(x => x.id === id);
+      const isNew = !existing;
+      rec.updatedBy = currentEmail();
+      rec.updatedAt = new Date().toISOString();
+      if (isNew) {
+        rec.createdBy = currentEmail();
+        rec.createdAt = rec.updatedAt;
+      } else {
+        rec.createdBy = existing.createdBy || currentEmail();
+        rec.createdAt = existing.createdAt || rec.updatedAt;
+      }
+      await setDoc(doc(db, COLLECTION, id), rec);
+      await writeAudit(isNew ? "create" : "update", id, { userName: rec.userName, processName: rec.processName });
+      submitBtn.disabled = false;
+      form.reset();
+      document.getElementById("recordId").value = "";
+      lockUserNameField();
+      pendingAttachments = [];
+      renderAttachmentList();
+      toast("Record saved");
+      document.querySelector('[data-tab="audit"]').click();
+      document.querySelector('#audit .subtab[data-sub="records"]').click();
+    } catch (err) {
+      console.error(err);
+      toast("Save failed: " + (err.message || err.code || "unknown"));
+      form.querySelector('button[type="submit"]').disabled = false;
+    }
+  });
+
+  document.getElementById("btnReset").addEventListener("click", () => {
+    form.reset();
+    document.getElementById("recordId").value = "";
+    lockUserNameField();
+    applyRcGating(true);
+    pendingAttachments = [];
+    removedAttachments = [];
+    renderAttachmentList();
+  });
+
+  function editRecord(id) {
+    const r = records.find(x => x.id === id);
+    if (!r) return;
+    document.getElementById("recordId").value = r.id;
+    FIELDS.forEach(f => {
+      const el = document.getElementById(f.id);
+      if (!el) return;
+      if (f.id === "complianceReason") {
+        populateNcReasonOptions(r.complianceReasonCategory || "", r.complianceReason || "");
+        return;
+      }
+      if (f.id === "rcSubCategory") {
+        populateRcSubOptions(r.rcCategory || "", r.rcSubCategory || "");
+        return;
+      }
+      el.value = r[f.id] === NA ? "" : (r[f.id] ?? "");
+    });
+    lockUserNameField();
+    applyRcGating(false);
+    pendingAttachments = (r.attachments || []).map(a => ({ ...a, file: null }));
+    removedAttachments = [];
+    renderAttachmentList();
+    document.querySelector('[data-tab="audit"]').click();
+    document.querySelector('#audit .subtab[data-sub="form"]').click();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  async function deleteRecord(id) {
+    if (!isAdmin()) { toast("Only admins can delete records"); return; }
+    if (!confirm("Delete this record?")) return;
+    const r = records.find(x => x.id === id);
+    try {
+      for (const a of (r?.attachments || [])) {
+        if (a.path) { try { await deleteObject(ref(storage, a.path)); } catch (e) {} }
+      }
+      await deleteDoc(doc(db, COLLECTION, id));
+      await writeAudit("delete", id, { userName: r?.userName, processName: r?.processName });
+      toast("Record deleted");
+    } catch (err) {
+      console.error(err);
+      toast("Delete failed");
+    }
+  }
+
+  async function deleteSelectedRecords() {
+    if (!isAdmin()) { toast("Only admins can delete records"); return; }
+    const ids = Array.from(document.querySelectorAll('#recordsTable tbody .row-select:checked')).map(c => c.value);
+    if (!ids.length) { toast("No records selected"); return; }
+    if (!confirm(`Delete ${ids.length} selected record(s)? This cannot be undone.`)) return;
+    let ok = 0, fail = 0;
+    for (const id of ids) {
+      const r = records.find(x => x.id === id);
+      try {
+        for (const a of (r?.attachments || [])) {
+          if (a.path) { try { await deleteObject(ref(storage, a.path)); } catch (e) {} }
+        }
+        await deleteDoc(doc(db, COLLECTION, id));
+        await writeAudit("delete", id, { userName: r?.userName, processName: r?.processName, bulk: true });
+        ok++;
+      } catch (err) { console.error(err); fail++; }
+    }
+    toast(`Deleted ${ok}${fail ? `, ${fail} failed` : ""}`);
+  }
+
+  function updateSelectedCount() {
+    const checked = document.querySelectorAll('#recordsTable tbody .row-select:checked').length;
+    const total = document.querySelectorAll('#recordsTable tbody .row-select').length;
+    const cnt = document.getElementById("selectedCount");
+    const btn = document.getElementById("btnDeleteSelected");
+    if (cnt) cnt.textContent = checked;
+    if (btn) btn.disabled = checked === 0 || !isAdmin();
+    const head = document.getElementById("selectAllRows");
+    if (head) {
+      head.checked = total > 0 && checked === total;
+      head.indeterminate = checked > 0 && checked < total;
+    }
+  }
+
+
+  /* ---------- Records table ---------- */
+  function renderRecords() {
+    const head = document.getElementById("recordsHead");
+    const tbody = document.querySelector("#recordsTable tbody");
+
+    // Wire filter inputs once
+    if (!renderRecords._filtersWired) {
+      const ids = ["recFilterAuditId","recFilterUser","recFilterPhase","recFilterDepartment"];
+      ids.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener("input", () => renderRecords());
+      });
+      const rp = document.getElementById("recFilterProcess");
+      if (rp) {
+        rp.addEventListener("change", () => renderRecords());
+        rp.addEventListener("input", () => renderRecords());
+      }
+      const clr = document.getElementById("recClearFilters");
+      if (clr) clr.addEventListener("click", () => {
+        ids.forEach(id => { const el = document.getElementById(id); if (el) el.value = ""; });
+        if (rp) {
+          Array.from(rp.options).forEach(o => o.selected = false);
+          if (rp._msRefresh) rp._msRefresh();
+        }
+        renderRecords();
+      });
+      const delBtn = document.getElementById("btnDeleteSelected");
+      if (delBtn) delBtn.addEventListener("click", deleteSelectedRecords);
+      renderRecords._filtersWired = true;
+    }
+
+    // Refresh department datalist with unique values from records
+    const dlDept = document.getElementById("dlRecDepartment");
+    if (dlDept) {
+      const depts = [...new Set(records.map(r => r.processOwner).filter(v => v && v !== NA))].sort();
+      dlDept.innerHTML = depts.map(v => `<option value="${String(v).replace(/"/g,'&quot;')}"></option>`).join("");
+    }
+
+    const fv = id => (document.getElementById(id)?.value || "").trim().toLowerCase();
+    const fAuditId = fv("recFilterAuditId");
+    const fUser    = fv("recFilterUser");
+    const fProcSel = msValues("recFilterProcess");
+    const fPhase   = fv("recFilterPhase");
+    const fDept    = fv("recFilterDepartment");
+    const match = (val, q) => !q || String(val || "").toLowerCase().includes(q);
+
+    const filtered = records.filter(r =>
+      match(r.auditId, fAuditId) &&
+      match(r.userName, fUser) &&
+      (!fProcSel.length || fProcSel.includes(r.processName)) &&
+      match(r.processPhase, fPhase) &&
+      match(r.processOwner, fDept)
+    );
+
+    document.getElementById("recordsCount").textContent =
+      (fAuditId || fUser || fProcSel.length || fPhase || fDept)
+        ? `${filtered.length} of ${records.length} record(s)`
+        : `${records.length} record(s)`;
+
+    // Build header dynamically: select-all + FIELDS + Files + Actions
+    const selectAllTh = isAdmin()
+      ? `<th style="width:32px"><input type="checkbox" id="selectAllRows" title="Select all" /></th>`
+      : `<th style="width:0;padding:0"></th>`;
+    if (head) {
+      head.innerHTML = selectAllTh + FIELDS.map(f => `<th>${escHtml(f.label)}</th>`).join("")
+        + `<th>Files</th><th>Actions</th>`;
+    }
+    const colCount = FIELDS.length + 3;
+
+    if (!filtered.length) {
+      const msg = records.length
+        ? "No records match the current filters."
+        : "No records yet. Use the “Audit form” tab to create one.";
+      tbody.innerHTML = `<tr><td colspan="${colCount}" style="text-align:center;color:var(--muted);padding:24px">${msg}</td></tr>`;
+      updateSelectedCount();
+      return;
+    }
+
+    const BADGE_FIELDS = new Set(["compliance","severityLevel","riskExist","riskLevel","mitigation","capaNeeded","capaStatus","effectiveness","ncType"]);
+    const WRAP_FIELDS  = new Set(["controlItem","ncDescription","ncDesc","findings","comments","rootCause","effectivenessCriteria","control"]);
+
+    const renderCell = (f, r) => {
+      const v = r[f.id];
+      if (f.id === "evidence" && v && v !== NA && /^https?:\/\//i.test(v)) {
+        return `<a href="${escHtml(v)}" target="_blank" rel="noopener">link</a>`;
+      }
+      if (BADGE_FIELDS.has(f.id) && v) {
+        return `<span class="badge ${badgeClass(f.id, v)}">${escHtml(v)}</span>`;
+      }
+      return escHtml(v);
+    };
+
+    tbody.innerHTML = filtered.map(r => {
+      const atts = r.attachments || [];
+      const filesCell = atts.length
+        ? `<div class="files-cell">${atts.map(a =>
+            `<a class="files-chip" href="${escHtml(a.url || "#")}" target="_blank" rel="noopener" title="${escHtml(a.name)}">${escHtml(a.name.length > 18 ? a.name.slice(0,15) + "…" : a.name)}</a>`
+          ).join("")}</div>`
+        : `<span class="muted">—</span>`;
+      const cells = FIELDS.map(f =>
+        `<td${WRAP_FIELDS.has(f.id) ? ' class="wrap"' : ""}>${renderCell(f, r)}</td>`
+      ).join("");
+      const selCell = isAdmin()
+        ? `<td><input type="checkbox" class="row-select" value="${r.id}" /></td>`
+        : `<td style="padding:0"></td>`;
+      return `
+      <tr>
+        ${selCell}
+        ${cells}
+        <td>${filesCell}</td>
+        <td>
+          <button class="btn sm" data-edit="${r.id}">Edit</button>
+          ${isAdmin() ? `<button class="btn sm danger" data-del="${r.id}">Del</button>` : ""}
+        </td>
+      </tr>`;
+    }).join("");
+
+    tbody.querySelectorAll("[data-edit]").forEach(b =>
+      b.addEventListener("click", () => editRecord(b.dataset.edit)));
+    tbody.querySelectorAll("[data-del]").forEach(b =>
+      b.addEventListener("click", () => deleteRecord(b.dataset.del)));
+    tbody.querySelectorAll(".row-select").forEach(cb =>
+      cb.addEventListener("change", updateSelectedCount));
+    const selAll = document.getElementById("selectAllRows");
+    if (selAll) selAll.addEventListener("change", () => {
+      tbody.querySelectorAll(".row-select").forEach(cb => { cb.checked = selAll.checked; });
+      updateSelectedCount();
+    });
+    updateSelectedCount();
+  }
+
+
+  /* ---------- Multi-select dropdowns ---------- */
+  function msValues(id){
+    const el = document.getElementById(id);
+    if (!el) return [];
+    return Array.from(el.selectedOptions).map(o => o.value).filter(v => v !== "");
+  }
+  function initMultiSelect(sel){
+    if (!sel || sel.dataset.msInit) return;
+    sel.dataset.msInit = "1";
+    const placeholder = sel.dataset.placeholder || "Select…";
+    sel.style.display = "none";
+    const wrap = document.createElement("span");
+    wrap.className = "ms-wrap";
+    const btn = document.createElement("button");
+    btn.type = "button"; btn.className = "ms-btn";
+    btn.innerHTML = `<span class="ms-label"></span>`;
+    const panel = document.createElement("div");
+    panel.className = "ms-panel";
+    wrap.appendChild(btn); wrap.appendChild(panel);
+    sel.parentNode.insertBefore(wrap, sel);
+    wrap.appendChild(sel);
+
+    let searchVal = "";
+
+    function filterList() {
+      const q = (searchVal || "").toLowerCase().trim();
+      const listEl = panel.querySelector(".ms-list");
+      if (!listEl) return;
+      let matched = 0;
+      listEl.querySelectorAll(".ms-opt").forEach(lbl => {
+        const text = lbl.querySelector("span")?.textContent || "";
+        const show = !q || text.toLowerCase().includes(q);
+        lbl.style.display = show ? "" : "none";
+        if (show) matched++;
+      });
+      let noMatch = listEl.querySelector(".ms-no-match");
+      if (!matched && q) {
+        if (!noMatch) {
+          noMatch = document.createElement("div");
+          noMatch.className = "ms-no-match";
+          noMatch.textContent = "No matching options";
+          listEl.appendChild(noMatch);
+        }
+      } else if (noMatch) {
+        noMatch.remove();
+      }
+    }
+
+    function renderListItems() {
+      const listEl = panel.querySelector(".ms-list");
+      if (!listEl) return;
+      const opts = Array.from(sel.options).filter(o => o.value !== "");
+      if (!opts.length) {
+        listEl.innerHTML = `<div class="ms-empty">No options</div>`;
+        return;
+      }
+      listEl.innerHTML = opts.map(o => {
+        const safeVal = o.value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        const safeText = escHtml(o.textContent);
+        return `<label class="ms-opt"><input type="checkbox" value="${safeVal}" ${o.selected ? "checked" : ""}><span>${safeText}</span></label>`;
+      }).join("");
+
+      listEl.querySelectorAll("input[type=checkbox]").forEach(cb => {
+        cb.addEventListener("change", () => {
+          const opt = Array.from(sel.options).find(o => o.value === cb.value);
+          if (opt) opt.selected = cb.checked;
+          updateLabel();
+          sel.dispatchEvent(new Event("input", { bubbles: true }));
+          sel.dispatchEvent(new Event("change", { bubbles: true }));
+        });
+      });
+      filterList();
+    }
+
+    function renderPanel(){
+      const searchBox = `<div class="ms-search-wrap"><input type="search" class="ms-search" placeholder="Search options…" autocomplete="off" aria-label="Search options" /></div>`;
+      const actions = `<div class="ms-actions"><button type="button" data-act="all">Select all</button><button type="button" data-act="none">Clear</button></div>`;
+      panel.innerHTML = searchBox + actions + `<div class="ms-list"></div>`;
+
+      const searchInp = panel.querySelector(".ms-search");
+      if (searchInp) {
+        searchInp.value = searchVal;
+        searchInp.addEventListener("click", e => e.stopPropagation());
+        searchInp.addEventListener("keydown", e => {
+          e.stopPropagation();
+          if (e.key === "Escape") wrap.classList.remove("open");
+        });
+        searchInp.addEventListener("input", e => {
+          searchVal = e.target.value;
+          filterList();
+        });
+      }
+
+      panel.querySelectorAll("button[data-act]").forEach(b => {
+        b.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const on = b.dataset.act === "all";
+          const q = (searchVal || "").toLowerCase().trim();
+          Array.from(sel.options).forEach(o => {
+            if (o.value === "") return;
+            if (on && q) {
+              if (o.textContent.toLowerCase().includes(q)) o.selected = true;
+            } else {
+              o.selected = on;
+            }
+          });
+          renderListItems();
+          updateLabel();
+          sel.dispatchEvent(new Event("input", { bubbles: true }));
+          sel.dispatchEvent(new Event("change", { bubbles: true }));
+        });
+      });
+
+      renderListItems();
+    }
+
+    function updateLabel(){
+      const vals = msValues(sel.id);
+      const lbl = wrap.querySelector(".ms-label");
+      if (!vals.length) { lbl.textContent = placeholder; lbl.style.color = "#6b7280"; }
+      else if (vals.length === 1) { lbl.textContent = vals[0]; lbl.style.color = "#1f2937"; }
+      else { lbl.textContent = `${vals.length} selected`; lbl.style.color = "#1f2937"; }
+    }
+
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const wasOpen = wrap.classList.contains("open");
+      document.querySelectorAll(".ms-wrap.open").forEach(w => { if (w !== wrap) w.classList.remove("open"); });
+      wrap.classList.toggle("open");
+      if (!wasOpen) {
+        renderPanel();
+        setTimeout(() => {
+          const inp = panel.querySelector(".ms-search");
+          if (inp) inp.focus();
+        }, 50);
+      }
+    });
+
+    sel._msRefresh = () => {
+      if (wrap.classList.contains("open")) {
+        renderListItems();
+      }
+      updateLabel();
+    };
+    updateLabel();
+  }
+  document.addEventListener("click", () => {
+    document.querySelectorAll(".ms-wrap.open").forEach(w => w.classList.remove("open"));
+  });
+
+  /* ---------- Filters & Dashboard ---------- */
+  const FILTER_IDS = ["filterProcessOwner","filterDept","filterDepartment","filterProcess","filterCompliance","filterRiskLevel","filterMitigation"];
+  // Which record field each dashboard filter reads (labels in the UI differ from field names).
+  const FILTER_FIELDS = {
+    filterProcessOwner: "processPreparedBy",
+    filterDept:         "processOwner",
+    filterDepartment:   "department",
+    filterProcess:      "processName",
+    filterCompliance:   "compliance",
+    filterRiskLevel:    "riskLevel",
+    filterMitigation:   "mitigation"
+  };
+  // Original fixed option order for selects that ship with hard-coded options.
+  const FILTER_STATIC_ORDER = {};
+  ["filterCompliance","filterRiskLevel","filterMitigation"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) FILTER_STATIC_ORDER[id] = Array.from(el.options).map(o => o.value).filter(Boolean);
+  });
+
+  // Column-search state for dashboard tables (key = data-col).
+  const colSearch = {};
+  function colQ(key) { return (colSearch[key] || "").toLowerCase().trim(); }
+
+  // Returns records matching every active filter + searches.
+  // `exceptId` skips one dropdown so its own options can be computed (dependent filters).
+  function getFiltered(exceptId) {
+    const q = (document.getElementById("filterSearch")?.value || "").toLowerCase().trim();
+    const active = FILTER_IDS
+      .filter(id => id !== exceptId)
+      .map(id => ({ field: FILTER_FIELDS[id], vals: msValues(id) }))
+      .filter(f => f.vals.length);
+    const procQ = colQ("processName");
+    return records.filter(r => {
+      for (const f of active) if (!f.vals.includes(r[f.field])) return false;
+      if (procQ && !String((r.processName || "").trim() || "—").toLowerCase().includes(procQ)) return false;
+      if (!q) return true;
+      return Object.values(r).some(v =>
+        v && typeof v !== "object" && String(v).toLowerCase().includes(q));
+    });
+  }
+
+  // Rebuild each dropdown from rows matching all OTHER filters. If an existing
+  // selection becomes incompatible, remove it so the menus never show stale choices.
+  function updateFilterOptions() {
+    let changed = true;
+    let pass = 0;
+    while (changed && pass++ < FILTER_IDS.length + 1) {
+      changed = false;
+      FILTER_IDS.forEach(id => {
+        const sel = document.getElementById(id);
+        if (!sel) return;
+        const field = FILTER_FIELDS[id];
+        const selected = msValues(id);
+        const avail = new Set(getFiltered(id).map(r => r[field]).filter(v => v && v !== NA));
+        const kept = selected.filter(v => avail.has(v));
+        if (kept.length !== selected.length) changed = true;
+
+        let values;
+        if (FILTER_STATIC_ORDER[id]) {
+          values = FILTER_STATIC_ORDER[id].filter(v => avail.has(v));
+          [...avail].sort((a, b) => String(a).localeCompare(String(b)))
+            .forEach(v => { if (!values.includes(v)) values.push(v); });
+        } else {
+          values = [...avail].sort((a, b) => String(a).localeCompare(String(b)));
+        }
+
+        const current = Array.from(sel.options).map(o => o.value).filter(Boolean);
+        const currentSelected = msValues(id);
+        const optionsChanged = current.join("\u0001") !== values.join("\u0001");
+        const selectionChanged = currentSelected.join("\u0001") !== kept.join("\u0001");
+        if (!optionsChanged && !selectionChanged) return;
+
+        sel.innerHTML = values.map(v => {
+          const text = escHtml(String(v));
+          const value = String(v).replace(/&/g, "&amp;").replace(/\"/g, "&quot;")
+            .replace(/</g, "&lt;").replace(/>/g, "&gt;");
+          return `<option value="${value}" ${kept.includes(v) ? "selected" : ""}>${text}</option>`;
+        }).join("");
+        if (sel._msRefresh) sel._msRefresh();
+      });
+    }
+  }
+
+  // Init multi-selects + wire change events
+  FILTER_IDS.forEach(id => { const el = document.getElementById(id); if (el) { initMultiSelect(el); el.addEventListener("change", renderDashboard); } });
+  const _fs = document.getElementById("filterSearch");
+  if (_fs) _fs.addEventListener("input", renderDashboard);
+
+  // Column search inputs in dashboard table headers
+  document.querySelectorAll("#dashboard .col-search").forEach(inp => {
+    inp.addEventListener("click", e => e.stopPropagation());
+    inp.addEventListener("input", () => {
+      colSearch[inp.dataset.col] = inp.value;
+      if (inp.dataset.col === "processName") renderDashboard();   // affects all dashboard data
+      else renderScheduleVariance(getFiltered());                  // affects only this table's rows
+    });
+  });
+
+  document.getElementById("clearFilters").addEventListener("click", () => {
+    document.getElementById("filterSearch").value = "";
+    document.querySelectorAll("#dashboard .col-search").forEach(inp => { inp.value = ""; });
+    Object.keys(colSearch).forEach(k => delete colSearch[k]);
+    FILTER_IDS.forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      Array.from(el.options).forEach(o => o.selected = false);
+      if (el._msRefresh) el._msRefresh();
+    });
+    renderDashboard();
+  });
+
+
+  function counts(arr, field, includeNA = true) {
+    return arr.reduce((acc, r) => {
+      const k = r[field] || NA;
+      if (!includeNA && (k === NA || !k)) return acc;
+      acc[k] = (acc[k] || 0) + 1;
+      return acc;
+    }, {});
+  }
+
+  function setText(id, v) { const el = document.getElementById(id); if (el) el.textContent = v; }
+
+  function colorCodeKpi(id, pct) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const card = el.closest('.kpi');
+    if (!card) return;
+    card.classList.remove('kpi-red', 'kpi-orange', 'kpi-green');
+    if (pct >= 0 && pct <= 69) {
+      card.classList.add('kpi-red');
+    } else if (pct >= 70 && pct <= 84) {
+      card.classList.add('kpi-orange');
+    } else if (pct >= 85 && pct <= 100) {
+      card.classList.add('kpi-green');
+    }
+  }
+
+  function renderDashboard() {
+    updateFilterOptions();
+    const data = getFiltered();
+
+    // ---------- KPIs ----------
+    const compliantBase = data.filter(r => ["Compliant","Non-Compliant","Observation"].includes(r.compliance)).length;
+    const compliantCount = data.filter(r => r.compliance === "Compliant").length;
+    const ncRows = data.filter(r => r.compliance === "Non-Compliant" || r.compliance === "Observation");
+    const compliancePct = compliantBase ? Math.round(compliantCount / compliantBase * 100) : 0;
+
+    const slaRows = data.filter(r => !isNaN(parseFloat(r.targetSla)) && !isNaN(parseFloat(r.actualSla)));
+    const adherent = slaRows.filter(r => parseFloat(r.actualSla) <= parseFloat(r.targetSla)).length;
+    const slaAdherence = slaRows.length ? Math.round(adherent / slaRows.length * 100) : 0;
+    const openRisks = data.filter(r => r.riskExist === "Yes" && r.mitigation !== "Closed" && r.mitigation !== "Mitigated").length;
+    const capaNeededRows = data.filter(r => r.capaNeeded === "Yes");
+    const ASSESSED_EFF = ["Effective", "Partially Effective", "Ineffective"];
+    const assessedEffRows = capaNeededRows.filter(r => ASSESSED_EFF.includes(r.effectiveness));
+    const effectiveCapa = assessedEffRows.filter(r => r.effectiveness === "Effective").length;
+    const effPct = assessedEffRows.length ? Math.round(effectiveCapa / assessedEffRows.length * 100) : null;
+
+    setText("kpiCompliancePct", compliancePct + "%");
+    setText("kpiSlaAdherence", slaAdherence + "%");
+    setText("kpiTotalNcs", ncRows.length);
+    setText("kpiTotalRisks", data.filter(r => r.riskExist === "Yes").length);
+    setText("kpiOpenRisks", openRisks);
+    setText("kpiEffectiveCapa", effPct === null ? "N/A" : effPct + "%");
+
+    colorCodeKpi("kpiCompliancePct", compliancePct);
+    colorCodeKpi("kpiSlaAdherence", slaAdherence);
+    colorCodeKpi("kpiEffectiveCapa", effPct === null ? 100 : effPct);
+
+    // ---------- Charts ----------
+    // Fixed category specs so legend always shows every category with its color.
+    const CAT_COMPLIANCE  = { labels:["Compliant","Non-Compliant","Observation"],
+                              colors:["#16a34a","#dc2626","#f59e0b"] };
+    const CAT_NC_CATEGORY = { labels:["People","Process","Technology"],
+                              colors:["#2563eb","#16a34a","#f97316"] };
+    const CAT_RISK_LEVEL  = { labels:["Low","Medium","High"],
+                              colors:["#16a34a","#f59e0b","#dc2626"] };
+    const CAT_MITIGATION  = { labels:["Open","Accepted","Mitigated","Closed"],
+                              colors:["#dc2626","#f59e0b","#16a34a","#2563eb"] };
+    const CAT_CAPA_STATUS = { labels:["Pending","In Progress","Closed","Overdue","Cancelled"],
+                              colors:["#f59e0b","#2563eb","#16a34a","#dc2626","#6b7280"] };
+    const CAT_CAPA_TYPE   = { labels:["Corrective","Preventive"],
+                              colors:["#dc2626","#2563eb"] };
+    const CAT_NC_REASON   = { labels:["Evidence & Documentation","Process Compliance","SLA Adherence"],
+                              colors:["#dc2626","#2563eb","#f59e0b"] };
+    const CAT_RC_CATEGORY = { labels:["Improper Root Cause Analysis","CAPA Design Failure","CAPA Implementation Failure","Effectiveness Verification Failure"],
+                              colors:["#dc2626","#f59e0b","#2563eb","#16a34a"] };
+    const CAT_RISK_TYPE   = { labels:["Operational","Compliance","Financial","Reputational"],
+                              colors:["#2563eb","#16a34a","#f59e0b","#dc2626"] };
+
+    // Section 1: Compliance & NC
+    drawPieCountPct("chartCompliance", counts(data, "compliance", false), CAT_COMPLIANCE);
+    drawPieCountPct("chartNcCategory", counts(ncRows, "ncCategory", false), CAT_NC_CATEGORY);
+
+    // Section 2: CAPA
+    const capaNeededRows2 = capaNeededRows;
+    const ncReasonRows = data.filter(r => {
+      const c = String(r.compliance || "").toLowerCase();
+      const cat = String(r.complianceReasonCategory || "").trim();
+      if (!cat || cat.toUpperCase() === "N/A") return false;
+      return c.includes("non-compliant") || c.includes("observation") || c.includes("partially");
+    });
+    drawPieCountPct("chartNcReason", counts(ncReasonRows, "complianceReasonCategory", false), CAT_NC_REASON,
+      { rows: ncReasonRows, parentField: "complianceReasonCategory", subField: "complianceReason", title: "NC Reason breakdown" });
+    const capaTypeRows = data.filter(r => {
+      const t = String(r.capaType || "").trim();
+      return t === "Corrective" || t === "Preventive";
+    });
+    drawPieCountPct("chartCapaType", counts(capaTypeRows, "capaType", false), CAT_CAPA_TYPE);
+    drawPieCountPct("chartRcCategory", counts(capaNeededRows2, "rcCategory", false), CAT_RC_CATEGORY,
+      { rows: capaNeededRows2, parentField: "rcCategory", subField: "rcSubCategory", title: "Root Cause breakdown" });
+    drawPieCountPct("chartCapaStatus", counts(capaNeededRows2, "capaStatus", false), CAT_CAPA_STATUS);
+
+    // Section 3: Risk
+    const riskData = data.filter(r => r.riskExist === "Yes");
+    drawPieCountPct("chartRiskType", counts(riskData, "riskType", false), CAT_RISK_TYPE);
+    drawPieCountPct("chartRiskLevel", counts(riskData, "riskLevel", false), CAT_RISK_LEVEL);
+    drawPieCountPct("chartRiskMitigation", counts(riskData, "mitigation", false), CAT_MITIGATION);
+
+    // Task Performance donut
+    drawTaskPerformanceDonut("chartTaskPerformance", data);
+
+    renderScheduleVariance(data);
+
+    // Recompute the Findings Summary so the latest data is always ready for PDF export.
+    refreshFindings(data);
+  }
+
+  /* ------------------------------------------------------------------
+   * Findings Summary integration
+   * ------------------------------------------------------------------ */
+  let _lastFindings = null;
+  function refreshFindings(data) {
+    if (!window.FindingsEngine) return;
+    try {
+      _lastFindings = window.FindingsEngine.analyze(data || getFiltered());
+      const procFilter = (typeof msValues === "function") ? msValues("filterProcess") : [];
+      const target = document.getElementById("findingsSection");
+      if (target) window.FindingsEngine.render(target, _lastFindings, { categoryExclude: "Risk", processFilter: procFilter });
+      const riskTarget = document.getElementById("findingsSectionRisk");
+      if (riskTarget) window.FindingsEngine.render(riskTarget, _lastFindings, { categoryFilter: "Risk", processFilter: procFilter });
+    } catch (e) { console.warn("Findings refresh failed", e); }
+  }
+
+  // "Findings Summary" button: regenerate + reveal + scroll into view
+  document.getElementById("btnFindingsSummary")?.addEventListener("click", () => {
+    refreshFindings(getFiltered());
+    const sec = document.getElementById("findingsSection");
+    if (sec) {
+      sec.style.display = "block";
+      sec.scrollIntoView({ behavior: "smooth", block: "start" });
+      toast(`Generated ${_lastFindings ? _lastFindings.findings.length : 0} finding(s)`);
+    }
+  });
+
+  // "View" toggle: show/hide the Findings Summary on the dashboard
+  document.getElementById("btnViewFindings")?.addEventListener("click", () => {
+    const sec = document.getElementById("findingsSection");
+    if (!sec) return;
+    if (!_lastFindings) refreshFindings(getFiltered());
+    const visible = sec.style.display !== "none";
+    sec.style.display = visible ? "none" : "block";
+    if (!visible) sec.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+
+  function diffDays(a, b) {
+    if (!a || !b) return null;
+    const da = new Date(a), db = new Date(b);
+    if (isNaN(da) || isNaN(db)) return null;
+    return Math.round((db - da) / 86400000);
+  }
+
+  function renderScheduleVariance(data) {
+    const tbl = document.getElementById("scheduleVarianceTable");
+    if (!tbl) return;
+    const tbody = tbl.querySelector("tbody");
+    const groups = {};
+    data.forEach(r => {
+      const name = (r.processName || "").trim() || "—";
+      if (!groups[name]) groups[name] = [];
+      groups[name].push(r);
+    });
+    const names = Object.keys(groups).sort();
+    if (!names.length) {
+      const anyFilter = records.length > 0;
+      tbody.innerHTML = `<tr><td colspan="3" class="muted" style="text-align:center;">${anyFilter ? "No records match the selected filters or searches" : "No data"}</td></tr>`;
+      return;
+    }
+    const toDate = v => { if (!v) return null; const d = new Date(v); return isNaN(d) ? null : d; };
+    const cell = v => {
+      if (v === null) return `<td class="var-cell"><span class="var-dash">—</span></td>`;
+      const cls = v === 0 ? "ok" : v > 0 ? "bad" : "early";
+      return `<td class="var-cell"><span class="var-pill ${cls}"><span class="var-dot"></span>${v}</span></td>`;
+    };
+    const svQ = colQ("startVariance"), evQ = colQ("endVariance");
+    const matchVar = (v, q) => !q || (v === null ? "—" : String(v)).toLowerCase().includes(q);
+    const html = names.map(n => {
+      const rows = groups[n];
+      let first = null, firstD = null;
+      rows.forEach(r => { const d = toDate(r.plannedStartDate); if (d && (!firstD || d < firstD)) { firstD = d; first = r; } });
+      let last = null, lastD = null;
+      rows.forEach(r => { const d = toDate(r.plannedEndDate); if (d && (!lastD || d > lastD)) { lastD = d; last = r; } });
+      const sv = first ? diffDays(first.plannedStartDate, first.actualStartDate) : null;
+      const ev = last  ? diffDays(last.plannedEndDate,  last.actualEndDate)   : null;
+      if (!matchVar(sv, svQ) || !matchVar(ev, evQ)) return "";
+      return `<tr>
+        <td class="var-name">${escHtml(n)}</td>
+        ${cell(sv)}
+        ${cell(ev)}
+      </tr>`;
+    }).join("");
+    tbody.innerHTML = html || `<tr><td colspan="3" class="muted" style="text-align:center;">No processes match the column search</td></tr>`;
+  }
+
+  function normalizeChartLabel(value) {
+    return String(value || "")
+      .trim()
+      .replace(/\s+/g, " ")
+      .replace(/\s*&\s*/g, " & ")
+      .toLowerCase();
+  }
+
+  function getChartDrilldownRows(drill, parentLabel) {
+    if (!drill || !Array.isArray(drill.rows)) return [];
+    const parentKey = normalizeChartLabel(parentLabel);
+    return drill.rows.filter(r => normalizeChartLabel(r[drill.parentField]) === parentKey);
+  }
+
+  function buildChartBreakdown(rows, subField) {
+    const counts = {};
+    rows.forEach(r => {
+      const k = String(r[subField] || "").trim() || "N/A";
+      counts[k] = (counts[k] || 0) + 1;
+    });
+    return Object.keys(counts)
+      .map(k => ({ label: k, count: counts[k] }))
+      .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+  }
+
+  function renderBreakdownRows(breakdown, color) {
+    const total = breakdown.reduce((a, b) => a + b.count, 0);
+    const swatch = color || "#2563eb";
+    if (!breakdown.length) {
+      return '<div style="color:#777;font-size:13px;padding:8px 0;">No sub-category data recorded for this slice.</div>';
+    }
+    return breakdown.map(b => {
+      const pct = total ? ((b.count / total) * 100).toFixed(1) : "0.0";
+      const w = total ? (b.count / total) * 100 : 0;
+      return `<div style="margin:8px 0;">
+        <div style="display:flex;justify-content:space-between;gap:10px;font-size:13px;color:#111;">
+          <span style="flex:1;white-space:normal;word-break:break-word;">${escHtml(b.label)}</span>
+          <span style="font-weight:700;white-space:nowrap;">${b.count} (${pct}%)</span>
+        </div>
+        <div style="background:#eef2f7;height:8px;border-radius:4px;overflow:hidden;margin-top:3px;">
+          <div style="background:${swatch};height:100%;width:${w}%;"></div>
+        </div>
+      </div>`;
+    }).join("");
+  }
+
+  function getChartColorMap(chartId, fallbackLabels, fallbackColors) {
+    const map = {};
+    const inst = charts[chartId];
+    if (inst && inst.data && Array.isArray(inst.data.labels)) {
+      const bg = (inst.data.datasets && inst.data.datasets[0] && inst.data.datasets[0].backgroundColor) || [];
+      inst.data.labels.forEach((lab, i) => {
+        const k = normalizeChartLabel(lab);
+        if (k && !map[k]) map[k] = bg[i];
+      });
+    }
+    if (Array.isArray(fallbackLabels)) {
+      fallbackLabels.forEach((lab, i) => {
+        const k = normalizeChartLabel(lab);
+        if (k && !map[k] && fallbackColors) map[k] = fallbackColors[i];
+      });
+    }
+    return map;
+  }
+
+  function renderChartDrilldownPanel(chartId, drill, activeLabel, color, colorMap) {
+    const canvas = document.getElementById(chartId);
+    if (!canvas || !drill) return;
+    let panel = document.getElementById(chartId + "Breakdown");
+    if (!panel) {
+      panel = document.createElement("div");
+      panel.id = chartId + "Breakdown";
+      panel.style.cssText = "margin-top:10px;border-top:1px solid #e5e7eb;padding-top:10px;max-height:190px;overflow:auto;";
+      canvas.insertAdjacentElement("afterend", panel);
+    }
+    const cmap = colorMap || getChartColorMap(chartId);
+
+    if (activeLabel) {
+      const swatch = color || cmap[normalizeChartLabel(activeLabel)] || "#2563eb";
+      const subRows = getChartDrilldownRows(drill, activeLabel);
+      const breakdown = buildChartBreakdown(subRows, drill.subField);
+      const total = subRows.length;
+      panel.innerHTML = `
+        <div style="display:flex;align-items:center;gap:7px;margin-bottom:4px;">
+          <span style="width:10px;height:10px;border-radius:2px;background:${swatch};display:inline-block;"></span>
+          <strong style="font-size:12px;color:#1f3a8a;">${escHtml(activeLabel)} breakdown</strong>
+          <span style="margin-left:auto;font-size:12px;color:#6b7280;">Total: ${total}</span>
+        </div>
+        ${renderBreakdownRows(breakdown, swatch)}`;
+      return;
+    }
+
+    const parentLabels = Array.from(new Set((drill.rows || [])
+      .map(r => String(r[drill.parentField] || "").trim())
+      .filter(v => v && v.toUpperCase() !== "N/A")));
+    const groups = parentLabels.map(parent => {
+      const parentSwatch = cmap[normalizeChartLabel(parent)] || "#2563eb";
+      const subRows = getChartDrilldownRows(drill, parent);
+      const breakdown = buildChartBreakdown(subRows, drill.subField);
+      const total = subRows.length;
+      const topRows = breakdown.slice(0, 4).map(b => {
+        const pct = total ? ((b.count / total) * 100).toFixed(1) : "0.0";
+        return `<div style="display:flex;justify-content:space-between;gap:8px;font-size:12px;color:#374151;margin-top:4px;">
+          <span style="white-space:normal;word-break:break-word;">${escHtml(b.label)}</span>
+          <strong style="white-space:nowrap;">${b.count} (${pct}%)</strong>
+        </div>`;
+      }).join("");
+      return `<div style="padding:8px 0;border-bottom:1px solid #f1f5f9;">
+        <div style="font-size:12px;font-weight:700;color:#1f3a8a;display:flex;align-items:center;gap:8px;">
+          <span style="width:10px;height:10px;border-radius:2px;background:${parentSwatch};display:inline-block;flex:none;"></span>
+          <span style="flex:1;">${escHtml(parent)}</span>
+          <span>Total: ${total}</span>
+        </div>
+        ${topRows || '<div style="font-size:12px;color:#777;margin-top:4px;">No sub-category data recorded.</div>'}
+      </div>`;
+    }).join("");
+    panel.innerHTML = groups || '<div style="color:#777;font-size:12px;">No breakdown data recorded.</div>';
+  }
+
+  function showChartDrilldown(title, parentLabel, breakdown, color, totalOverride) {
+    const total = Number.isFinite(totalOverride) ? totalOverride : breakdown.reduce((a, b) => a + b.count, 0);
+    let modal = document.getElementById("chartDrilldownModal");
+    if (!modal) {
+      modal = document.createElement("div");
+      modal.id = "chartDrilldownModal";
+      modal.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:2147483000;padding:18px;";
+      modal.innerHTML = '<div id="chartDrilldownBox" role="dialog" aria-modal="true" style="background:#fff;border-radius:10px;max-width:620px;width:94%;max-height:84vh;overflow:auto;box-shadow:0 18px 45px rgba(0,0,0,.35);"></div>';
+      modal.addEventListener("click", (e) => { if (e.target === modal) modal.remove(); });
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") document.getElementById("chartDrilldownModal")?.remove();
+      });
+      document.body.appendChild(modal);
+    }
+    const box = modal.querySelector("#chartDrilldownBox");
+    const swatch = color || "#2563eb";
+    const rows = renderBreakdownRows(breakdown, swatch);
+    box.innerHTML = `
+      <div style="padding:14px 18px;border-bottom:1px solid #eee;display:flex;align-items:center;gap:10px;">
+        <span style="display:inline-block;width:14px;height:14px;border-radius:3px;background:${swatch};"></span>
+        <div style="flex:1;">
+          <div style="font-weight:700;color:#111;">${escHtml(title)}</div>
+          <div style="font-size:12px;color:#666;">${escHtml(parentLabel)} — Total: ${total}</div>
+        </div>
+        <button type="button" id="chartDrilldownClose" style="border:0;background:#f3f4f6;border-radius:6px;padding:6px 12px;cursor:pointer;font-weight:600;">Close</button>
+      </div>
+      <div style="padding:14px 18px;">${rows}</div>`;
+    box.querySelector("#chartDrilldownClose").onclick = () => modal.remove();
+  }
+
+  function drawPieCountPct(id, obj, spec, drill) {
+    const ctx = document.getElementById(id);
+    if (!ctx) return;
+    let labels, values, colors;
+    if (spec && Array.isArray(spec.labels)) {
+      // Fixed categories — always render every category so the legend
+      // shows the full set with its color coding, even with zero counts.
+      labels = spec.labels.slice();
+      values = labels.map(k => Number(obj[k] || 0));
+      colors = spec.colors ? spec.colors.slice(0, labels.length) : palette.slice(0, labels.length);
+      // Also include any unexpected extra keys (e.g. legacy "Partially Compliant").
+      Object.keys(obj).forEach(k => {
+        if (!labels.includes(k)) {
+          labels.push(k);
+          values.push(Number(obj[k] || 0));
+          colors.push(palette[(labels.length - 1) % palette.length]);
+        }
+      });
+    } else {
+      labels = Object.keys(obj);
+      values = Object.values(obj);
+      colors = palette;
+    }
+    const total = values.reduce((a, b) => a + b, 0);
+    if (charts[id]) charts[id].destroy();
+    if (!labels.length || total === 0) {
+      const c = ctx.getContext("2d");
+      c.clearRect(0,0,ctx.width,ctx.height);
+      c.fillStyle = "#9ca3af"; c.font = "13px system-ui"; c.textAlign = "center";
+      c.fillText("No data", ctx.width/2, ctx.height/2);
+      if (drill) renderChartDrilldownPanel(id, drill, null, null, getChartColorMap(id, labels, colors));
+      if (!labels.length) return;
+    }
+    if (drill) renderChartDrilldownPanel(id, drill, null, null, getChartColorMap(id, labels, colors));
+    charts[id] = new Chart(ctx, {
+      type: "pie",
+      data: { labels, datasets: [{ data: values, backgroundColor: colors }] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        onClick: (evt, elements, chart) => {
+          if (!drill || !drill.rows || !elements || !elements.length) return;
+          const idx = elements[0].index;
+          const label = String(chart.data.labels[idx] || "").trim();
+          const labelKey = label.toLowerCase();
+          const color = (chart.data.datasets[0].backgroundColor || [])[idx];
+          const subRows = getChartDrilldownRows(drill, label);
+          const breakdown = buildChartBreakdown(subRows, drill.subField);
+          renderChartDrilldownPanel(id, drill, label, color);
+          showChartDrilldown(drill.title || "Breakdown", label, breakdown, color, subRows.length);
+        },
+        onHover: (evt, elements) => {
+          if (!drill) return;
+          evt.native && (evt.native.target.style.cursor = elements.length ? "pointer" : "default");
+        },
+        plugins: {
+          legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 11 } } },
+          tooltip: { callbacks: { label: (c) => {
+            const v = c.parsed; const pct = total ? ((v/total)*100).toFixed(1) : 0;
+            const hint = drill ? " — click for details" : "";
+            return `${c.label}: ${v} (${pct}%)${hint}`;
+          } } }
+        }
+      },
+      plugins: [{
+        id: id + "Labels",
+        afterDatasetsDraw(chart) {
+          const { ctx } = chart;
+          const meta = chart.getDatasetMeta(0);
+          ctx.save(); ctx.fillStyle = "#fff";
+          ctx.font = "600 11px system-ui, sans-serif";
+          ctx.textAlign = "center"; ctx.textBaseline = "middle";
+          meta.data.forEach((arc, i) => {
+            const v = values[i]; if (!v) return;
+            const pct = total ? ((v/total)*100).toFixed(0) : 0;
+            const { x, y } = arc.tooltipPosition();
+            ctx.fillText(`${v} (${pct}%)`, x, y);
+          });
+          ctx.restore();
+        }
+      }]
+    });
+  }
+
+  function drawTaskPerformanceDonut(id, rows) {
+    let ctx = document.getElementById(id);
+    if (!ctx) {
+      // Auto-create the canvas if the HTML doesn't already include it so the
+      // Task Performance donut never "disappears" from the dashboard.
+      const host = document.querySelector('[data-section="taskPerformance"]')
+                || document.getElementById("taskPerformanceSection")
+                || document.getElementById("taskPerformance");
+      if (host) {
+        let wrap = host.querySelector('[data-auto-chart="taskPerformance"]');
+        if (!wrap) {
+          wrap = document.createElement("div");
+          wrap.className = "card";
+          wrap.dataset.autoChart = "taskPerformance";
+          wrap.style.cssText = "background:#fff;padding:16px;border-radius:10px;margin-bottom:12px;min-height:360px;display:flex;flex-direction:column;";
+          const title = document.createElement("div");
+          title.textContent = "Task Performance Distribution";
+          title.style.cssText = "text-align:center;font-weight:700;color:#1e3a8a;margin-bottom:8px;";
+          const canvas = document.createElement("canvas");
+          canvas.id = id;
+          canvas.width = 900;
+          canvas.height = 420;
+          canvas.style.cssText = "height:320px;width:100%;display:block;";
+          wrap.appendChild(title);
+          wrap.appendChild(canvas);
+          host.appendChild(wrap);
+          ctx = canvas;
+        } else {
+          ctx = wrap.querySelector("canvas") || ctx;
+          if (ctx && !ctx.id) ctx.id = id;
+        }
+      }
+    }
+    if (!ctx) return;
+    const labels = ["Right & On Time", "Right but Late", "Wrong Execution", "Not Done"];
+    const colors = ["#16a34a", "#f59e0b", "#dc2626", "#7f1d1d"];
+    const counts = [0, 0, 0, 0];
+    (rows || []).forEach(r => {
+      const done = String(r.taskDone || "").trim().toLowerCase();
+      const corr = String(r.taskCorrectness || "").trim().toLowerCase();
+      const tim  = String(r.taskTiming || "").trim().toLowerCase();
+      if (done === "not done") { counts[3]++; return; }
+      if (done !== "done") return; // skip unset records
+      if (corr === "wrong") { counts[2]++; return; }
+      if (corr !== "right") return;
+      if (tim.includes("late")) counts[1]++;
+      else if (tim.includes("on time") || tim === "on-time" || tim === "ontime") counts[0]++;
+    });
+    const total = counts.reduce((a,b)=>a+b,0);
+    if (charts[id]) charts[id].destroy();
+    if (!total) {
+      const c = ctx.getContext("2d");
+      c.clearRect(0,0,ctx.width,ctx.height);
+      c.fillStyle = "#9ca3af"; c.font = "13px system-ui"; c.textAlign = "center";
+      c.fillText("No data", ctx.width/2, ctx.height/2);
+      return;
+    }
+    charts[id] = new Chart(ctx, {
+      type: "doughnut",
+      data: { labels, datasets: [{ data: counts, backgroundColor: colors, borderWidth: 2, borderColor: "#fff" }] },
+      options: {
+        responsive: true, maintainAspectRatio: false, cutout: "55%",
+        plugins: {
+          legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 12 } } },
+          tooltip: { callbacks: { label: (c) => {
+            const v = c.parsed; const pct = total ? ((v/total)*100).toFixed(1) : 0;
+            return `${c.label}: ${v} (${pct}%)`;
+          } } }
+        }
+      },
+      plugins: [{
+        id: id + "Labels",
+        afterDatasetsDraw(chart) {
+          const { ctx } = chart;
+          const meta = chart.getDatasetMeta(0);
+          ctx.save(); ctx.fillStyle = "#fff";
+          ctx.font = "700 12px system-ui, sans-serif";
+          ctx.textAlign = "center"; ctx.textBaseline = "middle";
+          meta.data.forEach((arc, i) => {
+            const v = counts[i]; if (!v) return;
+            const pct = total ? ((v/total)*100).toFixed(0) : 0;
+            const { x, y } = arc.tooltipPosition();
+            ctx.fillText(`${pct}%`, x, y);
+          });
+          ctx.restore();
+        }
+      }]
+    });
+  }
+
+
+  const palette = ["#d12027","#16a34a","#f97316","#16a34a","#06b6d4","#7c3aed","#db2777","#d97706","#6b7280"];
+
+  function drawBar(id, obj) {
+    const ctx = document.getElementById(id);
+    const labels = Object.keys(obj);
+    const values = Object.values(obj);
+    if (charts[id]) charts[id].destroy();
+    charts[id] = new Chart(ctx, {
+      type: "bar",
+      data: { labels, datasets: [{ data: values, backgroundColor: palette }] },
+      options: { responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
+    });
+  }
+  function drawDoughnut(id, obj) {
+    const ctx = document.getElementById(id);
+    const labels = Object.keys(obj);
+    const values = Object.values(obj);
+    if (charts[id]) charts[id].destroy();
+    charts[id] = new Chart(ctx, {
+      type: "doughnut",
+      data: { labels, datasets: [{ data: values, backgroundColor: palette }] },
+      options: { responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: "bottom", labels: { boxWidth: 12 } } } }
+    });
+  }
+  function drawRiskLevelPie(id, obj) {
+    const order = ["High", "Medium", "Low"];
+    const colorMap = { High: "#dc2626", Medium: "#f59e0b", Low: "#16a34a" };
+    const labels = order.filter(k => obj[k]);
+    const values = labels.map(k => obj[k]);
+    const colors = labels.map(k => colorMap[k]);
+    const total = values.reduce((a, b) => a + b, 0);
+    const ctx = document.getElementById(id);
+    if (charts[id]) charts[id].destroy();
+    charts[id] = new Chart(ctx, {
+      type: "pie",
+      data: { labels, datasets: [{ data: values, backgroundColor: colors }] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { position: "bottom", labels: { boxWidth: 12 } },
+          tooltip: { callbacks: { label: (ctx) => {
+            const v = ctx.parsed; const pct = total ? ((v/total)*100).toFixed(1) : 0;
+            return `${ctx.label}: ${v} (${pct}%)`;
+          } } }
+        }
+      },
+      plugins: [{
+        id: "pieDataLabels",
+        afterDatasetsDraw(chart) {
+          const { ctx } = chart;
+          const meta = chart.getDatasetMeta(0);
+          ctx.save(); ctx.fillStyle = "#fff";
+          ctx.font = "600 12px system-ui, sans-serif";
+          ctx.textAlign = "center"; ctx.textBaseline = "middle";
+          meta.data.forEach((arc, i) => {
+            const v = values[i]; if (!v) return;
+            const pct = total ? ((v/total)*100).toFixed(0) : 0;
+            const { x, y } = arc.tooltipPosition();
+            ctx.fillText(`${v} (${pct}%)`, x, y);
+          });
+          ctx.restore();
+        }
+      }]
+    });
+  }
+  function drawReasonPie(id, obj) {
+    const ctx = document.getElementById(id);
+    if (!ctx) return;
+    const labels = Object.keys(obj);
+    const values = Object.values(obj);
+    const total = values.reduce((a, b) => a + b, 0);
+    if (charts[id]) charts[id].destroy();
+    charts[id] = new Chart(ctx, {
+      type: "pie",
+      data: { labels, datasets: [{ data: values, backgroundColor: palette }] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 11 } } },
+          tooltip: { callbacks: { label: (c) => {
+            const v = c.parsed; const pct = total ? ((v/total)*100).toFixed(1) : 0;
+            return `${c.label}: ${v} (${pct}%)`;
+          } } }
+        }
+      },
+      plugins: [{
+        id: "reasonPieDataLabels",
+        afterDatasetsDraw(chart) {
+          const { ctx } = chart;
+          const meta = chart.getDatasetMeta(0);
+          ctx.save(); ctx.fillStyle = "#fff";
+          ctx.font = "600 11px system-ui, sans-serif";
+          ctx.textAlign = "center"; ctx.textBaseline = "middle";
+          meta.data.forEach((arc, i) => {
+            const v = values[i]; if (!v) return;
+            const pct = total ? ((v/total)*100).toFixed(0) : 0;
+            const { x, y } = arc.tooltipPosition();
+            ctx.fillText(`${v} (${pct}%)`, x, y);
+          });
+          ctx.restore();
+        }
+      }]
+    });
+  }
+  function drawCapaGauge(id, data) {
+    const today = new Date(); today.setHours(0,0,0,0);
+    const assessed = ["Effective", "Partially Effective", "Ineffective"];
+    const needed = data.filter(r => r.capaNeeded === "Yes");
+    const done = needed.filter(r => {
+      if (!assessed.includes(r.effectiveness)) return false;
+      const d = r.capaDue ? new Date(r.capaDue) : null;
+      if (!d || isNaN(d)) return false;
+      d.setHours(0,0,0,0);
+      return d <= today;
+    }).length;
+    const pct = needed.length ? Math.round((done / needed.length) * 100) : 0;
+    document.getElementById("capaPctLabel").textContent = `${pct}%`;
+    const ctx = document.getElementById(id);
+    if (charts[id]) charts[id].destroy();
+    charts[id] = new Chart(ctx, {
+      type: "doughnut",
+      data: { labels: ["Completed", "Remaining"],
+        datasets: [{ data: [pct, 100 - pct],
+          backgroundColor: ["#16a34a","#e5e7eb"], borderWidth: 0 }] },
+      options: { circumference: 180, rotation: 270, cutout: "70%",
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: "bottom", labels: { boxWidth: 12 } } } }
+    });
+  }
+
+  /* ---------- New Dashboard Helpers ---------- */
+  function drawSlaByPhase(id, data) {
+    const phases = {};
+    data.forEach(r => {
+      const t = parseFloat(r.targetSla), a = parseFloat(r.actualSla);
+      if (isNaN(t) || isNaN(a)) return;
+      const p = r.processPhase || NA;
+      if (!phases[p]) phases[p] = { tSum:0, aSum:0, n:0 };
+      phases[p].tSum += t; phases[p].aSum += a; phases[p].n++;
+    });
+    const labels = Object.keys(phases);
+    const target = labels.map(l => +(phases[l].tSum/phases[l].n).toFixed(1));
+    const actual = labels.map(l => +(phases[l].aSum/phases[l].n).toFixed(1));
+    const ctx = document.getElementById(id);
+    if (!ctx) return;
+    if (charts[id]) charts[id].destroy();
+    charts[id] = new Chart(ctx, {
+      type:"bar",
+      data:{ labels, datasets:[
+        { label:"Target SLA", data:target, backgroundColor:"#16a34a" },
+        { label:"Actual SLA", data:actual, backgroundColor:"#d12027" }
+      ]},
+      options:{ responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{ position:"bottom" } },
+        scales:{ y:{ beginAtZero:true } } }
+    });
+  }
+
+  function drawStackedByDept(id, ncData) {
+    const depts = [...new Set(ncData.map(r => r.department || NA))];
+    const severities = ["Low","Medium","High","Critical"];
+    const colorMap = { Low:"#16a34a", Medium:"#f59e0b", High:"#dc2626", Critical:"#7f1d1d" };
+    const datasets = severities.map(s => ({
+      label:s, backgroundColor: colorMap[s],
+      data: depts.map(d => ncData.filter(r => (r.department||NA)===d && r.severityLevel===s).length)
+    }));
+    const ctx = document.getElementById(id);
+    if (!ctx) return;
+    if (charts[id]) charts[id].destroy();
+    charts[id] = new Chart(ctx, {
+      type:"bar",
+      data:{ labels: depts, datasets },
+      options:{ responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{ position:"bottom" } },
+        scales:{ x:{ stacked:true }, y:{ stacked:true, beginAtZero:true, ticks:{precision:0} } } }
+    });
+  }
+
+  function drawPareto(id, obj) {
+    const sorted = Object.entries(obj).sort((a,b)=>b[1]-a[1]);
+    const labels = sorted.map(s=>s[0]);
+    const values = sorted.map(s=>s[1]);
+    const total = values.reduce((a,b)=>a+b,0);
+    let cum = 0;
+    const cumPct = values.map(v => { cum += v; return total ? +(cum/total*100).toFixed(1) : 0; });
+    const ctx = document.getElementById(id);
+    if (!ctx) return;
+    if (charts[id]) charts[id].destroy();
+    charts[id] = new Chart(ctx, {
+      data:{ labels, datasets:[
+        { type:"bar", label:"Count", data:values, backgroundColor:"#16a34a", yAxisID:"y", order:2 },
+        { type:"line", label:"Cumulative %", data:cumPct, borderColor:"#d12027", backgroundColor:"#d12027", yAxisID:"y1", tension:0.2, order:1 }
+      ]},
+      options:{ responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{ position:"bottom" } },
+        scales:{
+          y:{ beginAtZero:true, position:"left", ticks:{precision:0} },
+          y1:{ beginAtZero:true, max:100, position:"right", grid:{drawOnChartArea:false}, ticks:{callback:v=>v+"%"} }
+        } }
+    });
+  }
+
+  function drawHeatmap(id, data) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const levels = ["High","Medium","Low"];
+    const depts = [...new Set(data.map(r => r.affectedDepartment || r.department || ""))].filter(Boolean);
+    if (!depts.length) { el.innerHTML = '<p class="muted" style="padding:12px">No risk data</p>'; return; }
+    let max = 0;
+    levels.forEach(l => depts.forEach(d => {
+      const c = data.filter(r => r.riskLevel===l && (r.affectedDepartment||r.department)===d).length;
+      if (c>max) max = c;
+    }));
+    const cell = (l,d) => {
+      const c = data.filter(r => r.riskLevel===l && (r.affectedDepartment||r.department)===d).length;
+      const intensity = max ? c/max : 0;
+      const bg = c ? `rgba(209,32,39,${0.15 + intensity*0.7})` : "#f3f4f6";
+      const color = intensity > 0.5 ? "#fff" : "#111";
+      return `<td style="background:${bg};text-align:center;padding:6px;font-weight:600;color:${color};border:1px solid #e5e7eb">${c||""}</td>`;
+    };
+    el.innerHTML = `<div style="overflow:auto;max-height:300px"><table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead><tr><th style="text-align:left;padding:4px;background:#f9fafb">Risk Level \\ Dept</th>${depts.map(d=>`<th style="padding:4px;font-size:11px;background:#f9fafb">${escHtml(d)}</th>`).join("")}</tr></thead>
+      <tbody>${levels.map(l=>`<tr><td style="padding:4px;font-weight:600;background:#f9fafb">${l}</td>${depts.map(d=>cell(l,d)).join("")}</tr>`).join("")}</tbody>
+    </table></div>`;
+  }
+
+  function drawCapaAging(id, capaData) {
+    const today = new Date(); today.setHours(0,0,0,0);
+    const buckets = { "On Track":0, "1-7d overdue":0, "8-30d overdue":0, ">30d overdue":0, "Closed":0 };
+    capaData.forEach(r => {
+      if (r.capaStatus === "Closed") { buckets["Closed"]++; return; }
+      const end = r.endDate ? new Date(r.endDate) : null;
+      if (!end || isNaN(end)) { buckets["On Track"]++; return; }
+      end.setHours(0,0,0,0);
+      const diff = Math.floor((today-end)/86400000);
+      if (diff <= 0) buckets["On Track"]++;
+      else if (diff <= 7) buckets["1-7d overdue"]++;
+      else if (diff <= 30) buckets["8-30d overdue"]++;
+      else buckets[">30d overdue"]++;
+    });
+    const ctx = document.getElementById(id);
+    if (!ctx) return;
+    if (charts[id]) charts[id].destroy();
+    charts[id] = new Chart(ctx, {
+      type:"bar",
+      data:{ labels:Object.keys(buckets), datasets:[{ data:Object.values(buckets),
+        backgroundColor:["#16a34a","#f59e0b","#ea580c","#dc2626","#6b7280"] }] },
+      options:{ responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{display:false} },
+        scales:{ y:{ beginAtZero:true, ticks:{precision:0} } } }
+    });
+  }
+
+  function drawPhaseStacked(id, data) {
+    const phases = [...new Set(data.map(r => r.processPhase || NA))];
+    const ds = [
+      { label:"Compliant", backgroundColor:"#16a34a",
+        data: phases.map(p => data.filter(r=>(r.processPhase||NA)===p && r.compliance==="Compliant").length) },
+      { label:"Observation", backgroundColor:"#f59e0b",
+        data: phases.map(p => data.filter(r=>(r.processPhase||NA)===p && r.compliance==="Observation").length) },
+      { label:"Non-Compliant", backgroundColor:"#dc2626",
+        data: phases.map(p => data.filter(r=>(r.processPhase||NA)===p && r.compliance==="Non-Compliant").length) },
+    ];
+    const ctx = document.getElementById(id);
+    if (!ctx) return;
+    if (charts[id]) charts[id].destroy();
+    charts[id] = new Chart(ctx, {
+      type:"bar", data:{ labels:phases, datasets:ds },
+      options:{ responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{position:"bottom"} },
+        scales:{ x:{stacked:true}, y:{stacked:true, beginAtZero:true, ticks:{precision:0}} } }
+    });
+  }
+
+  function drawDeptScorecard(id, data) {
+    const depts = [...new Set(data.map(r => r.department || ""))].filter(Boolean);
+    const stats = depts.map(d => {
+      const rows = data.filter(r => (r.department||"")===d);
+      const base = rows.filter(r => ["Compliant","Non-Compliant","Observation"].includes(r.compliance)).length;
+      const comp = rows.filter(r => r.compliance==="Compliant").length;
+      const pct = base ? Math.round(comp/base*100) : 0;
+      const ncs = rows.filter(r => r.compliance==="Non-Compliant" || r.compliance==="Observation").length;
+      const slaRows = rows.filter(r => !isNaN(parseFloat(r.targetSla)) && !isNaN(parseFloat(r.actualSla)));
+      const breaches = slaRows.filter(r => parseFloat(r.actualSla) > parseFloat(r.targetSla)).length;
+      return { d, pct, ncs, breaches };
+    }).sort((a,b)=>b.pct-a.pct);
+    const labels = stats.map(s=>s.d);
+    const ctx = document.getElementById(id);
+    if (!ctx) return;
+    if (charts[id]) charts[id].destroy();
+    charts[id] = new Chart(ctx, {
+      type:"bar",
+      data:{ labels, datasets:[
+        { label:"Compliance %", data: stats.map(s=>s.pct), backgroundColor:"#16a34a" },
+        { label:"NCs", data: stats.map(s=>s.ncs), backgroundColor:"#dc2626" },
+        { label:"SLA Breaches", data: stats.map(s=>s.breaches), backgroundColor:"#f59e0b" },
+      ]},
+      options:{ indexAxis:"y", responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{position:"bottom"} },
+        scales:{ x:{ beginAtZero:true } } }
+    });
+  }
+
+  function drawTrends(id, data) {
+    const months = {};
+    data.forEach(r => {
+      if (!r.auditDate) return;
+      const d = new Date(r.auditDate); if (isNaN(d)) return;
+      const k = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+      if (!months[k]) months[k] = { comp:0, base:0, nc:0, slaTotal:0, slaOk:0 };
+      if (["Compliant","Non-Compliant","Observation"].includes(r.compliance)) months[k].base++;
+      if (r.compliance === "Compliant") months[k].comp++;
+      if (r.compliance === "Non-Compliant" || r.compliance === "Observation") months[k].nc++;
+      const t = parseFloat(r.targetSla), a = parseFloat(r.actualSla);
+      if (!isNaN(t) && !isNaN(a)) { months[k].slaTotal++; if (a<=t) months[k].slaOk++; }
+    });
+    const labels = Object.keys(months).sort();
+    const compPct = labels.map(k => months[k].base ? Math.round(months[k].comp/months[k].base*100) : 0);
+    const ncCount = labels.map(k => months[k].nc);
+    const slaPct = labels.map(k => months[k].slaTotal ? Math.round(months[k].slaOk/months[k].slaTotal*100) : 0);
+    const ctx = document.getElementById(id);
+    if (!ctx) return;
+    if (charts[id]) charts[id].destroy();
+    charts[id] = new Chart(ctx, {
+      type:"line",
+      data:{ labels, datasets:[
+        { label:"Compliance %", data:compPct, borderColor:"#16a34a", backgroundColor:"#16a34a", yAxisID:"y", tension:0.2 },
+        { label:"SLA Adherence %", data:slaPct, borderColor:"#16a34a", backgroundColor:"#16a34a", yAxisID:"y", tension:0.2 },
+        { label:"NC Count", data:ncCount, borderColor:"#dc2626", backgroundColor:"#dc2626", yAxisID:"y1", tension:0.2 },
+      ]},
+      options:{ responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{position:"bottom"} },
+        scales:{
+          y:{ position:"left", beginAtZero:true, max:100, ticks:{callback:v=>v+"%"} },
+          y1:{ position:"right", beginAtZero:true, grid:{drawOnChartArea:false}, ticks:{precision:0} }
+        } }
+    });
+  }
+
+  /* ---------- PDF Export ---------- */
+  function activeFiltersText() {
+    const parts = [];
+    const map = { filterSearch: "Search", filterDept: "Department", filterDepartment: "Action Owner",
+      filterProcess: "Process", filterProcessOwner: "Process Owner",
+      filterCompliance: "Compliance", filterRiskLevel: "Risk Level",
+      filterMitigation: "Mitigation" };
+    Object.keys(map).forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const v = el.multiple ? msValues(id).join(", ") : el.value;
+      if (v) parts.push(`${map[id]}: ${v}`);
+    });
+    return parts.length ? parts.join(" · ") : "None";
+  }
+  async function exportPdf() {
+    const orientation = document.getElementById("pdfOrientation").value;
+    const scope = document.getElementById("pdfScope").value;
+    const riskPanel = document.getElementById("dashRisk");
+    const riskActive = !!riskPanel && getComputedStyle(riskPanel).display !== "none";
+    const capture = document.getElementById(riskActive ? "riskDashboardCapture" : "dashboardCapture");
+    const meta = document.getElementById("pdfMeta");
+    const riskMeta = document.getElementById("riskPdfMeta");
+    const exportMetaText = `Exported: ${new Date().toLocaleString()} · Filters: ${activeFiltersText()}`;
+    if (meta) {
+      meta.textContent = exportMetaText;
+    }
+    if (riskMeta) riskMeta.textContent = exportMetaText;
+
+    // Refresh dynamic sections so what gets captured matches the screen.
+    refreshFindings(getFiltered());
+    try {
+      drawTaskPerformanceDonut("chartTaskPerformance", getFiltered());
+      charts.chartTaskPerformance?.update?.("none");
+    } catch (_) {}
+
+    // Scope toggling (kept for non-"all" scopes) — only applies to the Findings dashboard
+    const sectionDisplay = [];
+    capture.classList.add("exporting");
+    // Risk mode reuses the Findings dashboard header (#pdfHeader lives inside #dashboardCapture)
+    const findingsCapture = document.getElementById("dashboardCapture");
+    if (riskActive && findingsCapture) findingsCapture.classList.add("exporting");
+    if (!riskActive) {
+      capture.querySelectorAll("[data-section]").forEach(el => {
+        sectionDisplay.push([el, el.style.display]);
+        const section = el.dataset.section;
+        const show = scope === "all"
+          || scope === section
+          || (scope === "charts" && (section === "charts" || section === "taskPerformance"))
+          || (scope === "table"  && section === "scheduleVariance")
+          || (scope === "findings" && section === "findings");
+        el.style.display = show ? "" : "none";
+      });
+    }
+
+    try {
+      toast("Generating PDF…");
+      // Wait for layout/charts to settle before capturing.
+      await new Promise(r => setTimeout(r, 400));
+      await new Promise(requestAnimationFrame);
+
       const { jsPDF } = window.jspdf;
-      const pdf = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+      const pdf = new jsPDF({ orientation, unit: "pt", format: "a4", compress: true });
       const pageW = pdf.internal.pageSize.getWidth();
       const pageH = pdf.internal.pageSize.getHeight();
       const margin = 24;
-      const headerH = 40;
-      // Title header
-      pdf.setFontSize(14);
-      pdf.setTextColor(31, 58, 138);
-      pdf.text(title, margin, margin + 4);
-      pdf.setFontSize(9);
-      pdf.setTextColor(107, 114, 128);
-      pdf.text(new Date().toLocaleString(), pageW - margin, margin + 4, { align: 'right' });
-      const availW = pageW - margin * 2;
-      const availH = pageH - margin * 2 - headerH;
-      const imgProps = { w: canvas.width, h: canvas.height };
-      const ratio = Math.min(availW / imgProps.w, availH / imgProps.h);
-      const renderW = imgProps.w * ratio;
-      const renderH = imgProps.h * ratio;
-      const imgData = canvas.toDataURL('image/png');
-      // If content is very tall, paginate by slicing the canvas
-      if (renderH <= availH) {
-        pdf.addImage(imgData, 'PNG', margin + (availW - renderW) / 2, margin + headerH, renderW, renderH);
+      const contentW = pageW - margin * 2;
+      const contentH = pageH - margin * 2;
+
+      const isVisible = el => !!el && getComputedStyle(el).display !== "none" && el.offsetWidth > 0 && el.offsetHeight > 0;
+      const chartIds = [
+        "chartTaskPerformance",
+        "chartCompliance","chartNcCategory","chartNcReason",
+        "chartCapaType","chartRcCategory","chartCapaStatus",
+        "chartRiskType","chartRiskLevel","chartRiskMitigation"
+      ];
+      const getChartCard = (id) => {
+        const node = document.getElementById(id);
+        if (!node) return null;
+        return node.closest('[data-auto-chart="taskPerformance"], .chart-card, .card, .dash-card, .panel') || node;
+      };
+      const getSharedChartRow = (ids) => {
+        const cards = ids.map(getChartCard).filter(Boolean);
+        if (cards.length !== ids.length) return null;
+        let ancestor = cards[0];
+        while (ancestor && ancestor !== capture) {
+          if (cards.every(card => ancestor.contains(card))) {
+            const chartCount = chartIds.filter((cid) => {
+              const n = document.getElementById(cid);
+              return n && ancestor.contains(n);
+            }).length;
+            if (chartCount === ids.length) return ancestor;
+          }
+          ancestor = ancestor.parentElement;
+        }
+        return null;
+      };
+
+      // ---- Ordered blocks (exact dashboard order, each appears ONCE) ----
+      const header = document.getElementById("pdfHeader");
+      const riskHeader = document.getElementById("riskPdfHeader");
+      let orderedBlocks;
+      if (riskActive) {
+        const riskKpis = capture.querySelector(".kpis");
+        const riskRow = getSharedChartRow(["chartRiskType","chartRiskLevel","chartRiskMitigation"]);
+        const riskFindings = document.getElementById("findingsSectionRisk");
+        orderedBlocks = [riskHeader, riskKpis, riskRow, riskFindings];
       } else {
-        // Slice into pages based on availH mapped back to source pixels
-        const sliceHpx = Math.floor(availH / (availW / imgProps.w));
-        let y = 0, page = 0;
-        const tmp = document.createElement('canvas');
-        tmp.width = imgProps.w;
-        const ctx = tmp.getContext('2d');
-        while (y < imgProps.h) {
-          const h = Math.min(sliceHpx, imgProps.h - y);
-          tmp.height = h;
-          ctx.fillStyle = '#ffffff';
-          ctx.fillRect(0, 0, tmp.width, h);
-          ctx.drawImage(canvas, 0, y, imgProps.w, h, 0, 0, imgProps.w, h);
-          const slice = tmp.toDataURL('image/png');
-          if (page > 0) pdf.addPage();
-          pdf.setFontSize(14); pdf.setTextColor(31, 58, 138);
-          pdf.text(title, margin, margin + 4);
-          pdf.setFontSize(9); pdf.setTextColor(107, 114, 128);
-          pdf.text(new Date().toLocaleString() + '  ·  Page ' + (page + 1), pageW - margin, margin + 4, { align: 'right' });
-          const sliceRenderW = availW;
-          const sliceRenderH = h * (availW / imgProps.w);
-          pdf.addImage(slice, 'PNG', margin, margin + headerH, sliceRenderW, sliceRenderH);
-          y += h; page += 1;
+        const kpis = capture.querySelector('[data-section="kpis"]');
+        const scheduleVar = capture.querySelector('[data-section="scheduleVariance"]');
+        const taskCard = getChartCard("chartTaskPerformance");
+        const complianceRow = getSharedChartRow(["chartCompliance","chartNcCategory","chartNcReason"]);
+        const capaRow = getSharedChartRow(["chartCapaType","chartRcCategory","chartCapaStatus"]);
+        const findings = document.getElementById("findingsSection");
+        if (scope === "all") {
+          orderedBlocks = [header, kpis, scheduleVar, complianceRow, capaRow, findings];
+        } else {
+          orderedBlocks = [header];
+          if (scope === "kpis") orderedBlocks.push(kpis);
+          if (scope === "table") orderedBlocks.push(scheduleVar);
+          if (scope === "taskPerformance") orderedBlocks.push(taskCard);
+          if (scope === "charts") orderedBlocks.push(complianceRow, capaRow);
+          if (scope === "findings") orderedBlocks.push(findings);
         }
       }
-      pdf.save(filename);
-    } catch (err) {
-      console.error('PDF export failed', err);
-      alert('PDF export failed: ' + (err && err.message ? err.message : err));
-    } finally {
-      btn.textContent = originalText;
-      btn.disabled = false;
-    }
-  });
-  </script>
-
-  <style>
-    .sub-panel{display:none;}
-    .sub-panel.active{display:block;}
-    .dash-sub-panel{display:none;}
-    .dash-sub-panel.active{display:block;}
-    .ga-sub-panel{display:none;}
-    .ga-sub-panel.active{display:block;}
-    /* Detail modal (NC / CAPA / Risk row click) */
-    .detail-overlay{position:fixed;inset:0;background:rgba(15,23,42,.55);display:flex;align-items:flex-start;justify-content:center;z-index:10000;overflow-y:auto;padding:40px 16px;}
-    .detail-card{background:#fff;border-radius:10px;width:100%;max-width:720px;padding:20px 24px;box-shadow:0 20px 60px rgba(0,0,0,.25);}
-    .detail-card h3{margin:0 0 12px;color:#1f3a8a;}
-    .detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;font-size:13px;}
-    .detail-grid .row{display:flex;gap:6px;padding:4px 0;border-bottom:1px solid #f1f5f9;}
-    .detail-grid .lbl{font-weight:600;color:#374151;min-width:130px;}
-    .detail-grid .val{color:#111827;word-break:break-word;}
-  </style>
-  <script>
-  (function(){
-    function activate(btn, attr, panelSelector){
-      const group = btn.parentElement;
-      const targetId = btn.getAttribute(attr);
-      group.querySelectorAll('['+attr+']').forEach(b=>b.classList.toggle('active', b===btn));
-      // Find sibling panels: search within the closest common ancestor
-      const scope = group.parentElement || document;
-      scope.querySelectorAll(panelSelector).forEach(p=>{
-        const on = p.id === targetId;
-        p.classList.toggle('active', on);
-        p.style.display = on ? '' : 'none';
+      const seen = new Set();
+      const blocks = orderedBlocks.filter(el => {
+        if (!el || seen.has(el) || !isVisible(el)) return false;
+        seen.add(el);
+        return true;
       });
-    }
-    document.addEventListener('click', function(e){
-      const t = e.target.closest('button');
-      if(!t) return;
-      if(t.hasAttribute('data-sub'))       return activate(t,'data-sub','.sub-panel');
-      if(t.hasAttribute('data-dashsub'))   return activate(t,'data-dashsub','.dash-sub-panel');
-      if(t.hasAttribute('data-gasub'))     return activate(t,'data-gasub','.ga-sub-panel');
-      if(t.hasAttribute('data-pi-sub')){
-        const key = t.getAttribute('data-pi-sub');
-        const map = {search:'piPanelSearch', dash:'piPanelDash'};
-        const scope = document.getElementById('processInventory') || document;
-        scope.querySelectorAll('[data-pi-sub]').forEach(b=>b.classList.toggle('active', b===t));
-        scope.querySelectorAll('.pi-subpanel').forEach(p=>p.classList.toggle('active', p.id===map[key]));
+      if (!blocks.length) throw new Error("Nothing visible to export");
+
+      // ---- Render every block once ----
+      const cache = new Map();
+      for (const el of blocks) {
+        const canvas = await html2canvas(el, {
+          scale: 2, backgroundColor: "#ffffff", useCORS: true, logging: false,
+          imageTimeout: 0, scrollX: 0, scrollY: -window.scrollY,
+          windowWidth: document.documentElement.scrollWidth,
+          windowHeight: document.documentElement.scrollHeight
+        });
+        cache.set(el, { dataUrl: canvas.toDataURL("image/png"), w: canvas.width, h: canvas.height });
       }
+
+      // ---- Uniform scale (mirror dashboard proportions) ----
+      // Base width = widest captured block. Every block uses the SAME scale,
+      // so relative widths/heights match the on-screen layout exactly.
+      const baseW = Math.max(...blocks.map(el => cache.get(el).w));
+      const widthScale = contentW / baseW;
+      const blockHeightsAtWidth = blocks.map(el => cache.get(el).h * widthScale);
+      const maxBlockH = Math.max(...blockHeightsAtWidth);
+      // If the tallest single card exceeds a page, shrink everything uniformly
+      // so no card ever splits across pages.
+      const fitScale = maxBlockH > contentH ? contentH / maxBlockH : 1;
+      const finalScale = widthScale * fitScale;
+
+      const gap = 10;
+
+      // ---- Pack blocks across pages, never splitting a card ----
+      let y = margin;
+      let pageStarted = true;
+      blocks.forEach((el) => {
+        const c = cache.get(el);
+        const drawW = c.w * finalScale;
+        const drawH = c.h * finalScale;
+        const xOff = margin + (contentW - drawW) / 2;
+
+        if (!pageStarted && y + drawH > margin + contentH + 0.5) {
+          pdf.addPage();
+          y = margin;
+          pageStarted = true;
+        }
+        pdf.addImage(c.dataUrl, "PNG", xOff, y, drawW, drawH, undefined, "FAST");
+        y += drawH + gap;
+        pageStarted = false;
+      });
+
+      pdf.save(`Assurance Tracker -${new Date().toISOString().slice(0,10)}.pdf`);
+      toast("PDF downloaded");
+    } catch (e) {
+      console.error(e);
+      toast("PDF export failed");
+    } finally {
+      capture.classList.remove("exporting");
+      if (riskActive && findingsCapture) findingsCapture.classList.remove("exporting");
+      sectionDisplay.forEach(([el, display]) => { el.style.display = display; });
+    }
+  }
+  document.getElementById("btnExportPdf").addEventListener("click", exportPdf);
+
+  /* ---------- CSV ---------- */
+  function csvEscape(v) {
+    const s = String(v ?? "");
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  }
+  // Export column order grouped by section: General → Task Performance → NC Register → CAPA → Risk
+  const EXPORT_SECTIONS = [
+    { name: "General", ids: ["auditDate","auditId","stepNumber","userName","processName","processOwner","processPreparedBy","processPhase","dayWeek","plannedStartDate","actualStartDate","plannedEndDate","actualEndDate","controlItem","department","subDepartment","owner","evidence","targetSla","actualSla"] },
+    { name: "Task Performance", ids: ["taskDone","taskCorrectness","taskTiming","taskPerformance"] },
+    { name: "NC Register", ids: ["compliance","complianceReasonCategory","complianceReason","ncCategory","ncType","ncId","severityLevel","ncResponsibleDept","verifiedBy","ncDesc","rootCause","ncDescription"] },
+    { name: "CAPA", ids: ["capaNeeded","capaIdField","capaType","rcCategory","rcSubCategory","capaStatus","actionOwner","accountable","startDate","endDate","closureDate","overdueDates","effectivenessCriteria","effectiveness","comments"] },
+    { name: "Risk", ids: ["riskId","riskExist","riskType","riskLevel","affectedDepartment","riskOwner","mitigation","linkedCapaId","control","findings"] },
+  ];
+  function getExportFields() {
+    const byId = Object.fromEntries(FIELDS.map(f => [f.id, f]));
+    const ordered = [];
+    const seen = new Set();
+    EXPORT_SECTIONS.forEach(s => s.ids.forEach(id => {
+      if (byId[id] && !seen.has(id)) { ordered.push(byId[id]); seen.add(id); }
+    }));
+    // Append any FIELDS not covered above to avoid data loss
+    FIELDS.forEach(f => { if (!seen.has(f.id)) { ordered.push(f); seen.add(f.id); } });
+    return ordered;
+  }
+  function exportCSV() {
+    const recProc = msValues("recFilterProcess");
+    const anyFilter = !!document.getElementById("filterSearch").value
+      || FILTER_IDS.some(id => msValues(id).length)
+      || recProc.length > 0;
+    let data = anyFilter ? getFiltered() : records;
+    if (recProc.length) data = data.filter(r => recProc.includes(r.processName));
+    if (!data.length) return toast("No records to export");
+    const fields = getExportFields();
+    const header = ["id", ...fields.map(f => f.label), "Attachments"];
+    const lines = [header.join(",")];
+    data.forEach(r => {
+      const att = (r.attachments || []).map(a => a.name).join(" | ");
+      lines.push([csvEscape(r.id), ...fields.map(f => csvEscape(r[f.id])), csvEscape(att)].join(","));
     });
-  })();
-  // Safety: close any leftover Risk/NC/CAPA detail overlay when switching main tabs
-  document.addEventListener('click', function(e){
-    const nav = e.target.closest('[data-tab], nav a, .tab-btn, .navbtn');
-    if(!nav) return;
-    const ov = document.getElementById('detailOverlay');
-    if(ov) ov.remove();
-  });
-  </script>
-
-  <script>
-  // ===== CAPA: Send Notification via Microsoft Power Automate =====
-  (function(){
-    const FLOW_URL_KEY = 'capaPowerAutomateFlowUrl';
-    const $ = (id) => document.getElementById(id);
-    function toast(msg){
-      const t = document.getElementById('toast');
-      if(!t){ alert(msg); return; }
-      t.textContent = msg; t.classList.add('show');
-      setTimeout(()=>t.classList.remove('show'), 3500);
-    }
-    function getFlowUrl(forcePrompt){
-      let url = localStorage.getItem(FLOW_URL_KEY) || '';
-      if(forcePrompt || !url){
-        const entered = prompt('Enter your Power Automate HTTP POST URL for CAPA notifications:', url);
-        if(entered === null) return '';
-        url = entered.trim();
-        if(url) localStorage.setItem(FLOW_URL_KEY, url);
+    const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `compliance-records-${new Date().toISOString().slice(0,10)}.csv`;
+    a.click(); URL.revokeObjectURL(url);
+    toast(`Exported ${data.length} record(s)`);
+  }
+  function parseCSV(text) {
+    const rows = []; let cur = [], val = "", inQ = false;
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+      if (inQ) {
+        if (c === '"' && text[i+1] === '"') { val += '"'; i++; }
+        else if (c === '"') inQ = false;
+        else val += c;
+      } else {
+        if (c === '"') inQ = true;
+        else if (c === ",") { cur.push(val); val = ""; }
+        else if (c === "\n" || c === "\r") {
+          if (val !== "" || cur.length) { cur.push(val); rows.push(cur); cur = []; val = ""; }
+          if (c === "\r" && text[i+1] === "\n") i++;
+        } else val += c;
       }
-      return url;
     }
-    function buildEmailBody(p){
-      return [
-        'Dear Action Owner,','',
-        'A Corrective / Preventive Action has been assigned.','',
-        'CAPA ID: '+(p.capaId||''),
-        'CAPA Type: '+(p.capaType||''),'',
-        'Start Date: '+(p.startDate||''),
-        'End Date: '+(p.endDate||''),'',
-        'Effectiveness Criteria:',(p.effectivenessCriteria||''),'',
-        'Comments:',(p.comments||''),'',
-        'Please complete the assigned action before the due date.','',
-        'Regards,','Process Assurance System'
-      ].join('\n');
-    }
-    document.addEventListener('click', async (ev) => {
-      const btn = ev.target.closest('#capaSendNotification');
-      if(!btn) return;
-      ev.preventDefault();
+    if (val !== "" || cur.length) { cur.push(val); rows.push(cur); }
+    return rows;
+  }
+  async function importCSV(file) {
+    const reader = new FileReader();
+    reader.onload = async e => {
+      const rows = parseCSV(e.target.result);
+      if (rows.length < 2) return toast("CSV is empty");
+      const header = rows[0].map(h => h.trim());
+      const batch = writeBatch(db);
+      let added = 0;
+      // Use a single import timestamp + zero-padded row index so generated
+      // document IDs sort in the exact CSV file sequence (Firestore default
+      // ordering is by document ID).
+      const importTs = Date.now().toString(36);
+      const pad = String(rows.length).length;
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        if (!row.length || row.every(v => !v)) continue;
+        const obj = {};
+        header.forEach((h, idx) => obj[h] = row[idx] ?? "");
+        const seqId = `${importTs}-${String(i).padStart(pad, "0")}`;
+        const id = obj.id || obj.ID || seqId;
+        const nowIso = new Date().toISOString();
+        const rec = { id, attachments: [], importSeq: i, importedAt: importTs, createdAt: nowIso, updatedAt: nowIso };
+        FIELDS.forEach(f => {
+          const matchKey = Object.keys(obj).find(k => k.toLowerCase() === f.label.toLowerCase()) || f.id;
+          rec[f.id] = normalize(obj[matchKey], f.kind);
+        });
+        // Ensure timestamps exist even if FIELDS loop overwrote them with empties
+        if (!rec.createdAt) rec.createdAt = nowIso;
+        if (!rec.updatedAt) rec.updatedAt = nowIso;
+        // preserve existing attachments + original createdAt if record already exists
+        const existing = records.find(r => r.id === id);
+        if (existing) {
+          rec.attachments = existing.attachments || [];
+          if (existing.createdAt) rec.createdAt = existing.createdAt;
+        }
+        batch.set(doc(db, COLLECTION, id), rec);
+        added++;
+      }
+      try {
+        await batch.commit();
+        toast(`Imported ${added} record(s)`);
+      } catch (err) {
+        console.error(err); toast("Import failed");
+      }
+    };
+    reader.readAsText(file);
+  }
 
-      const capaNeeded = ($('capaNeeded')?.value || '').trim().toLowerCase();
-      if(capaNeeded !== 'yes'){
-        alert('Notification is only sent when CAPA Needed = Yes.');
+  document.getElementById("btnExport").addEventListener("click", exportCSV);
+  document.getElementById("fileImport").addEventListener("change", e => {
+    if (e.target.files[0]) importCSV(e.target.files[0]);
+    e.target.value = "";
+  });
+  const BACKUP_COLLECTION = "records_backup";
+  const BACKUP_DOC_ID = "last";
+
+  async function refreshBackupInfo() {
+    const el = document.getElementById("backupInfo");
+    const btn = document.getElementById("btnRestoreBackup");
+    if (!el && !btn) return;
+    try {
+      const snap = await getDoc(doc(db, BACKUP_COLLECTION, BACKUP_DOC_ID));
+      if (snap.exists()) {
+        const d = snap.data();
+        const when = d.backedUpAt ? new Date(d.backedUpAt).toLocaleString() : "";
+        const count = (d.records || []).length;
+        if (el) el.textContent = count ? `Last backup: ${count} record(s) — ${when}` : "";
+        if (btn) btn.disabled = !count;
+      } else {
+        if (el) el.textContent = "No backup available";
+        if (btn) btn.disabled = true;
+      }
+    } catch (e) { /* ignore */ }
+  }
+
+  document.getElementById("btnClearAll").addEventListener("click", async () => {
+    if (!isAdmin()) { toast("Only admins can clear all records"); return; }
+    if (!records.length) { toast("No records to clear"); return; }
+    const typed = prompt(
+      `This will delete ALL ${records.length} record(s).\n\n` +
+      `A backup will be saved so you can restore it later via "Restore Last Backup".\n\n` +
+      `Type YES (in capitals) to confirm:`
+    );
+    if (typed === null) return;
+    if (String(typed).trim().toUpperCase() !== "YES") { toast("Clear cancelled"); return; }
+    if (!confirm(`Final confirmation: delete ALL ${records.length} record(s) now?`)) return;
+    try {
+      // 1) Save backup snapshot of all current records (metadata only — attachments are NOT deleted)
+      const toDelete = records.slice();
+      const backupPayload = {
+        backedUpAt: new Date().toISOString(),
+        backedUpBy: (window.__session && window.__session.email) || "(unknown)",
+        count: toDelete.length,
+        records: toDelete.map(r => ({ ...r }))
+      };
+      await setDoc(doc(db, BACKUP_COLLECTION, BACKUP_DOC_ID), backupPayload);
+
+      // 2) Delete records from the live collection (keep storage attachments intact for restore)
+      const batch = writeBatch(db);
+      toDelete.forEach(r => batch.delete(doc(db, COLLECTION, r.id)));
+      await batch.commit();
+
+      await writeAudit("clear_all", null, { count: toDelete.length, backup: true });
+      toast(`All records cleared — ${toDelete.length} backed up`);
+      refreshBackupInfo();
+    } catch (err) {
+      console.error(err); toast("Clear failed: " + (err.message || err.code));
+    }
+  });
+
+  document.getElementById("btnRestoreBackup")?.addEventListener("click", async () => {
+    if (!isAdmin()) { toast("Only admins can restore backups"); return; }
+    try {
+      const snap = await getDoc(doc(db, BACKUP_COLLECTION, BACKUP_DOC_ID));
+      if (!snap.exists()) { toast("No backup found"); return; }
+      const d = snap.data();
+      const list = Array.isArray(d.records) ? d.records : [];
+      if (!list.length) { toast("Backup is empty"); return; }
+      const when = d.backedUpAt ? new Date(d.backedUpAt).toLocaleString() : "(unknown time)";
+      if (!confirm(`Restore ${list.length} record(s) from backup taken ${when}?\n\nExisting records with the same ID will be overwritten.`)) return;
+      // Firestore writeBatch limit ~500; chunk if needed
+      const CHUNK = 400;
+      for (let i = 0; i < list.length; i += CHUNK) {
+        const batch = writeBatch(db);
+        list.slice(i, i + CHUNK).forEach(r => {
+          if (r && r.id) batch.set(doc(db, COLLECTION, r.id), r);
+        });
+        await batch.commit();
+      }
+      await writeAudit("restore_backup", null, { count: list.length });
+      toast(`Restored ${list.length} record(s) from backup`);
+    } catch (err) {
+      console.error(err); toast("Restore failed: " + (err.message || err.code));
+    }
+  });
+
+  // Show backup info once auth/data is ready
+  setTimeout(refreshBackupInfo, 1500);
+
+  /* ---------- Realtime sync ---------- */
+  const status = document.getElementById("syncStatus");
+  let unsubscribeRecords = null;
+
+  function startRealtimeSync() {
+    if (unsubscribeRecords) return;
+    status.textContent = "Connecting…";
+    status.style.color = "#6b7280";
+
+    unsubscribeRecords = onSnapshot(colRef, snap => {
+      records = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => {
+        // Preserve CSV import sequence: order by importedAt then importSeq,
+        // fall back to document id for records without import metadata.
+        const ax = a.importedAt || "", bx = b.importedAt || "";
+        if (ax !== bx) return ax < bx ? -1 : 1;
+        const ai = a.importSeq ?? null, bi = b.importSeq ?? null;
+        if (ai !== null && bi !== null && ai !== bi) return ai - bi;
+        return String(a.id).localeCompare(String(b.id));
+      });
+      status.textContent = "Connected — syncs across devices";
+      status.style.color = "#16a34a";
+      window.__paRecords = records;
+      updateDataLists();
+      renderDashboard();
+      renderRecords();
+    }, err => {
+      console.error(err);
+      unsubscribeRecords = null;
+      status.textContent = "Connection error — check Firestore rules";
+      status.style.color = "#dc2626";
+      toast("Firestore error: " + (err.message || err.code));
+    });
+  }
+
+  function stopRealtimeSync() {
+    if (unsubscribeRecords) {
+      unsubscribeRecords();
+      unsubscribeRecords = null;
+    }
+    records = [];
+    status.textContent = "Sign in to sync";
+    status.style.color = "#6b7280";
+    updateDataLists();
+    renderDashboard();
+    renderRecords();
+  }
+
+  window.__startComplianceSync = startRealtimeSync;
+  window.__stopComplianceSync = stopRealtimeSync;
+})();
+
+/* ==================== AUTH GATE ==================== */
+function describeAuthError(err) {
+  const code = String(err?.code || err?.message || err || "");
+  if (code.includes("invalid-credential") || code.includes("wrong-password") || code.includes("invalid-login"))
+    return "Incorrect email or password. Please try again.";
+  if (code.includes("user-not-found")) return "No account exists for this email. Contact the administrator.";
+  if (code.includes("invalid-email")) return "That email address is not valid.";
+  if (code.includes("missing-password")) return "Please enter your password.";
+  if (code.includes("user-disabled")) return "This account has been disabled. Contact the administrator.";
+  if (code.includes("too-many-requests")) return "Too many attempts. Wait a few minutes, or reset your password.";
+  if (code.includes("network-request-failed")) return "Network problem. Check your internet connection and try again.";
+  if (code.includes("operation-not-allowed")) return "Email/password sign-in is disabled in Firebase Authentication.";
+  return (err?.message || String(err)).replace("Firebase: ", "");
+}
+(function () {
+  const overlay = document.getElementById("loginOverlay");
+  const loginForm = document.getElementById("loginForm");
+  const loginError = document.getElementById("loginError");
+  const emailInput = document.getElementById("loginEmail");
+  const passwordInput = document.getElementById("loginPassword");
+  const logoutBtn = document.getElementById("logoutBtn");
+
+  if (!overlay || !loginForm) return;
+
+  observeAuthState(async (user) => {
+    if (user) {
+      const email = (user.email || "").toLowerCase();
+      const admin = ADMIN_EMAILS.map(e => String(e).toLowerCase()).includes(email);
+
+      // Approval check: admins are always approved; for other users, fall back to allow access
+      // when the approval collection is unavailable or not configured yet.
+      let approved = admin;
+      if (!admin) {
+        try {
+          const snap = await getApprovedUserDoc(email);
+          if (!snap) {
+            approved = true;
+          } else {
+            const exists = typeof snap.exists === "function" ? snap.exists() : !!snap.exists;
+            const data = typeof snap.data === "function" ? snap.data() : (snap.data || {});
+            approved = !exists || data.approved === true;
+          }
+        } catch (e) {
+          console.warn("approved_users lookup failed; allowing signed-in user", e);
+          approved = true;
+        }
+      }
+
+      if (!approved) {
+        loginError.textContent = "Your account is not approved yet. Contact the administrator.";
+        await signOutUser();
         return;
       }
 
-      const payload = {
-        capaId:                $('capaIdField')?.value?.trim() || '',
-        capaType:              $('capaType')?.value?.trim() || '',
-        actionOwnerEmail:      $('actionOwner')?.value?.trim() || '',
-        accountableEmail:      $('accountable')?.value?.trim() || '',
-        startDate:             $('startDate')?.value || '',
-        endDate:               $('endDate')?.value || '',
-        effectivenessCriteria: $('effectivenessCriteria')?.value?.trim() || '',
-        comments:              $('comments')?.value?.trim() || '',
-        subject:               `CAPA Assigned - ${$('capaIdField')?.value?.trim() || ''}`
-      };
-      payload.emailBody = buildEmailBody(payload);
+      const viewer = !admin && VIEWER_EMAILS.includes(email);
+      window.__session = { user, email, isAdmin: admin, isViewer: viewer };
+      applyViewerRestrictions(viewer);
+      // Auto-fill the User Name field with the logged-in email and HARD lock it
+      lockUserNameField(email);
+      // Show logged-in email above the Logout button
+      const emailLabel = document.getElementById("currentUserEmail");
+      if (emailLabel) emailLabel.textContent = email;
+      // Toggle admin-only UI
+      document.querySelectorAll("[data-admin-only]").forEach(el => {
+        el.style.display = admin ? "" : "none";
+      });
+      // Land directly on the Home page (with all the tiles) after signing in
+      if (!viewer) {
+        goToHomeTab();
+        // Re-apply after the current auth/render cycle. Some initialization
+        // routines finish after the auth callback and can otherwise leave all
+        // panels inactive until the user manually clicks a navigation item.
+        requestAnimationFrame(() => goToHomeTab());
+      }
+      overlay.style.display = "none";
+      window.__initAdminPanel?.();
+      window.__startComplianceSync?.();
+    } else {
+      window.__session = { user: null, email: null, isAdmin: false, isViewer: false };
+      applyViewerRestrictions(false);
+      const emailLabel = document.getElementById("currentUserEmail");
+      if (emailLabel) emailLabel.textContent = "";
+      window.__stopComplianceSync?.();
+      goToHomeTab();
+      overlay.style.display = "flex";
+      if (passwordInput) passwordInput.value = "";
+    }
+  });
 
-      if(!payload.capaId){ alert('CAPA ID is required.'); return; }
-      if(!payload.actionOwnerEmail){ alert('Action Owner (email) is required.'); return; }
+  loginForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    loginError.textContent = "";
+    try {
+      await signInUser(emailInput.value, passwordInput.value);
+    } catch (err) {
+      loginError.textContent = describeAuthError(err);
+    }
+  });
 
-      const url = getFlowUrl(ev.shiftKey);
-      if(!url){ alert('Power Automate URL is required.'); return; }
+  if (logoutBtn) {
+    logoutBtn.addEventListener("click", async () => {
+      try { await signOutUser(); } catch (err) { console.error(err); }
+    });
+  }
 
-      const originalText = btn.textContent;
-      btn.disabled = true; btn.textContent = 'Sending…';
-      try{
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: {'Content-Type':'application/json'},
-          body: JSON.stringify(payload)
-        });
-        if(!res.ok) throw new Error('HTTP '+res.status);
-        toast('✅ CAPA notification sent');
-      }catch(err){
-        console.error('CAPA notification error', err);
-        alert('Failed to send notification: '+err.message+'\n\nTip: Shift-click the button to re-enter the Power Automate URL.');
-      }finally{
-        btn.disabled = false; btn.textContent = originalText;
+  // Forgot password
+  const forgotLink = document.getElementById("forgotPasswordLink");
+  if (forgotLink) {
+    forgotLink.addEventListener("click", async (e) => {
+      e.preventDefault();
+      loginError.style.color = "#dc2626";
+      const defaultEmail = (emailInput.value || "").trim();
+      const email = (defaultEmail || window.prompt("Enter your email address to receive a password reset link:") || "").trim();
+      if (!email) {
+        loginError.textContent = "Please enter your email address first.";
+        emailInput.focus();
+        return;
+      }
+      forgotLink.setAttribute("aria-busy", "true");
+      forgotLink.style.pointerEvents = "none";
+      loginError.style.color = "#374151";
+      loginError.textContent = "Sending password reset email...";
+      try {
+        await sendResetEmail(email);
+        emailInput.value = email;
+        loginError.style.color = "#059669";
+        loginError.textContent = "If this email belongs to an account, Firebase has sent a reset link. Check the inbox and spam folder.";
+      } catch (err) {
+        console.error("Password reset failed:", err);
+        loginError.style.color = "#dc2626";
+        loginError.textContent = describeAuthError(err);
+      } finally {
+        forgotLink.removeAttribute("aria-busy");
+        forgotLink.style.pointerEvents = "";
       }
     });
-  })();
-  </script>
+  }
+})();
 
-</body>
-</html>
+/* ==================== ADMIN PANEL ==================== */
+(function () {
+  let unsubUsers = null, unsubAudit = null;
+  let initialized = false;
+
+  async function approveUser(email) {
+    email = email.trim().toLowerCase();
+    if (!email) return;
+    try {
+      await setDoc(doc(db, "approved_users", email), {
+        email, approved: true,
+        approvedBy: window.__session.email,
+        approvedAt: new Date().toISOString()
+      });
+      await window.__writeAudit?.("user_approve", null, { targetEmail: email });
+      const inp = document.getElementById("newUserEmail");
+      if (inp) inp.value = "";
+    } catch (e) { console.error(e); alert("Failed: " + e.message); }
+  }
+  async function revokeUser(email) {
+    if (!confirm(`Revoke access for ${email}?`)) return;
+    try {
+      await setDoc(doc(db, "approved_users", email), {
+        email, approved: false,
+        revokedBy: window.__session.email,
+        revokedAt: new Date().toISOString()
+      });
+      await window.__writeAudit?.("user_revoke", null, { targetEmail: email });
+    } catch (e) { console.error(e); alert("Failed: " + e.message); }
+  }
+
+  function renderUsers(list) {
+    const tbody = document.querySelector("#usersTable tbody");
+    if (!tbody) return;
+    if (!list.length) { tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;color:#6b7280;padding:16px">No users yet</td></tr>`; return; }
+    tbody.innerHTML = list.map(u => `
+      <tr>
+        <td>${u.email}</td>
+        <td><span class="badge ${u.approved ? "green" : "red"}">${u.approved ? "Approved" : "Revoked"}</span></td>
+        <td>
+          ${u.approved
+            ? `<button class="btn sm danger" data-revoke="${u.email}">Revoke</button>`
+            : `<button class="btn sm" data-reapprove="${u.email}">Re-approve</button>`}
+        </td>
+      </tr>`).join("");
+    tbody.querySelectorAll("[data-revoke]").forEach(b =>
+      b.addEventListener("click", () => revokeUser(b.dataset.revoke)));
+    tbody.querySelectorAll("[data-reapprove]").forEach(b =>
+      b.addEventListener("click", () => approveUser(b.dataset.reapprove)));
+  }
+
+  function renderAudit(list) {
+    const tbody = document.querySelector("#auditTable tbody");
+    if (!tbody) return;
+    if (!list.length) { tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:#6b7280;padding:16px">No audit entries yet</td></tr>`; return; }
+    tbody.innerHTML = list.map(a => {
+      const ts = a.at?.toDate ? a.at.toDate().toLocaleString() : "(pending)";
+      const detail = [a.userName, a.processName, a.targetEmail, a.count != null ? `${a.count} records` : null]
+        .filter(Boolean).join(" · ");
+      return `<tr>
+        <td>${ts}</td>
+        <td>${a.userEmail || ""}</td>
+        <td><span class="badge ${a.action === "delete" || a.action === "user_revoke" || a.action === "clear_all" ? "red" : a.action === "create" || a.action === "user_approve" ? "green" : "amber"}">${a.action}</span></td>
+        <td>${detail || (a.recordId || "")}</td>
+      </tr>`;
+    }).join("");
+  }
+
+  window.__initAdminPanel = function () {
+    if (!window.__session.isAdmin) return;
+    if (initialized) return;
+    initialized = true;
+
+    // wire add-user form
+    const addBtn = document.getElementById("btnAddUser");
+    if (addBtn) addBtn.addEventListener("click", () => {
+      const v = document.getElementById("newUserEmail").value;
+      approveUser(v);
+    });
+
+    // realtime users
+    unsubUsers = onSnapshot(collection(db, "approved_users"), snap => {
+      const list = snap.docs.map(d => d.data()).sort((a,b) => (a.email||"").localeCompare(b.email||""));
+      renderUsers(list);
+    }, err => console.error("users sync", err));
+
+    // realtime audit (latest 200)
+    const q = query(collection(db, "audit_log"), orderBy("at", "desc"), limit(200));
+    unsubAudit = onSnapshot(q, snap => {
+      renderAudit(snap.docs.map(d => d.data()));
+    }, err => console.error("audit sync", err));
+  };
+})();
+/* ==================== CAPA REGISTER ==================== */
+(function () {
+  "use strict";
+
+  const CAPA_COLLECTION = "capa_records";
+  let capaRecords = [];
+  let unsubCapa = null;
+
+  const CAPA_FIELDS = [
+    { id: "capaId",          label: "CAPA ID" },
+    { id: "relatedNcId",     label: "Related NC ID" },
+    { id: "auditRef",        label: "Assessment/Audit Reference" },
+    { id: "type",            label: "CAPA Type" },
+    { id: "rcCategory",      label: "RC Category" },
+    { id: "rcSummary",       label: "RC Summary" },
+    { id: "description",     label: "CAPA Description" },
+    { id: "owner",           label: "Owner" },
+    { id: "accountable",     label: "Accountable" },
+    { id: "startDate",       label: "Start Date" },
+    { id: "completionDate",  label: "Completion Date" },
+    { id: "status",          label: "Status" },
+    { id: "daysOverdue",     label: "Days Overdue" },
+    { id: "evidence",        label: "Required Evidence" },
+    { id: "effCriteria",     label: "Effectiveness Criteria" },
+    { id: "effStatus",       label: "Effectiveness Status" },
+    { id: "closureDate",     label: "Closure Date" },
+  ];
+
+  const $ = (id) => document.getElementById(id);
+  const escH = (s) => String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+  function toastMsg(msg) {
+    const el = $("toast"); if (!el) return;
+    el.textContent = msg; el.classList.add("show");
+    clearTimeout(toastMsg._t);
+    toastMsg._t = setTimeout(() => el.classList.remove("show"), 2200);
+  }
+  function isAdminNow() { return !!(window.__session && window.__session.isAdmin); }
+  function currentEmailNow() { return (window.__session && window.__session.email) || "(unknown)"; }
+
+  /* ---------- Filters ---------- */
+  function getFilteredCapa() {
+    const q = ($("capaFilterSearch")?.value || "").toLowerCase().trim();
+    const type = $("capaFilterType")?.value || "";
+    const status = ($("capaFilterStatus")?.value || "").toLowerCase();
+    const eff = ($("capaFilterEffectiveness")?.value || "").toLowerCase();
+    const owner = ($("capaFilterOwner")?.value || "").toLowerCase().trim();
+    return capaRecords.filter(r => {
+      if (type && (r.type || "").toLowerCase() !== type.toLowerCase()) return false;
+      if (status && !(r.status || "").toLowerCase().includes(status)) return false;
+      if (eff && !(r.effStatus || "").toLowerCase().includes(eff)) return false;
+      if (owner && !(r.owner || "").toLowerCase().includes(owner)) return false;
+      if (!q) return true;
+      return CAPA_FIELDS.some(f => String(r[f.id] || "").toLowerCase().includes(q));
+    });
+  }
+
+  /* ---------- Render table ---------- */
+  function renderCapa() {
+    const tbody = document.querySelector("#capaTable tbody");
+    if (!tbody) return;
+    const data = getFilteredCapa();
+    $("capaCount").textContent = `${data.length} CAPA record(s)`;
+    if (!data.length) {
+      tbody.innerHTML = `<tr><td colspan="18" style="text-align:center;color:var(--muted);padding:24px">No CAPA records. Click “+ New CAPA” to add one.</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = data.map(r => `
+      <tr>
+        <td>${escH(r.capaId)}</td>
+        <td>${escH(r.relatedNcId)}</td>
+        <td class="wrap">${escH(r.auditRef)}</td>
+        <td>${escH(r.type)}</td>
+        <td>${escH(r.rcCategory)}</td>
+        <td class="wrap">${escH(r.rcSummary)}</td>
+        <td class="wrap">${escH(r.description)}</td>
+        <td>${escH(r.owner)}</td>
+        <td>${escH(r.accountable)}</td>
+        <td>${escH(r.startDate)}</td>
+        <td>${escH(r.completionDate)}</td>
+        <td>${escH(r.status)}</td>
+        <td>${escH(r.daysOverdue)}</td>
+        <td class="wrap">${escH(r.evidence)}</td>
+        <td class="wrap">${escH(r.effCriteria)}</td>
+        <td>${escH(r.effStatus)}</td>
+        <td>${escH(r.closureDate)}</td>
+        <td>
+          <button class="btn sm" data-capa-edit="${r.id}">Edit</button>
+          ${isAdminNow() ? `<button class="btn sm danger" data-capa-del="${r.id}">Del</button>` : ""}
+        </td>
+      </tr>`).join("");
+
+    tbody.querySelectorAll("[data-capa-edit]").forEach(b =>
+      b.addEventListener("click", () => openCapaModal(b.dataset.capaEdit)));
+    tbody.querySelectorAll("[data-capa-del]").forEach(b =>
+      b.addEventListener("click", () => deleteCapa(b.dataset.capaDel)));
+  }
+
+  /* ---------- Modal / form ---------- */
+  function openCapaModal(id) {
+    const modal = $("capaModal");
+    const title = $("capaModalTitle");
+    $("capaForm").reset();
+    $("capaId_hidden").value = "";
+    if (id) {
+      const r = capaRecords.find(x => x.id === id);
+      if (r) {
+        title.textContent = "Edit CAPA";
+        $("capaId_hidden").value = r.id;
+        CAPA_FIELDS.forEach(f => {
+          const el = $("capa_" + f.id);
+          if (el) el.value = r[f.id] || "";
+        });
+      }
+    } else {
+      title.textContent = "New CAPA";
+    }
+    modal.style.display = "flex";
+  }
+  function closeCapaModal() { $("capaModal").style.display = "none"; }
+
+  $("btnCapaNew")?.addEventListener("click", () => openCapaModal());
+  $("capaModalClose")?.addEventListener("click", closeCapaModal);
+  $("capaModal")?.addEventListener("click", (e) => { if (e.target.id === "capaModal") closeCapaModal(); });
+  $("capaFormReset")?.addEventListener("click", () => {
+    $("capaForm").reset();
+    $("capaId_hidden").value = "";
+  });
+
+  $("capaForm")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const id = $("capaId_hidden").value || uid();
+    const rec = { id };
+    CAPA_FIELDS.forEach(f => {
+      const el = $("capa_" + f.id);
+      rec[f.id] = el ? String(el.value || "").trim() : "";
+    });
+    const existing = capaRecords.find(x => x.id === id);
+    const isNew = !existing;
+    rec.updatedBy = currentEmailNow();
+    rec.updatedAt = new Date().toISOString();
+    if (isNew) {
+      rec.createdBy = currentEmailNow();
+      rec.createdAt = rec.updatedAt;
+    } else {
+      rec.createdBy = existing.createdBy || currentEmailNow();
+      rec.createdAt = existing.createdAt || rec.updatedAt;
+    }
+    try {
+      await setDoc(doc(db, CAPA_COLLECTION, id), rec);
+      await window.__writeAudit?.(isNew ? "create" : "update", id, { capaId: rec.capaId, type: rec.type });
+      closeCapaModal();
+      toastMsg("CAPA saved");
+    } catch (err) {
+      console.error(err); toastMsg("Save failed: " + (err.message || err.code));
+    }
+  });
+
+  async function deleteCapa(id) {
+    if (!isAdminNow()) { toastMsg("Only admins can delete CAPA records"); return; }
+    if (!confirm("Delete this CAPA record?")) return;
+    const r = capaRecords.find(x => x.id === id);
+    try {
+      await deleteDoc(doc(db, CAPA_COLLECTION, id));
+      await window.__writeAudit?.("delete", id, { capaId: r?.capaId });
+      toastMsg("CAPA deleted");
+    } catch (err) { console.error(err); toastMsg("Delete failed"); }
+  }
+
+  $("btnCapaClearAll")?.addEventListener("click", async () => {
+    if (!isAdminNow()) { toastMsg("Only admins can clear all CAPA records"); return; }
+    if (!capaRecords.length) return;
+    if (!confirm("Delete ALL CAPA records? This cannot be undone.")) return;
+    try {
+      const batch = writeBatch(db);
+      const toDelete = capaRecords.slice();
+      toDelete.forEach(r => batch.delete(doc(db, CAPA_COLLECTION, r.id)));
+      await batch.commit();
+      await window.__writeAudit?.("clear_all", null, { count: toDelete.length, scope: "capa" });
+      toastMsg("All CAPA records cleared");
+    } catch (err) { console.error(err); toastMsg("Clear failed"); }
+  });
+
+  /* ---------- Filters wiring ---------- */
+  ["capaFilterSearch","capaFilterType","capaFilterStatus","capaFilterEffectiveness","capaFilterOwner"]
+    .forEach(id => $(id)?.addEventListener("input", renderCapa));
+  $("capaClearFilters")?.addEventListener("click", () => {
+    ["capaFilterSearch","capaFilterType","capaFilterStatus","capaFilterEffectiveness","capaFilterOwner"]
+      .forEach(id => { const el = $(id); if (el) el.value = ""; });
+    renderCapa();
+  });
+
+  /* ---------- Export to Excel ---------- */
+  $("btnCapaExportExcel")?.addEventListener("click", () => {
+    const data = getFilteredCapa();
+    if (!data.length) return toastMsg("No CAPA records to export");
+    if (typeof XLSX === "undefined") return toastMsg("Excel library not loaded");
+    const headers = CAPA_FIELDS.map(f => f.label);
+    const rows = data.map(r => CAPA_FIELDS.map(f => r[f.id] || ""));
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    ws["!cols"] = headers.map(h => ({ wch: Math.max(14, Math.min(40, h.length + 4)) }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "CAPA Register");
+    XLSX.writeFile(wb, `capa-register-${new Date().toISOString().slice(0,10)}.xlsx`);
+    toastMsg(`Exported ${data.length} CAPA record(s)`);
+  });
+
+  /* ---------- Export to PDF ---------- */
+  $("btnCapaExportPdf")?.addEventListener("click", async () => {
+    const data = getFilteredCapa();
+    if (!data.length) return toastMsg("No CAPA records to export");
+    try {
+      toastMsg("Generating PDF…");
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF({ orientation: "landscape", unit: "pt", format: "a3" });
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+      const margin = 24;
+
+      // Header
+      pdf.setFontSize(14); pdf.setTextColor(33,33,33);
+      pdf.text("IDH — CAPA Register / Master Log", margin, margin + 4);
+      pdf.setFontSize(9); pdf.setTextColor(107,114,128);
+      pdf.text(`Exported ${new Date().toLocaleString()} · ${data.length} record(s)`, margin, margin + 20);
+
+      // Build offscreen table for capture (so we keep all columns)
+      const wrap = document.createElement("div");
+      wrap.style.cssText = "position:fixed;left:-10000px;top:0;background:#fff;padding:12px;font-family:Arial,sans-serif;";
+      const tbl = document.createElement("table");
+      tbl.style.cssText = "border-collapse:collapse;font-size:10px;";
+      const thead = `<tr>${CAPA_FIELDS.map(f => `<th style="border:1px solid #cbd5e1;background:#f1f5f9;padding:4px 6px;text-align:left;color:#334155;font-weight:600;">${escH(f.label)}</th>`).join("")}</tr>`;
+      const tbody = data.map(r => `<tr>${CAPA_FIELDS.map(f => `<td style="border:1px solid #e2e8f0;padding:4px 6px;color:#1f2937;vertical-align:top;max-width:180px;word-wrap:break-word;">${escH(r[f.id] || "")}</td>`).join("")}</tr>`).join("");
+      tbl.innerHTML = `<thead>${thead}</thead><tbody>${tbody}</tbody>`;
+      wrap.appendChild(tbl);
+      document.body.appendChild(wrap);
+
+      const canvas = await html2canvas(wrap, { scale: 2, backgroundColor: "#ffffff", logging: false });
+      document.body.removeChild(wrap);
+
+      const imgW = pageW - margin * 2;
+      const usableH = pageH - margin - 50;
+      const imgH = canvas.height * (imgW / canvas.width);
+      const img = canvas.toDataURL("image/jpeg", 0.92);
+
+      if (imgH <= usableH) {
+        pdf.addImage(img, "JPEG", margin, margin + 36, imgW, imgH);
+      } else {
+        const pageCanvas = document.createElement("canvas");
+        const pageCtx = pageCanvas.getContext("2d");
+        const sliceHpx = usableH * (canvas.width / imgW);
+        pageCanvas.width = canvas.width;
+        let y = 0, first = true;
+        while (y < canvas.height) {
+          const h = Math.min(sliceHpx, canvas.height - y);
+          pageCanvas.height = h;
+          pageCtx.fillStyle = "#fff";
+          pageCtx.fillRect(0, 0, pageCanvas.width, h);
+          pageCtx.drawImage(canvas, 0, y, canvas.width, h, 0, 0, canvas.width, h);
+          const slice = pageCanvas.toDataURL("image/jpeg", 0.92);
+          if (!first) { pdf.addPage(); }
+          pdf.addImage(slice, "JPEG", margin, margin + (first ? 36 : 12), imgW, h * (imgW / canvas.width));
+          y += h; first = false;
+        }
+      }
+      pdf.save(`capa-register-${new Date().toISOString().slice(0,10)}.pdf`);
+      toastMsg("PDF downloaded");
+    } catch (err) {
+      console.error(err); toastMsg("PDF export failed");
+    }
+  });
+
+  /* ---------- Realtime sync (start/stop with auth) ---------- */
+  function startCapaSync() {
+    if (unsubCapa) return;
+    unsubCapa = onSnapshot(collection(db, CAPA_COLLECTION), snap => {
+      capaRecords = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+        .sort((a,b) => String(a.capaId || "").localeCompare(String(b.capaId || "")));
+      renderCapa();
+    }, err => {
+      console.error("capa sync", err);
+      toastMsg("CAPA sync error: " + (err.message || err.code));
+    });
+  }
+  function stopCapaSync() {
+    if (unsubCapa) { unsubCapa(); unsubCapa = null; }
+    capaRecords = []; renderCapa();
+  }
+
+  // Hook into auth state changes (auth already initialized at top of file)
+  observeAuthState((user) => {
+    if (user) startCapaSync(); else stopCapaSync();
+  });
+
+  // Render once on load (empty)
+  renderCapa();
+})();
