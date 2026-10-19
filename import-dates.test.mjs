@@ -1,0 +1,26 @@
+import { test } from "node:test"; import assert from "node:assert/strict";
+import { parseDateCell as p, detectSlashOrder, mapHeaders, reviewIdDate, toLocalDate } from "../import-dates.js";
+const ok = (r, v) => assert.deepEqual(r, { status: "ok", value: v });
+test("ISO", () => { ok(p("2026-09-20"), "2026-09-20"); ok(p("2026-09-21"), "2026-09-21"); ok(p(" 2026-09-22 "), "2026-09-22"); });
+test("DMY", () => ok(p("20/09/2026", "DMY"), "2026-09-20"));
+test("MDY", () => ok(p("09/20/2026", "MDY"), "2026-09-20"));
+test("unambiguous auto", () => { ok(p("20/09/2026"), "2026-09-20"); ok(p("09/20/2026"), "2026-09-20"); });
+test("ambiguous not guessed", () => assert.equal(p("03/04/2026").status, "ambiguous"));
+test("explicit ambiguous", () => { ok(p("03/04/2026","DMY"),"2026-04-03"); ok(p("03/04/2026","MDY"),"2026-03-04"); });
+test("excel serial", () => { ok(p("46285"), "2026-09-20"); ok(p("46285.75"), "2026-09-20"); });
+test("blank / NA", () => { for (const v of ["", " ", "N/A", "n/a", undefined]) assert.equal(p(v).status, "blank"); });
+test("datetime keeps written day", () => { ok(p("2026-09-20T23:30:00Z"), "2026-09-20"); ok(p("2026-09-20T00:30:00+05:00"), "2026-09-20"); ok(p("20/09/2026 23:59","DMY"),"2026-09-20"); ok(p("9/20/2026 1:05 PM"),"2026-09-20"); });
+test("invalid reported", () => { for (const v of ["2026-02-30","31/31/2026","tomorrow","12345"]) assert.equal(p(v).status, "invalid"); });
+test("month names", () => { ok(p("20-Sep-2026"),"2026-09-20"); ok(p("Sep 20, 2026"),"2026-09-20"); });
+test("detect order", () => { assert.equal(detectSlashOrder(["20/09/2026","03/04/2026"]),"DMY"); assert.equal(detectSlashOrder(["09/20/2026"]),"MDY"); assert.equal(detectSlashOrder(["20/09/2026","09/20/2026"]),"conflict"); assert.equal(detectSlashOrder(["2026-09-20"]),null); });
+test("local date no shift", () => { const d = toLocalDate("2026-09-01"); assert.equal(d.getDate(), 1); assert.equal(d.getMonth(), 8); });
+const F = [{id:"auditDate",label:"Review Date"},{id:"plannedStartDate",label:"Planned Start Date"},{id:"actualStartDate",label:"Actual Start Date"},{id:"plannedEndDate",label:"Planned End Date"},{id:"actualEndDate",label:"Actual End Date"},{id:"department",label:"Action Owner"},{id:"ncResponsibleDept",label:"Action Owner"},{id:"actionOwner",label:"Action Owner"},{id:"startDate",label:"Start Date"}];
+test("header mapping", () => {
+  const r = mapHeaders(["\uFEFFid"," review date ","PLANNED START DATE","Actual Start Date","plannedEndDate","Actual  End Date","Action Owner","Action Owner","Action Owner","Start Date"], F);
+  assert.deepEqual(r.errors, []); assert.equal(r.idCol, 0);
+  assert.deepEqual([r.map.auditDate,r.map.plannedStartDate,r.map.actualStartDate,r.map.plannedEndDate,r.map.actualEndDate], [1,2,3,4,5]);
+  assert.deepEqual([r.map.department,r.map.ncResponsibleDept,r.map.actionOwner,r.map.startDate],[6,7,8,9]);
+});
+test("Start Date not taken for Planned Start Date", () => { const r = mapHeaders(["Start Date"], F); assert.equal(r.map.plannedStartDate, undefined); assert.equal(r.map.startDate, 0); });
+test("duplicate header is an error", () => assert.ok(mapHeaders(["Review Date","Review Date"], F).errors.length));
+test("review id date", () => { assert.equal(reviewIdDate("R-20260920-01"), "2026-09-20"); assert.equal(reviewIdDate("AUD-1"), null); });
