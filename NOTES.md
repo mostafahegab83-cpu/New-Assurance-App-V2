@@ -310,5 +310,5 @@ the filtered result list is correct.
 - Columns: No. · Step · Who (Swimlane) · Type · Next step No. · If NO/Reject → No. · Note. Title / Process No. / Version sit above the table.
 - Defaults: blank Next = next row; blank Who = row above; blank Type = Task. Decision → Yes/No, Approval → Approve/Reject (diamonds).
 - Layout is computed (no Sequence column). One sheet = one process; multiple sheets → process selector.
-- Upload auto-renders and (checkbox, remembered per browser) auto-downloads the .vdx. Visio export now mirrors the screen layout.
+- Upload auto-renders and (checkbox, remembered per browser) auto-downloads a native .vsdx (built with JSZip). .vsdx export mirrors the screen layout.
 - Old unified-schema and legacy files still import unchanged (checked first).

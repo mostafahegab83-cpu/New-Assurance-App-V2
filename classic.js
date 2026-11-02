@@ -1846,32 +1846,73 @@
     pdf.save('process-map.pdf');
   }
   function computeLayout(){ const m=effectiveMode(); return m==='horizontal'?computeLayoutHorizontal():computeLayoutVertical(); }
-  // ---------- Visio 2003 VDX export (single-file XML, opens in Visio) ----------
-  function vdxEsc(t){ return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-  function vdxRect(id, cx, cy, w, h, fill, line, text, bold, opts){
-    const o = opts || {};
-    const round = o.round != null ? o.round : 0.05;
-    const txtColor = o.textColor || '#0F172A';
-    const size = o.size || (bold?0.13:0.10);
-    const noLine = o.noLine ? 1 : 0;
-    const txf = o.rotate ? `<TextXForm><TxtPinX>${w/2}</TxtPinX><TxtPinY>${h/2}</TxtPinY><TxtWidth>${h}</TxtWidth><TxtHeight>${w}</TxtHeight><TxtLocPinX>${h/2}</TxtLocPinX><TxtLocPinY>${w/2}</TxtLocPinY><TxtAngle>1.5707963</TxtAngle></TextXForm>` : '';
-    return `<Shape ID="${id}" Type="Shape" LineStyle="3" FillStyle="3" TextStyle="3"><XForm><PinX>${cx}</PinX><PinY>${cy}</PinY><Width>${w}</Width><Height>${h}</Height><LocPinX>${w/2}</LocPinX><LocPinY>${h/2}</LocPinY></XForm><Line><LineWeight>0.01</LineWeight><LineColor>${line}</LineColor><Rounding>${round}</Rounding></Line><Fill><FillForegnd>${fill}</FillForegnd><FillPattern>1</FillPattern></Fill><TextBlock><VerticalAlign>1</VerticalAlign><LeftMargin>0.03</LeftMargin><RightMargin>0.03</RightMargin><TopMargin>0.02</TopMargin><BottomMargin>0.02</BottomMargin></TextBlock>${txf}<Char IX="0"><Font>2</Font><Color>${txtColor}</Color><Size>${size}</Size><Style>${bold?1:0}</Style></Char><Para IX="0"><HorzAlign>${o.align!=null?o.align:1}</HorzAlign></Para><Geom IX="0"><NoFill>0</NoFill><NoLine>${noLine}</NoLine><MoveTo IX="1"><X>0</X><Y>0</Y></MoveTo><LineTo IX="2"><X>${w}</X><Y>0</Y></LineTo><LineTo IX="3"><X>${w}</X><Y>${h}</Y></LineTo><LineTo IX="4"><X>0</X><Y>${h}</Y></LineTo><LineTo IX="5"><X>0</X><Y>0</Y></LineTo></Geom><Text>${vdxEsc(text)}</Text></Shape>`;
+  // ---------- Native Visio (.vsdx) export — Visio 2013+ package built with JSZip ----------
+  function vsxEsc(t){ return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  const vsxN = v => (Math.round(v*10000)/10000);
+  function vsxCell(n, v){ return `<Cell N="${n}" V="${vsxEsc(v)}"/>`; }
+  // o: { cx, cy, w, h, pts:[[x,y]...] local, closed, fill, line, lineW, round, text, textColor, size, bold, align, rotate, arrow, margin }
+  function vsxShape(id, o){
+    let c = '';
+    c += vsxCell('PinX', vsxN(o.cx)) + vsxCell('PinY', vsxN(o.cy)) + vsxCell('Width', vsxN(o.w)) + vsxCell('Height', vsxN(o.h));
+    c += vsxCell('LocPinX', vsxN(o.w/2)) + vsxCell('LocPinY', vsxN(o.h/2)) + vsxCell('Angle', 0);
+    c += vsxCell('LineWeight', o.lineW || 0.0104) + vsxCell('LineColor', o.line || '#1F4E79') + vsxCell('LinePattern', 1);
+    if (o.round) c += vsxCell('Rounding', vsxN(o.round));
+    if (o.fill){ c += vsxCell('FillForegnd', o.fill) + vsxCell('FillPattern', 1); }
+    else c += vsxCell('FillPattern', 0);
+    if (o.arrow){ c += vsxCell('EndArrow', 4) + vsxCell('EndArrowSize', 1); }
+    const m = o.margin!=null ? o.margin : 0.04;
+    c += vsxCell('VerticalAlign', 1) + vsxCell('LeftMargin', m) + vsxCell('RightMargin', m) + vsxCell('TopMargin', 0.02) + vsxCell('BottomMargin', 0.02);
+    if (o.rotate){
+      c += vsxCell('TxtPinX', vsxN(o.w/2)) + vsxCell('TxtPinY', vsxN(o.h/2)) + vsxCell('TxtWidth', vsxN(o.h)) + vsxCell('TxtHeight', vsxN(o.w));
+      c += vsxCell('TxtLocPinX', vsxN(o.h/2)) + vsxCell('TxtLocPinY', vsxN(o.w/2)) + vsxCell('TxtAngle', 1.5707963);
+    }
+    let sec = `<Section N="Character"><Row IX="0">${vsxCell('Font','Calibri')}${vsxCell('Color', o.textColor || '#0F172A')}${vsxCell('Size', o.size || 0.1111)}${vsxCell('Style', o.bold?1:0)}</Row></Section>`;
+    sec += `<Section N="Paragraph"><Row IX="0">${vsxCell('HorzAlign', o.align!=null?o.align:1)}</Row></Section>`;
+    const pts = o.pts;
+    let g = `<Section N="Geometry" IX="0">${vsxCell('NoFill', o.fill?0:1)}${vsxCell('NoLine',0)}${vsxCell('NoShow',0)}${vsxCell('NoSnap',0)}`;
+    g += `<Row T="MoveTo" IX="1">${vsxCell('X', vsxN(pts[0][0]))}${vsxCell('Y', vsxN(pts[0][1]))}</Row>`;
+    for (let i=1;i<pts.length;i++) g += `<Row T="LineTo" IX="${i+1}">${vsxCell('X', vsxN(pts[i][0]))}${vsxCell('Y', vsxN(pts[i][1]))}</Row>`;
+    if (o.closed) g += `<Row T="LineTo" IX="${pts.length+1}">${vsxCell('X', vsxN(pts[0][0]))}${vsxCell('Y', vsxN(pts[0][1]))}</Row>`;
+    g += `</Section>`;
+    const txt = o.text ? `<Text>${vsxEsc(o.text)}</Text>` : '';
+    return `<Shape ID="${id}" NameU="Shape${id}" Name="Shape${id}" Type="Shape">${c}${sec}${g}${txt}</Shape>`;
   }
-  function vdxDiamond(id, cx, cy, w, h, text){
-    return `<Shape ID="${id}" Type="Shape" LineStyle="3" FillStyle="3" TextStyle="3"><XForm><PinX>${cx}</PinX><PinY>${cy}</PinY><Width>${w}</Width><Height>${h}</Height><LocPinX>${w/2}</LocPinX><LocPinY>${h/2}</LocPinY></XForm><Line><LineWeight>0.01</LineWeight><LineColor>#E69138</LineColor></Line><Fill><FillForegnd>#FFF2CC</FillForegnd><FillPattern>1</FillPattern></Fill><TextBlock><VerticalAlign>1</VerticalAlign><LeftMargin>0.25</LeftMargin><RightMargin>0.25</RightMargin></TextBlock><Char IX="0"><Font>2</Font><Color>#0F172A</Color><Size>0.10</Size></Char><Para IX="0"><HorzAlign>1</HorzAlign></Para><Geom IX="0"><MoveTo IX="1"><X>${w/2}</X><Y>0</Y></MoveTo><LineTo IX="2"><X>${w}</X><Y>${h/2}</Y></LineTo><LineTo IX="3"><X>${w/2}</X><Y>${h}</Y></LineTo><LineTo IX="4"><X>0</X><Y>${h/2}</Y></LineTo><LineTo IX="5"><X>${w/2}</X><Y>0</Y></LineTo></Geom><Text>${vdxEsc(text)}</Text></Shape>`;
-  }
-  // Orthogonal connector: pts = [[x,y],...] in Visio inches (page coords). Open path with end arrow.
-  function vdxPolyline(id, pts, color){
+  function vsxRect(id, cx, cy, w, h, opts){ return vsxShape(id, { ...opts, cx, cy, w, h, closed:true, pts:[[0,0],[w,0],[w,h],[0,h]] }); }
+  function vsxDiamond(id, cx, cy, w, h, opts){ return vsxShape(id, { ...opts, cx, cy, w, h, closed:true, pts:[[w/2,0],[w,h/2],[w/2,h],[0,h/2]] }); }
+  function vsxPolyline(id, pts, color){
     const xs = pts.map(p=>p[0]), ys = pts.map(p=>p[1]);
     const minX = Math.min(...xs), minY = Math.min(...ys);
     const w = Math.max(0.01, Math.max(...xs)-minX), h = Math.max(0.01, Math.max(...ys)-minY);
-    const lc = color || '#1F4E79';
-    let g = `<MoveTo IX="1"><X>${pts[0][0]-minX}</X><Y>${pts[0][1]-minY}</Y></MoveTo>`;
-    for (let i=1;i<pts.length;i++) g += `<LineTo IX="${i+1}"><X>${pts[i][0]-minX}</X><Y>${pts[i][1]-minY}</Y></LineTo>`;
-    return `<Shape ID="${id}" Type="Shape" LineStyle="3" FillStyle="3" TextStyle="3"><XForm><PinX>${minX+w/2}</PinX><PinY>${minY+h/2}</PinY><Width>${w}</Width><Height>${h}</Height><LocPinX>${w/2}</LocPinX><LocPinY>${h/2}</LocPinY></XForm><Line><LineWeight>0.015</LineWeight><LineColor>${lc}</LineColor><EndArrow>4</EndArrow><EndArrowSize>1</EndArrowSize></Line><Fill><FillPattern>0</FillPattern></Fill><Geom IX="0"><NoFill>1</NoFill><NoLine>0</NoLine>${g}</Geom></Shape>`;
+    return vsxShape(id, { cx:minX+w/2, cy:minY+h/2, w, h, line:color, lineW:0.0139, arrow:true, pts: pts.map(p => [p[0]-minX, p[1]-minY]) });
+  }
+  function buildVsdxPackage(title, pageW, pageH, shapesXml){
+    const NS = 'http://schemas.microsoft.com/office/visio/2012/main';
+    const RNS = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+    const PR = 'http://schemas.openxmlformats.org/package/2006/relationships';
+    const HDR = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
+    const now = new Date().toISOString().replace(/\.\d+Z$/,'Z');
+    const files = {};
+    files['[Content_Types].xml'] = HDR + `<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/visio/document.xml" ContentType="application/vnd.ms-visio.drawing.main+xml"/><Override PartName="/visio/pages/pages.xml" ContentType="application/vnd.ms-visio.pages+xml"/><Override PartName="/visio/pages/page1.xml" ContentType="application/vnd.ms-visio.page+xml"/><Override PartName="/visio/windows.xml" ContentType="application/vnd.ms-visio.windows+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/></Types>`;
+    files['_rels/.rels'] = HDR + `<Relationships xmlns="${PR}"><Relationship Id="rId1" Type="http://schemas.microsoft.com/visio/2010/relationships/document" Target="visio/document.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/></Relationships>`;
+    files['docProps/core.xml'] = HDR + `<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>${vsxEsc(title)}</dc:title><dc:creator>Process Assurance Tracker</dc:creator><dcterms:created xsi:type="dcterms:W3CDTF">${now}</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">${now}</dcterms:modified></cp:coreProperties>`;
+    files['docProps/app.xml'] = HDR + `<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Application>Microsoft Visio</Application><Template></Template></Properties>`;
+    files['visio/_rels/document.xml.rels'] = HDR + `<Relationships xmlns="${PR}"><Relationship Id="rId1" Type="http://schemas.microsoft.com/visio/2010/relationships/pages" Target="pages/pages.xml"/><Relationship Id="rId2" Type="http://schemas.microsoft.com/visio/2010/relationships/windows" Target="windows.xml"/></Relationships>`;
+    const styleCells = [['EnableLineProps',1],['EnableFillProps',1],['EnableTextProps',1],['HideForApply',0],
+      ['LineWeight',0.0104],['LineColor','#000000'],['LinePattern',1],['Rounding',0],['EndArrowSize',2],['BeginArrow',0],['EndArrow',0],['LineCap',0],['BeginArrowSize',2],['LineColorTrans',0],
+      ['FillForegnd','#FFFFFF'],['FillBkgnd','#FFFFFF'],['FillPattern',1],['ShdwForegnd','#000000'],['ShdwPattern',0],['FillForegndTrans',0],['FillBkgndTrans',0],
+      ['LeftMargin',0.0556],['RightMargin',0.0556],['TopMargin',0.0556],['BottomMargin',0.0556],['VerticalAlign',1],['TextBkgnd',0],['DefaultTabStop',0.5],['TextDirection',0]
+    ].map(([n,v]) => vsxCell(n,v)).join('');
+    const styleSecs = `<Section N="Character"><Row IX="0">${vsxCell('Font','Calibri')}${vsxCell('Color','#000000')}${vsxCell('Style',0)}${vsxCell('Case',0)}${vsxCell('Pos',0)}${vsxCell('FontScale',1)}${vsxCell('Size',0.1667)}${vsxCell('ColorTrans',0)}</Row></Section><Section N="Paragraph"><Row IX="0">${vsxCell('IndFirst',0)}${vsxCell('IndLeft',0)}${vsxCell('IndRight',0)}${vsxCell('SpLine',-1.2)}${vsxCell('SpBefore',0)}${vsxCell('SpAfter',0)}${vsxCell('HorzAlign',1)}${vsxCell('Bullet',0)}</Row></Section>`;
+    files['visio/document.xml'] = HDR + `<VisioDocument xmlns="${NS}" xmlns:r="${RNS}" xml:space="preserve"><DocumentSettings TopPage="0" DefaultTextStyle="0" DefaultLineStyle="0" DefaultFillStyle="0" DefaultGuideStyle="0"><GlueSettings>9</GlueSettings><SnapSettings>65847</SnapSettings><SnapExtensions>34</SnapExtensions><SnapAngles/><DynamicGridEnabled>1</DynamicGridEnabled><ProtectStyles>0</ProtectStyles><ProtectShapes>0</ProtectShapes><ProtectMasters>0</ProtectMasters><ProtectBkgnds>0</ProtectBkgnds></DocumentSettings><Colors><ColorEntry IX="0" RGB="#000000"/><ColorEntry IX="1" RGB="#FFFFFF"/></Colors><FaceNames><FaceName NameU="Calibri" UnicodeRanges="-536859905 -1073732485 9 0" CharSets="536871423 0" Panos="2 15 5 2 2 2 4 3 2 4" Flags="325"/></FaceNames><StyleSheets><StyleSheet ID="0" NameU="No Style" IsCustomNameU="1" Name="No Style" IsCustomName="1">${styleCells}${styleSecs}</StyleSheet></StyleSheets><DocumentSheet NameU="TheDoc" IsCustomNameU="1" Name="TheDoc" IsCustomName="1" LineStyle="0" FillStyle="0" TextStyle="0">${vsxCell('OutputFormat',0)}${vsxCell('LockPreview',0)}${vsxCell('AddMarkup',0)}${vsxCell('ViewMarkup',0)}${vsxCell('DocLockReplace',0)}${vsxCell('NoCoauth',0)}${vsxCell('DocLockDuplicatePage',0)}${vsxCell('PreviewQuality',0)}${vsxCell('PreviewScope',0)}${vsxCell('DocLangID',1033)}</DocumentSheet></VisioDocument>`;
+    files['visio/windows.xml'] = HDR + `<Windows xmlns="${NS}" xmlns:r="${RNS}" ClientWidth="1600" ClientHeight="900" xml:space="preserve"><Window ID="0" WindowType="Drawing" WindowState="1073741824" ClientWidth="1600" ClientHeight="900" Page="0" ViewScale="-1" ViewCenterX="${vsxN(pageW/2)}" ViewCenterY="${vsxN(pageH/2)}"><ShowRulers>1</ShowRulers><ShowGrid>0</ShowGrid><ShowPageBreaks>0</ShowPageBreaks><ShowGuides>1</ShowGuides><ShowConnectionPoints>1</ShowConnectionPoints><GlueSettings>9</GlueSettings><SnapSettings>65847</SnapSettings><SnapExtensions>34</SnapExtensions><SnapAngles/><DynamicGridEnabled>1</DynamicGridEnabled><TabSplitterPos>0.5</TabSplitterPos></Window></Windows>`;
+    files['visio/pages/_rels/pages.xml.rels'] = HDR + `<Relationships xmlns="${PR}"><Relationship Id="rId1" Type="http://schemas.microsoft.com/visio/2010/relationships/page" Target="page1.xml"/></Relationships>`;
+    files['visio/pages/pages.xml'] = HDR + `<Pages xmlns="${NS}" xmlns:r="${RNS}" xml:space="preserve"><Page ID="0" NameU="Page-1" Name="Process Map" ViewScale="-1" ViewCenterX="${vsxN(pageW/2)}" ViewCenterY="${vsxN(pageH/2)}"><PageSheet LineStyle="0" FillStyle="0" TextStyle="0">${vsxCell('PageWidth', vsxN(pageW))}${vsxCell('PageHeight', vsxN(pageH))}${vsxCell('ShdwOffsetX',0.125)}${vsxCell('ShdwOffsetY',-0.125)}${vsxCell('PageScale',1)}${vsxCell('DrawingScale',1)}${vsxCell('DrawingSizeType',3)}${vsxCell('DrawingScaleType',0)}${vsxCell('InhibitSnap',0)}${vsxCell('PageLockReplace',0)}${vsxCell('PageLockDuplicate',0)}${vsxCell('UIVisibility',0)}${vsxCell('ShdwType',0)}${vsxCell('ShdwObliqueAngle',0)}${vsxCell('ShdwScaleFactor',1)}${vsxCell('DrawingResizeType',1)}${vsxCell('PageShapeSplit',1)}${vsxCell('PrintPageOrientation', pageW>=pageH?2:1)}${vsxCell('PaperKind',8)}</PageSheet><Rel r:id="rId1"/></Page></Pages>`;
+    files['visio/pages/page1.xml'] = HDR + `<PageContents xmlns="${NS}" xmlns:r="${RNS}" xml:space="preserve"><Shapes>${shapesXml}</Shapes></PageContents>`;
+    return files;
   }
 
-  function downloadVsdx(){
+  async function downloadVsdx(){
+    if (!window.JSZip){ alert('Zip library not loaded — cannot build the Visio file.'); return; }
     if (!state.steps || !state.steps.length){ alert('No data to export. Generate the process map first.'); return; }
     const mode = effectiveMode();
     const lay = computeLayout();
@@ -1892,7 +1933,8 @@
 
     let id = 1, shapes = '';
     const drawRectPx = (xPx, yPx, wPx, hPx, fill, line, text, bold, opts) => {
-      shapes += vdxRect(id++, X(xPx + wPx/2), Y(yPx + hPx/2), wPx*PX, hPx*PX, fill, line, text || '', !!bold, opts);
+      const o = opts || {};
+      shapes += vsxRect(id++, X(xPx + wPx/2), Y(yPx + hPx/2), wPx*PX, hPx*PX, { fill, line, text: text || '', bold: !!bold, round: o.round, align: o.align, size: o.size, textColor: o.textColor, rotate: o.rotate });
     };
 
     const fullTitle = (state.title || 'Process Map') + (state.pno ? `   |   Process Code: ${state.pno}` : '') + (state.ver ? `   |   Version: ${state.ver}` : '');
@@ -1932,7 +1974,7 @@
         const isYes = /^(yes|approv|accept|ok)/i.test(lbl);
         const isNo  = /^(no|reject|deny)/i.test(lbl);
         const color = isYes ? '#2E7D32' : isNo ? '#C62828' : '#1F4E79';
-        shapes += vdxPolyline(id++, pts.map(p => [X(p[0]), Y(p[1])]), color);
+        shapes += vsxPolyline(id++, pts.map(p => [X(p[0]), Y(p[1])]), color);
         if (lbl) labels.push({ x:(a.x+b.x)/2, y:(a.y+b.y)/2 - 6, lbl, color, fill: isYes ? '#B7E1A1' : isNo ? '#F4CCCC' : '#FFFFFF' });
       });
     });
@@ -1943,9 +1985,9 @@
       const p = lay.stepPos[st.id]; if (!p) return;
       const cx = X(p.x + boxWpx/2), cy = Y(p.y + boxHpx/2);
       const label = st.name || st.id;
-      if (st.type === 'decision') shapes += vdxDiamond(id++, cx, cy, bw, bh, label);
-      else if (st.type === 'start' || st.type === 'end') shapes += vdxRect(id++, cx, cy, bw, bh*0.6, '#1F4E79', '#1F4E79', label, true, { round: bh*0.3, textColor:'#FFFFFF' });
-      else shapes += vdxRect(id++, cx, cy, bw, bh, fillFor(st.type), '#1F4E79', label, false, { round:0.04 });
+      if (st.type === 'decision') shapes += vsxDiamond(id++, cx, cy, bw, bh, { fill:'#FFF2CC', line:'#E69138', text:label, size:0.1, margin:0.25 });
+      else if (st.type === 'start' || st.type === 'end') shapes += vsxRect(id++, cx, cy, bw, bh, { fill:'#1F4E79', line:'#1F4E79', text:label, bold:true, round: bh*0.5, textColor:'#FFFFFF' });
+      else shapes += vsxRect(id++, cx, cy, bw, bh, { fill:fillFor(st.type), line:'#1F4E79', text:label, round:0.04, size:0.1 });
     });
 
     // Branch labels (Yes/No, Approve/Reject) on top of connectors
@@ -1964,20 +2006,14 @@
       drawRectPx(nx, p.y + (boxHpx-noteH)/2, noteW, noteH, '#FFFBE6', '#B45309', st.annotation, false, { round:0.03, size:0.085, textColor:'#78350F' });
     });
 
-    const xml = `<?xml version="1.0" encoding="utf-8" ?>
-<VisioDocument xmlns="http://schemas.microsoft.com/visio/2003/core" start="190" metric="0" DocLangID="1033" buildnum="6360" version="11.0" xml:space="preserve">
-<DocumentProperties><Title>${vdxEsc(state.title||'Process Map')}</Title><Creator>Process Assurance Tracker</Creator></DocumentProperties>
-<DocumentSettings TopPage="0" DefaultTextStyle="3" DefaultLineStyle="3" DefaultFillStyle="3" DefaultGuideStyle="4"><GlueSettings>9</GlueSettings><SnapSettings>65847</SnapSettings></DocumentSettings>
-<FaceNames><FaceName ID="2" Name="Calibri" Panos="2 15 5 2 2 2 4 3 2 4" Flags="325"/></FaceNames>
-<StyleSheets><StyleSheet ID="0" NameU="No Style" Name="No Style"/><StyleSheet ID="3" NameU="Normal" Name="Normal" LineStyle="0" FillStyle="0" TextStyle="0"><Char IX="0"><Font>2</Font><Color>0</Color><Size>0.1666</Size></Char></StyleSheet><StyleSheet ID="4" NameU="Guide" Name="Guide"/></StyleSheets>
-<Pages><Page ID="0" NameU="Page-1" Name="Page-1"><PageSheet LineStyle="0" FillStyle="0" TextStyle="0"><PageProps><PageWidth>${pageW.toFixed(3)}</PageWidth><PageHeight>${pageH.toFixed(3)}</PageHeight><PageScale>1</PageScale><DrawingScale>1</DrawingScale><DrawingSizeType>3</DrawingSizeType></PageProps><PrintProps><PrintPageOrientation>2</PrintPageOrientation><PaperKind>8</PaperKind></PrintProps></PageSheet>
-<Shapes>${shapes}</Shapes></Page></Pages></VisioDocument>`;
-
-    const blob = new Blob([xml], { type:'application/vnd.visio' });
+    const files = buildVsdxPackage(state.title || 'Process Map', pageW, pageH, shapes);
+    const zip = new JSZip();
+    Object.entries(files).forEach(([n, c]) => zip.file(n, c, { createFolders:false }));
+    const blob = await zip.generateAsync({ type:'blob', mimeType:'application/vnd.ms-visio.drawing', compression:'DEFLATE' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     const base = [state.pno, state.title].filter(Boolean).join(' - ') || 'process-map';
-    a.download = base.replace(/[^\w\-؀-ۿ ]+/g, '_').trim() + '.vdx';
+    a.download = base.replace(/[^\w\-؀-ۿ ]+/g, '_').trim() + '.vsdx';
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   }
