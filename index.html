@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>IDH · Process Assurance Tracker</title>
 <link rel="icon" href="idh-logo.png" />
-<link rel="stylesheet" href="styles.css?v=20261103-unassigned" />
+<link rel="stylesheet" href="styles.css?v=20261103-allfilters" />
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -41,10 +41,10 @@
   .ms-btn:hover{border-color:#94a3b8;}
   .ms-wrap.open .ms-btn{border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,.15);}
   .ms-label{display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .ms-panel{display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:1000;min-width:100%;max-width:340px;max-height:280px;overflow:auto;background:#fff;border:1px solid #cbd5e1;border-radius:8px;box-shadow:0 8px 24px rgba(15,23,42,.12);padding:6px;}
+  .ms-panel{display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:1000;min-width:max(100%,280px);max-width:420px;max-height:280px;overflow:auto;background:#fff;border:1px solid #cbd5e1;border-radius:8px;box-shadow:0 8px 24px rgba(15,23,42,.12);padding:6px;}
   .ms-wrap.open .ms-panel{display:block;}
   .ms-actions{display:flex;gap:6px;padding:4px 4px 8px;border-bottom:1px solid #eef2f7;margin-bottom:4px;}
-  .ms-actions button{flex:1;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:6px;padding:5px 8px;font-size:12px;font-weight:600;color:#334155;cursor:pointer;}
+  .ms-actions button{flex:1;white-space:nowrap;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:6px;padding:5px 8px;font-size:12px;font-weight:600;color:#334155;cursor:pointer;}
   .ms-actions button:hover{background:#e2e8f0;}
   .ms-search{padding:2px 4px 6px;}
   .ms-search input{width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:6px;padding:6px 8px;font-size:13px;outline:none;}
@@ -342,16 +342,14 @@
           <span class="muted" id="backupInfo" style="margin-left:8px;"></span>
         </div>
         <div class="filters">
-          <input type="search" id="recFilterAuditId" placeholder="Review ID" />
-          <input type="search" id="recFilterUser" placeholder="User Name" list="dlUser" />
+          <select id="recFilterAuditId" multiple data-placeholder="Review ID"></select>
+          <select id="recFilterUser" multiple data-placeholder="User Name"></select>
           <select id="recFilterProcess" multiple data-placeholder="Process Name"></select>
-          <input type="search" id="recFilterPhase" placeholder="Process Phase" autocomplete="off" />
-          <input type="search" id="recFilterDepartment" placeholder="Department" autocomplete="off" />
+          <select id="recFilterPhase" multiple data-placeholder="Process Phase"></select>
+          <select id="recFilterDepartment" multiple data-placeholder="Department"></select>
           <select id="recFilterProcessOwner" multiple data-placeholder="Process Owner"></select>
           <select id="recFilterActionOwner" multiple data-placeholder="Action Owner"></select>
-          <label class="records-month-filter" for="recFilterMonth">Review Month
-            <select id="recFilterMonth"><option value="">All Months</option></select>
-          </label>
+          <select id="recFilterMonth" multiple data-placeholder="Review Month"></select>
           <span class="reviewed-processes" role="status" aria-live="polite" aria-atomic="true">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5H6a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-3"/><rect x="9" y="2" width="6" height="5" rx="1"/><path d="m8 14 3 3 5-6"/></svg>
             <span>Reviewed Processes: <strong id="reviewedProcessesCount">0</strong></span>
@@ -1706,9 +1704,9 @@
 
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script src="classic.js?v=20261103-unassigned"></script>
-  <script type="module" src="app.js?v=20261103-unassigned"></script>
-  <script type="module" src="features.js?v=20261103-unassigned"></script>
+  <script src="classic.js?v=20261103-allfilters"></script>
+  <script type="module" src="app.js?v=20261103-allfilters"></script>
+  <script type="module" src="features.js?v=20261103-allfilters"></script>
 
   <script>
   // Export-to-PDF handler (shared for dashboard sub-pages)

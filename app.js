@@ -357,7 +357,10 @@ function countReviewedProcesses(records) {
 
 // Owner filters: the UNASSIGNED pick matches blank / N/A values.
 const UNASSIGNED = "__unassigned__";
-const inOwnerList = (list, value) => list.includes(value) || (list.includes(UNASSIGNED) && identityPart(value) === "");
+const inOwnerList = (list, value) => {
+  const key = identityPart(value);
+  return list.some(pick => pick === UNASSIGNED ? key === "" : identityPart(pick) === key);
+};
 
 function filterReviewRecords(records, filters = {}) {
   const match = (value, term) => !term || String(value || "").toLowerCase()
@@ -365,12 +368,17 @@ function filterReviewRecords(records, filters = {}) {
   return records.filter(r =>
     match(r.auditId, filters.auditId) &&
     match(r.userName, filters.user) &&
-    (!filters.processes?.length || filters.processes.includes(r.processName)) &&
+    (!filters.auditIds?.length || inOwnerList(filters.auditIds, r.auditId)) &&
+    (!filters.users?.length || inOwnerList(filters.users, r.userName)) &&
+    (!filters.processes?.length || inOwnerList(filters.processes, r.processName)) &&
     match(r.processPhase, filters.phase) &&
+    (!filters.phases?.length || inOwnerList(filters.phases, r.processPhase)) &&
     match(r.processOwner, filters.department) &&
+    (!filters.departments?.length || inOwnerList(filters.departments, r.processOwner)) &&
     (!filters.processOwners?.length || inOwnerList(filters.processOwners, r.processPreparedBy)) &&
     (!filters.actionOwners?.length || inOwnerList(filters.actionOwners, r.department)) &&
-    (!filters.month || reviewMonth(r.auditDate) === filters.month)
+    (!filters.month || reviewMonth(r.auditDate) === filters.month) &&
+    (!filters.months?.length || filters.months.includes(reviewMonth(r.auditDate) || UNASSIGNED))
   );
 }
 
@@ -869,34 +877,34 @@ window.__writeAudit = writeAudit;
       posel.innerHTML = owners.map(v => `<option ${pocur.includes(v)?'selected':''}>${v.replace(/"/g,'&quot;')}</option>`).join("");
       if (posel._msRefresh) posel._msRefresh();
     }
-    const rpsel = document.getElementById("recFilterProcess");
-    if (rpsel) {
-      const rpcur = Array.from(rpsel.selectedOptions).map(o => o.value);
-      const rprocs = [...new Set(records.map(r => r.processName).filter(v => v && v !== NA))].sort();
-      rpsel.innerHTML = rprocs.map(v => `<option ${rpcur.includes(v)?'selected':''}>${v.replace(/"/g,'&quot;')}</option>`).join("");
-      initMultiSelect(rpsel);
-      if (rpsel._msRefresh) rpsel._msRefresh();
-    }
-    const rposel = document.getElementById("recFilterProcessOwner");
-    if (rposel) {
-      const rpocur = Array.from(rposel.selectedOptions).map(o => o.value);
-      const rpos = [...new Set(records.map(r => r.processPreparedBy).filter(v => v && v !== NA))].sort();
-      const rpoBlank = records.some(r => identityPart(r.processPreparedBy) === "");
-      rposel.innerHTML = (rpoBlank ? `<option value="${UNASSIGNED}" ${rpocur.includes(UNASSIGNED)?'selected':''}>Unassigned (N/A)</option>` : "")
-        + rpos.map(v => `<option ${rpocur.includes(v)?'selected':''}>${v.replace(/"/g,'&quot;')}</option>`).join("");
-      initMultiSelect(rposel);
-      if (rposel._msRefresh) rposel._msRefresh();
-    }
-    const raosel = document.getElementById("recFilterActionOwner");
-    if (raosel) {
-      const raocur = Array.from(raosel.selectedOptions).map(o => o.value);
-      const raos = [...new Set(records.map(r => r.department).filter(v => v && v !== NA))].sort();
-      const raoBlank = records.some(r => identityPart(r.department) === "");
-      raosel.innerHTML = (raoBlank ? `<option value="${UNASSIGNED}" ${raocur.includes(UNASSIGNED)?'selected':''}>Unassigned (N/A)</option>` : "")
-        + raos.map(v => `<option ${raocur.includes(v)?'selected':''}>${v.replace(/"/g,'&quot;')}</option>`).join("");
-      initMultiSelect(raosel);
-      if (raosel._msRefresh) raosel._msRefresh();
-    }
+    // Records filters: every filter is a search / Select all / Clear dropdown.
+    // Values are de-duplicated ignoring case and spacing; blanks / N/A become "Unassigned (N/A)".
+    const fillRecFilter = (id, field, blankLabel = "Unassigned (N/A)") => {
+      const sel = document.getElementById(id);
+      if (!sel) return;
+      const cur = Array.from(sel.selectedOptions).map(o => o.value);
+      const seenKeys = new Map();
+      records.forEach(r => {
+        const raw = String(r[field] ?? "").trim().replace(/\s+/g, " ");
+        const key = identityPart(raw);
+        if (key && !seenKeys.has(key)) seenKeys.set(key, raw);
+      });
+      // Keep a picked value visible (showing zero) even if its last record changed.
+      cur.forEach(v => { const k = identityPart(v); if (v !== UNASSIGNED && k && !seenKeys.has(k)) seenKeys.set(k, v); });
+      const vals = [...seenKeys.values()].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }));
+      const hasBlank = records.some(r => identityPart(r[field]) === "") || cur.includes(UNASSIGNED);
+      const opt = (val, text) => `<option value="${escHtml(val)}" ${cur.includes(val) ? "selected" : ""}>${escHtml(text)}</option>`;
+      sel.innerHTML = (hasBlank ? opt(UNASSIGNED, blankLabel) : "") + vals.map(v => opt(v, v)).join("");
+      initMultiSelect(sel);
+      if (sel._msRefresh) sel._msRefresh();
+    };
+    fillRecFilter("recFilterAuditId", "auditId", "No Review ID (N/A)");
+    fillRecFilter("recFilterUser", "userName", "No user (N/A)");
+    fillRecFilter("recFilterProcess", "processName", "No process name (N/A)");
+    fillRecFilter("recFilterPhase", "processPhase", "No phase (N/A)");
+    fillRecFilter("recFilterDepartment", "processOwner", "No department (N/A)");
+    fillRecFilter("recFilterProcessOwner", "processPreparedBy");
+    fillRecFilter("recFilterActionOwner", "department");
   }
 
   /* ---------- Attachments (staged in form, uploaded on save) ---------- */
@@ -1250,48 +1258,29 @@ window.__writeAudit = writeAudit;
 
 
   /* ---------- Records table ---------- */
+  const REC_FILTER_IDS = ["recFilterAuditId","recFilterUser","recFilterProcess","recFilterPhase","recFilterDepartment",
+    "recFilterProcessOwner","recFilterActionOwner","recFilterMonth"];
   function renderRecords() {
     const head = document.getElementById("recordsHead");
     const tbody = document.querySelector("#recordsTable tbody");
 
     // Wire filter inputs once
     if (!renderRecords._filtersWired) {
-      const ids = ["recFilterAuditId","recFilterUser","recFilterPhase","recFilterDepartment","recFilterMonth"];
+      const ids = REC_FILTER_IDS;
       ids.forEach(id => {
         const el = document.getElementById(id);
-        if (el) el.addEventListener("input", () => renderRecords());
+        if (!el) return;
+        el.addEventListener("change", () => renderRecords());
+        el.addEventListener("input", () => renderRecords());
       });
-      const rp = document.getElementById("recFilterProcess");
-      document.getElementById("recFilterMonth")?.addEventListener("change", () => renderRecords());
-      if (rp) {
-        rp.addEventListener("change", () => renderRecords());
-        rp.addEventListener("input", () => renderRecords());
-      }
-      const rpo = document.getElementById("recFilterProcessOwner");
-      if (rpo) {
-        rpo.addEventListener("change", () => renderRecords());
-        rpo.addEventListener("input", () => renderRecords());
-      }
-      const rao = document.getElementById("recFilterActionOwner");
-      if (rao) {
-        rao.addEventListener("change", () => renderRecords());
-        rao.addEventListener("input", () => renderRecords());
-      }
       const clr = document.getElementById("recClearFilters");
       if (clr) clr.addEventListener("click", () => {
-        ids.forEach(id => { const el = document.getElementById(id); if (el) el.value = ""; });
-        if (rp) {
-          Array.from(rp.options).forEach(o => o.selected = false);
-          if (rp._msRefresh) rp._msRefresh();
-        }
-        if (rpo) {
-          Array.from(rpo.options).forEach(o => o.selected = false);
-          if (rpo._msRefresh) rpo._msRefresh();
-        }
-        if (rao) {
-          Array.from(rao.options).forEach(o => o.selected = false);
-          if (rao._msRefresh) rao._msRefresh();
-        }
+        ids.forEach(id => {
+          const el = document.getElementById(id);
+          if (!el) return;
+          Array.from(el.options).forEach(o => o.selected = false);
+          if (el._msRefresh) el._msRefresh();
+        });
         renderRecords();
       });
       const delBtn = document.getElementById("btnDeleteSelected");
@@ -1301,35 +1290,38 @@ window.__writeAudit = writeAudit;
 
     const monthSelect = document.getElementById("recFilterMonth");
     if (monthSelect) {
-      const selectedMonth = monthSelect.value;
+      const picked = Array.from(monthSelect.selectedOptions).map(o => o.value);
       const months = availableReviewMonths(records);
       // Retain an active month if its last record is edited/deleted: show zero,
       // rather than silently broadening the user's filter to All Months.
-      if (selectedMonth && !months.includes(selectedMonth)) months.push(selectedMonth);
+      picked.forEach(m => { if (m !== UNASSIGNED && !months.includes(m)) months.push(m); });
       months.sort().reverse();
-      monthSelect.innerHTML = '<option value="">All Months</option>' + months
-        .map(month => `<option value="${month}">${monthLabel(month)}</option>`).join("");
-      monthSelect.value = selectedMonth;
+      const hasUndated = records.some(r => !reviewMonth(r.auditDate)) || picked.includes(UNASSIGNED);
+      const mopt = (val, text) => `<option value="${val}" ${picked.includes(val) ? "selected" : ""}>${escHtml(text)}</option>`;
+      monthSelect.innerHTML = months.map(m => mopt(m, monthLabel(m))).join("")
+        + (hasUndated ? mopt(UNASSIGNED, "No review date (N/A)") : "");
+      initMultiSelect(monthSelect);
+      if (monthSelect._msRefresh) monthSelect._msRefresh();
     }
 
-    const fv = id => (document.getElementById(id)?.value || "").trim().toLowerCase();
-    const fAuditId = fv("recFilterAuditId");
-    const fUser    = fv("recFilterUser");
-    const fProcSel = msValues("recFilterProcess");
-    const fPhase   = fv("recFilterPhase");
-    const fDept    = fv("recFilterDepartment");
+    const fAuditIds = msValues("recFilterAuditId");
+    const fUsers    = msValues("recFilterUser");
+    const fProcSel  = msValues("recFilterProcess");
+    const fPhases   = msValues("recFilterPhase");
+    const fDepts    = msValues("recFilterDepartment");
     const fProcOwners = msValues("recFilterProcessOwner");
     const fActionOwners = msValues("recFilterActionOwner");
-    const fMonth   = fv("recFilterMonth");
+    const fMonths   = msValues("recFilterMonth");
+    const anyRecFilter = [fAuditIds, fUsers, fProcSel, fPhases, fDepts, fProcOwners, fActionOwners, fMonths].some(a => a.length);
     const filtered = filterReviewRecords(records, {
-      auditId: fAuditId, user: fUser, processes: fProcSel,
-      phase: fPhase, department: fDept, processOwners: fProcOwners, actionOwners: fActionOwners, month: fMonth
+      auditIds: fAuditIds, users: fUsers, processes: fProcSel, phases: fPhases, departments: fDepts,
+      processOwners: fProcOwners, actionOwners: fActionOwners, months: fMonths
     });
     const processCount = document.getElementById("reviewedProcessesCount");
     if (processCount) processCount.textContent = String(countReviewedProcesses(filtered));
 
     document.getElementById("recordsCount").textContent =
-      (fAuditId || fUser || fProcSel.length || fPhase || fDept || fProcOwners.length || fActionOwners.length || fMonth)
+      anyRecFilter
         ? `${filtered.length} of ${records.length} record(s)`
         : `${records.length} record(s)`;
 
@@ -1440,7 +1432,7 @@ window.__writeAudit = writeAudit;
       const allOpts = Array.from(sel.options).filter(o => o.value !== "");
       const opts = visibleOpts();
       const actions = `<div class="ms-actions"><button type="button" data-act="all">Select all</button><button type="button" data-act="none">Clear</button></div>`;
-      const searchHtml = allOpts.length > 1
+      const searchHtml = allOpts.length
         ? `<div class="ms-search"><input type="text" placeholder="Search…" value="${msSearch.replace(/"/g,'&quot;')}" /></div>`
         : "";
       const body = !allOpts.length
@@ -1490,14 +1482,21 @@ window.__writeAudit = writeAudit;
       const lbl = wrap.querySelector('.ms-label');
       if (!vals.length) { lbl.textContent = placeholder; lbl.style.color = "#6b7280"; }
       else if (vals.length === 1) { lbl.textContent = sel.selectedOptions[0]?.textContent || vals[0]; lbl.style.color = "#1f2937"; }
-      else { lbl.textContent = `${vals.length} selected`; lbl.style.color = "#1f2937"; }
+      else { lbl.textContent = `${placeholder} (${vals.length})`; lbl.style.color = "#1f2937"; }
     }
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       document.querySelectorAll('.ms-wrap.open').forEach(w => { if (w!==wrap) w.classList.remove('open'); });
       wrap.classList.toggle('open');
+      // Keep the panel on-screen for dropdowns near the right edge.
+      panel.style.left = ""; panel.style.right = "";
+      if (wrap.classList.contains('open') && panel.getBoundingClientRect().right > window.innerWidth - 8) {
+        panel.style.left = "auto"; panel.style.right = "0";
+      }
       if (wrap.classList.contains('open')) { msSearch = ""; renderPanel(); }
     });
+    // Clicks inside the panel must not reach the document "close all" handler.
+    panel.addEventListener('click', (e) => e.stopPropagation());
     sel._msRefresh = () => { renderPanel(); updateLabel(); };
     updateLabel();
   }
