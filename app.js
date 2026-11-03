@@ -320,7 +320,7 @@ async function commitPrepared(prepared, { batchSize = 450, onProgress = () => {}
 return { fileKey, stableImportId, rowId, planRecordRow, applyClearChoice, finalizeRecord, fieldChangeStats, commitPrepared };
 })();
 /* ===== records-filters.js (merged) ===== */
-const { reviewMonth, monthLabel, availableReviewMonths, processKey, countReviewedProcesses, filterReviewRecords, filterDashboardRecords } = (function () {
+const { reviewMonth, monthLabel, availableReviewMonths, processKey, countReviewedProcesses, filterReviewRecords, filterDashboardRecords, UNASSIGNED, identityPart } = (function () {
 /* Read-only Records and Dashboard helpers. Calendar strings never pass through Date. */
 
 const MONTH_NAMES = ["January", "February", "March", "April", "May", "June",
@@ -355,6 +355,10 @@ function countReviewedProcesses(records) {
   return new Set(records.map(processKey).filter(Boolean)).size;
 }
 
+// Owner filters: the UNASSIGNED pick matches blank / N/A values.
+const UNASSIGNED = "__unassigned__";
+const inOwnerList = (list, value) => list.includes(value) || (list.includes(UNASSIGNED) && identityPart(value) === "");
+
 function filterReviewRecords(records, filters = {}) {
   const match = (value, term) => !term || String(value || "").toLowerCase()
     .includes(String(term).trim().toLowerCase());
@@ -364,8 +368,8 @@ function filterReviewRecords(records, filters = {}) {
     (!filters.processes?.length || filters.processes.includes(r.processName)) &&
     match(r.processPhase, filters.phase) &&
     match(r.processOwner, filters.department) &&
-    (!filters.processOwners?.length || filters.processOwners.includes(r.processPreparedBy)) &&
-    (!filters.actionOwners?.length || filters.actionOwners.includes(r.department)) &&
+    (!filters.processOwners?.length || inOwnerList(filters.processOwners, r.processPreparedBy)) &&
+    (!filters.actionOwners?.length || inOwnerList(filters.actionOwners, r.department)) &&
     (!filters.month || reviewMonth(r.auditDate) === filters.month)
   );
 }
@@ -382,7 +386,7 @@ function filterDashboardRecords(records, filters = {}) {
       String(value).toLowerCase().includes(q));
   });
 }
-return { reviewMonth, monthLabel, availableReviewMonths, processKey, countReviewedProcesses, filterReviewRecords, filterDashboardRecords };
+return { reviewMonth, monthLabel, availableReviewMonths, processKey, countReviewedProcesses, filterReviewRecords, filterDashboardRecords, UNASSIGNED, identityPart };
 })();
 
 
@@ -877,7 +881,9 @@ window.__writeAudit = writeAudit;
     if (rposel) {
       const rpocur = Array.from(rposel.selectedOptions).map(o => o.value);
       const rpos = [...new Set(records.map(r => r.processPreparedBy).filter(v => v && v !== NA))].sort();
-      rposel.innerHTML = rpos.map(v => `<option ${rpocur.includes(v)?'selected':''}>${v.replace(/"/g,'&quot;')}</option>`).join("");
+      const rpoBlank = records.some(r => identityPart(r.processPreparedBy) === "");
+      rposel.innerHTML = (rpoBlank ? `<option value="${UNASSIGNED}" ${rpocur.includes(UNASSIGNED)?'selected':''}>Unassigned (N/A)</option>` : "")
+        + rpos.map(v => `<option ${rpocur.includes(v)?'selected':''}>${v.replace(/"/g,'&quot;')}</option>`).join("");
       initMultiSelect(rposel);
       if (rposel._msRefresh) rposel._msRefresh();
     }
@@ -885,7 +891,9 @@ window.__writeAudit = writeAudit;
     if (raosel) {
       const raocur = Array.from(raosel.selectedOptions).map(o => o.value);
       const raos = [...new Set(records.map(r => r.department).filter(v => v && v !== NA))].sort();
-      raosel.innerHTML = raos.map(v => `<option ${raocur.includes(v)?'selected':''}>${v.replace(/"/g,'&quot;')}</option>`).join("");
+      const raoBlank = records.some(r => identityPart(r.department) === "");
+      raosel.innerHTML = (raoBlank ? `<option value="${UNASSIGNED}" ${raocur.includes(UNASSIGNED)?'selected':''}>Unassigned (N/A)</option>` : "")
+        + raos.map(v => `<option ${raocur.includes(v)?'selected':''}>${v.replace(/"/g,'&quot;')}</option>`).join("");
       initMultiSelect(raosel);
       if (raosel._msRefresh) raosel._msRefresh();
     }
@@ -1481,7 +1489,7 @@ window.__writeAudit = writeAudit;
       const vals = msValues(sel.id);
       const lbl = wrap.querySelector('.ms-label');
       if (!vals.length) { lbl.textContent = placeholder; lbl.style.color = "#6b7280"; }
-      else if (vals.length === 1) { lbl.textContent = vals[0]; lbl.style.color = "#1f2937"; }
+      else if (vals.length === 1) { lbl.textContent = sel.selectedOptions[0]?.textContent || vals[0]; lbl.style.color = "#1f2937"; }
       else { lbl.textContent = `${vals.length} selected`; lbl.style.color = "#1f2937"; }
     }
     btn.addEventListener('click', (e) => {
