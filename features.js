@@ -67,134 +67,324 @@ function riskRows() {
   );
 }
 
+/* ---------- Register view helpers (badges, dates, sorting, view state) ---------- */
+const isNA = (x) => x === undefined || x === null || String(x).trim() === "" || String(x).trim().toUpperCase() === NA;
+const slug = (s) => String(s ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+const clean = (x) => (isNA(x) ? "" : String(x).trim());
+
+// Calendar-string dates only (YYYY-MM-DD) — no timezone conversion.
+function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+const dateStr = (x) => { const m = /^(\d{4}-\d{2}-\d{2})/.exec(String(x ?? "")); return m ? m[1] : ""; };
+
+const PILL_KIND = {
+  compliance: { "Non-Compliant": "red", "Observation": "amber", "Compliant": "green" },
+  ncType: { Major: "red", Minor: "amber", Enhancement: "blue" },
+  severity: { Critical: "crit", High: "red", Medium: "amber", Low: "green" },
+  capaStatus: { Pending: "gray", "In Progress": "blue", Overdue: "red", Closed: "green", Cancelled: "muted", "Not Set": "muted" },
+  capaType: { Corrective: "blue", Preventive: "violet" },
+  mitigation: { Open: "red", Mitigated: "green", Accepted: "amber", Closed: "green" },
+  effectiveness: { Effective: "green", "Not Effective": "red", "Partially Effective": "amber" },
+};
+function pill(val, kind) {
+  if (isNA(val)) return `<span class="reg-na">${NA}</span>`;
+  const tone = (PILL_KIND[kind] || {})[val] || "gray";
+  return `<span class="reg-pill t-${tone}">${esc(val)}</span>`;
+}
+
+const VIEW_KEY = "ncrcViewModes";
+function loadViews() { try { return JSON.parse(localStorage.getItem(VIEW_KEY) || "{}") || {}; } catch (e) { return {}; } }
+const VIEWS = Object.assign({ capa: "board", risk: "cards" }, loadViews());
+function saveViews() { try { localStorage.setItem(VIEW_KEY, JSON.stringify(VIEWS)); } catch (e) {} }
+
+const SORT = { nc: null, capa: null, risk: null };      // { key, dir }
+const EXTRA = { ncOwner: "", capaDue: false, riskNoCapa: false, showAllOwners: false };
+const FILTERED = { nc: [], capa: [], risk: [] };          // what the user currently sees (used by exports)
+
+function sortRows(rows, kind) {
+  const s = SORT[kind];
+  if (!s) return rows;
+  const dir = s.dir === "asc" ? 1 : -1;
+  return rows.slice().sort((a, b) => {
+    const av = clean(a[s.key]), bv = clean(b[s.key]);
+    if (!av && bv) return 1;            // blanks always last
+    if (av && !bv) return -1;
+    return av.localeCompare(bv, undefined, { numeric: true, sensitivity: "base" }) * dir;
+  });
+}
+
+function renderTable(tableId, kind, cols, rows, emptyMsg, detailTitle) {
+  const table = document.getElementById(tableId);
+  if (!table) return;
+  const s = SORT[kind];
+  table.classList.add("reg-table");
+  table.querySelector("thead").innerHTML = `<tr>${cols.map(([lbl, key]) => {
+    const arrow = s && s.key === key ? (s.dir === "asc" ? " ▲" : " ▼") : "";
+    return `<th data-sort="${key}" class="${s && s.key === key ? "sorted" : ""}" title="Sort by ${esc(lbl)}">${esc(lbl)}<span class="arr">${arrow}</span></th>`;
+  }).join("")}</tr>`;
+  const tbody = table.querySelector("tbody");
+  tbody.innerHTML = sortRows(rows, kind).map((r) => `<tr class="clickable" data-id="${esc(r.id)}">${cols.map(([, key, fmt]) => {
+    const raw = r[key];
+    if (typeof fmt === "function") return `<td>${fmt(r)}</td>`;
+    if (fmt && fmt.startsWith("pill:")) return `<td>${pill(raw, fmt.slice(5))}</td>`;
+    if (fmt === "id") return `<td class="reg-idcell">${esc(v(raw))}</td>`;
+    if (fmt === "clip") return `<td class="clip" title="${esc(v(raw))}">${isNA(raw) ? `<span class="reg-na">${NA}</span>` : esc(raw)}</td>`;
+    return `<td>${isNA(raw) ? `<span class="reg-na">${NA}</span>` : esc(raw)}</td>`;
+  }).join("")}</tr>`).join("")
+    || `<tr><td colspan="${cols.length}" class="reg-empty">${emptyMsg}</td></tr>`;
+  tbody.querySelectorAll("tr.clickable").forEach((tr) => tr.addEventListener("click", () => openDetail(tr.dataset.id, detailTitle)));
+  table.querySelectorAll("th[data-sort]").forEach((th) => th.addEventListener("click", () => {
+    const key = th.dataset.sort, cur = SORT[kind];
+    SORT[kind] = !cur || cur.key !== key ? { key, dir: "asc" } : cur.dir === "asc" ? { key, dir: "desc" } : null;
+    ({ nc: renderNc, capa: renderCapa, risk: renderRisk })[kind]();
+  }));
+}
+
+// KPI tiles: [{label, value, tone, sub, active, onClick}]
+function renderKpis(elId, tiles) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  el.innerHTML = tiles.map((t, i) => `<button type="button" class="reg-kpi t-${t.tone || "gray"}${t.active ? " active" : ""}${t.onClick ? "" : " static"}" data-i="${i}">
+      <span class="reg-kpi-val">${t.value}</span><span class="reg-kpi-lbl">${esc(t.label)}</span>${t.sub ? `<span class="reg-kpi-sub">${esc(t.sub)}</span>` : ""}</button>`).join("");
+  el.querySelectorAll(".reg-kpi").forEach((b) => {
+    const t = tiles[+b.dataset.i];
+    if (t.onClick) b.addEventListener("click", t.onClick);
+  });
+}
+
+// Active-filter chips with one-click removal
+function renderChips(elId, chips) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  el.innerHTML = chips.length
+    ? chips.map((c, i) => `<span class="reg-chip">${esc(c.label)}<button type="button" data-i="${i}" aria-label="Remove filter">×</button></span>`).join("")
+    : "";
+  el.querySelectorAll("button").forEach((b) => b.addEventListener("click", chips[+b.dataset.i].clear));
+}
+function selChip(id, label, render) {
+  const el = document.getElementById(id);
+  if (!el || !el.value) return null;
+  return { label: `${label}: ${el.value}`, clear: () => { el.value = ""; render(); } };
+}
+const setVal = (id, val, render) => { const el = document.getElementById(id); if (el) { el.value = el.value === val ? "" : val; render(); } };
+
 /* ---------- NC breakdown per Action Owner ---------- */
+const OWNER_LIMIT = 8;
+const ownerOf = (r) => clean(r.ncResponsibleDept) || "Unassigned";
 function renderNcOwnerBreakdown(rows) {
   const tb = document.querySelector("#ncOwnerTable tbody");
   const msg = document.getElementById("ncOwnerMsg");
+  const more = document.getElementById("ncOwnerMore");
   if (!tb) return;
   const TYPES = ["Major", "Minor", "Enhancement"];
   const SEVS = ["Critical", "High", "Medium", "Low"];
   const by = {};
   rows.forEach((r) => {
-    const o = String(r.ncResponsibleDept || "").trim() || "Unassigned";
+    const o = ownerOf(r);
     const g = by[o] || (by[o] = { total: 0, t: {}, s: {} });
     g.total++;
     if (TYPES.includes(r.ncType)) g.t[r.ncType] = (g.t[r.ncType] || 0) + 1;
     if (SEVS.includes(r.severityLevel)) g.s[r.severityLevel] = (g.s[r.severityLevel] || 0) + 1;
   });
-  const owners = Object.keys(by).sort((a, b) => by[b].total - by[a].total || a.localeCompare(b));
+  // Unassigned sinks to the bottom so accountable owners lead the list.
+  const owners = Object.keys(by).sort((a, b) =>
+    (a === "Unassigned") - (b === "Unassigned") || by[b].total - by[a].total || a.localeCompare(b));
   const total = rows.length;
   if (!owners.length) {
-    tb.innerHTML = `<tr><td colspan="10" style="text-align:center;color:#6b7280;padding:16px;">No NC records in this scope.</td></tr>`;
+    tb.innerHTML = `<tr><td colspan="10" class="reg-empty">No NC records in this scope.</td></tr>`;
     if (msg) msg.textContent = "";
+    if (more) more.innerHTML = "";
     return;
   }
-  const cell = (n, cls) => `<td style="text-align:center;${n && cls ? cls : ""}">${n || "–"}</td>`;
-  const sevCls = { Critical: "background:#fee2e2;color:#991b1b;font-weight:700;", High: "background:#ffedd5;color:#c2410c;font-weight:700;" };
-  tb.innerHTML = owners.map((o) => {
+  const shown = EXTRA.showAllOwners ? owners : owners.slice(0, OWNER_LIMIT);
+  const cell = (n, cls) => `<td class="num ${n && cls ? cls : ""}">${n || "–"}</td>`;
+  const sevCls = { Critical: "hot-crit", High: "hot-high" };
+  tb.innerHTML = shown.map((o) => {
     const g = by[o], pct = Math.round(g.total / total * 100);
-    return `<tr class="clickable" data-owner="${esc(o)}">
+    const act = EXTRA.ncOwner === o ? " active" : "";
+    return `<tr class="clickable${act}${o === "Unassigned" ? " unassigned" : ""}" data-owner="${esc(o)}">
       <td><b>${esc(o)}</b></td>
-      <td style="text-align:center;font-weight:700;">${g.total}</td>
-      <td style="min-width:110px;"><div style="display:flex;align-items:center;gap:6px;">
-        <div style="flex:1;background:#e5e7eb;border-radius:4px;height:8px;"><div style="width:${pct}%;background:#d12027;height:8px;border-radius:4px;"></div></div><span style="font-size:12px;">${pct}%</span></div></td>
+      <td class="num"><b>${g.total}</b></td>
+      <td class="share"><div class="bar"><i style="width:${pct}%"></i></div><span>${pct}%</span></td>
       ${TYPES.map((t) => cell(g.t[t])).join("")}
       ${SEVS.map((x) => cell(g.s[x], sevCls[x])).join("")}</tr>`;
-  }).join("") + `<tr style="font-weight:700;background:#f8fafc;"><td>Total</td><td style="text-align:center;">${total}</td><td></td>`
+  }).join("") + `<tr class="total"><td>Total</td><td class="num">${total}</td><td></td>`
     + TYPES.map((t) => cell(rows.filter((r) => r.ncType === t).length)).join("")
     + SEVS.map((x) => cell(rows.filter((r) => r.severityLevel === x).length)).join("") + `</tr>`;
+  if (more) {
+    more.innerHTML = owners.length > OWNER_LIMIT
+      ? `<button type="button" class="btn sm ghost">${EXTRA.showAllOwners ? "Show top " + OWNER_LIMIT : "Show all " + owners.length + " owners"}</button>` : "";
+    more.querySelector("button")?.addEventListener("click", () => { EXTRA.showAllOwners = !EXTRA.showAllOwners; renderNcOwnerBreakdown(rows); });
+  }
   if (msg) {
-    const top = owners[0], share = Math.round(by[top].total / total * 100);
-    const crit = owners.filter((o) => (by[o].s.Critical || 0) + (by[o].s.High || 0) > 0)
+    const assigned = owners.filter((o) => o !== "Unassigned");
+    const unassigned = by.Unassigned ? by.Unassigned.total : 0;
+    const parts = [];
+    if (assigned.length) {
+      const top = assigned[0];
+      parts.push(`${top} holds the most assigned NCs: ${by[top].total} of ${total} (${Math.round(by[top].total / total * 100)}%).`);
+    }
+    const crit = assigned.filter((o) => (by[o].s.Critical || 0) + (by[o].s.High || 0) > 0)
       .sort((a, b) => ((by[b].s.Critical || 0) + (by[b].s.High || 0)) - ((by[a].s.Critical || 0) + (by[a].s.High || 0)))[0];
-    msg.textContent = `${top} holds the most NCs: ${by[top].total} of ${total} (${share}%).`
-      + (crit ? ` Most Critical/High items: ${crit} (${(by[crit].s.Critical || 0) + (by[crit].s.High || 0)}).` : "");
+    if (crit) parts.push(`Most Critical/High items: ${crit} (${(by[crit].s.Critical || 0) + (by[crit].s.High || 0)}).`);
+    if (unassigned) parts.push(`${unassigned} NC(s) (${Math.round(unassigned / total * 100)}%) have no responsible owner recorded.`);
+    msg.innerHTML = parts.map((p, i) => i === parts.length - 1 && unassigned ? `<span class="warn">${esc(p)}</span>` : esc(p)).join(" ");
   }
   tb.querySelectorAll("tr.clickable").forEach((tr) => tr.addEventListener("click", () => {
     const o = tr.dataset.owner;
-    const inp = document.getElementById("ncrcNcSearch");
-    if (inp) { inp.value = o === "Unassigned" ? "" : o; renderNc(); }
+    EXTRA.ncOwner = EXTRA.ncOwner === o ? "" : o;
+    renderNc();
+    if (EXTRA.ncOwner) document.getElementById("ncrcNcTable")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }));
 }
 
-/* ---------- NC table ---------- */
+/* ---------- NC register ---------- */
+const NC_COLS = [
+  ["NC ID", "ncId", "id"], ["Review ID", "auditId"], ["Review Date", "auditDate"],
+  ["Process", "processName", "clip"], ["Phase", "processPhase", "clip"],
+  ["Compliance", "compliance", "pill:compliance"], ["NC Type", "ncType", "pill:ncType"],
+  ["Severity", "severityLevel", "pill:severity"], ["Category", "ncCategory"],
+  ["Resp. Owner", "ncResponsibleDept"], ["Root Cause", "rootCause", "clip"], ["Verified By", "verifiedBy"],
+];
 function renderNc() {
   const q = document.getElementById("ncrcNcSearch")?.value || "";
   const type = document.getElementById("ncrcNcType")?.value || "";
   const sev = document.getElementById("ncrcNcSeverity")?.value || "";
   const comp = document.getElementById("ncrcNcCompliance")?.value || "";
-  const rows = ncRows().filter(
+  // Breakdown follows the dropdown/search filters; the owner pick narrows only the register below it.
+  const scoped = ncRows().filter(
     (r) =>
       (!type || r.ncType === type) &&
       (!sev || r.severityLevel === sev) &&
       (!comp || r.compliance === comp) &&
       passText(r, ["ncId", "auditId", "processName", "rootCause", "ncDesc", "ncResponsibleDept"], q)
   );
-  renderNcOwnerBreakdown(rows);
-  const tbody = document.querySelector("#ncrcNcTable tbody");
-  tbody.innerHTML = rows
-    .map(
-      (r) => `<tr class="clickable" data-id="${r.id}">
-      <td>${esc(v(r.ncId))}</td><td>${esc(v(r.auditId))}</td><td>${esc(v(r.auditDate))}</td>
-      <td>${esc(v(r.processName))}</td><td>${esc(v(r.processPhase))}</td>
-      <td>${esc(v(r.compliance))}</td><td>${esc(v(r.ncType))}</td><td>${esc(v(r.severityLevel))}</td>
-      <td>${esc(v(r.ncCategory))}</td><td>${esc(v(r.ncResponsibleDept))}</td>
-      <td>${esc(v(r.rootCause))}</td><td>${esc(v(r.verifiedBy))}</td></tr>`
-    )
-    .join("") || `<tr><td colspan="12" style="text-align:center;color:#6b7280;padding:24px;">No NC records yet — add via the Audit form.</td></tr>`;
-  document.getElementById("ncrcNcCount").textContent = `${rows.length} record(s)`;
-  tbody.querySelectorAll("tr.clickable").forEach((tr) =>
-    tr.addEventListener("click", () => openDetail(tr.dataset.id, "NC Detail"))
-  );
+  renderNcOwnerBreakdown(scoped);
+  const rows = EXTRA.ncOwner ? scoped.filter((r) => ownerOf(r) === EXTRA.ncOwner) : scoped;
+  FILTERED.nc = rows;
+
+  const all = ncRows();
+  const cnt = (f, val) => rows.filter((r) => r[f] === val).length;
+  renderKpis("ncKpis", [
+    { label: "NCs in view", value: rows.length, tone: "ink", sub: rows.length !== all.length ? `of ${all.length} total` : "all records" },
+    { label: "Non-Compliant", value: cnt("compliance", "Non-Compliant"), tone: "red", active: comp === "Non-Compliant", onClick: () => setVal("ncrcNcCompliance", "Non-Compliant", renderNc) },
+    { label: "Observation", value: cnt("compliance", "Observation"), tone: "amber", active: comp === "Observation", onClick: () => setVal("ncrcNcCompliance", "Observation", renderNc) },
+    { label: "Major", value: cnt("ncType", "Major"), tone: "red", active: type === "Major", onClick: () => setVal("ncrcNcType", "Major", renderNc) },
+    { label: "Minor", value: cnt("ncType", "Minor"), tone: "amber", active: type === "Minor", onClick: () => setVal("ncrcNcType", "Minor", renderNc) },
+    { label: "Critical", value: cnt("severityLevel", "Critical"), tone: "crit", active: sev === "Critical", onClick: () => setVal("ncrcNcSeverity", "Critical", renderNc) },
+    { label: "High", value: cnt("severityLevel", "High"), tone: "red", active: sev === "High", onClick: () => setVal("ncrcNcSeverity", "High", renderNc) },
+  ]);
+  const qEl = document.getElementById("ncrcNcSearch");
+  renderChips("ncChips", [
+    q && { label: `Search: "${q}"`, clear: () => { qEl.value = ""; renderNc(); } },
+    selChip("ncrcNcType", "Type", renderNc), selChip("ncrcNcSeverity", "Severity", renderNc), selChip("ncrcNcCompliance", "Compliance", renderNc),
+    EXTRA.ncOwner && { label: `Owner: ${EXTRA.ncOwner}`, clear: () => { EXTRA.ncOwner = ""; renderNc(); } },
+  ].filter(Boolean));
+
+  renderTable("ncrcNcTable", "nc", NC_COLS, rows,
+    all.length ? "No NCs match these filters." : "No NC records yet — add via the Review form.", "NC Detail");
+  document.getElementById("ncrcNcCount").textContent = `Showing ${rows.length} of ${all.length} NC record(s) · click a row for full detail · click a header to sort`;
 }
 
-/* ---------- CAPA kanban + table ---------- */
+/* ---------- CAPA board + register ---------- */
 const CAPA_STATUSES = ["Pending", "In Progress", "Overdue", "Closed", "Cancelled"];
+const OPEN_CAPA = ["Pending", "In Progress", "Overdue"];
+const capaStatusOf = (r) => (CAPA_STATUSES.includes(r.capaStatus) ? r.capaStatus : "Not Set");
+// Past due = still open (or status not set) and the planned end date is before today.
+const isPastDue = (r) => {
+  const st = capaStatusOf(r), end = dateStr(r.endDate);
+  return (OPEN_CAPA.includes(st) || st === "Not Set") && !!end && end < todayStr();
+};
+function dueCell(r) {
+  const end = dateStr(r.endDate);
+  if (!end) return isNA(r.endDate) ? `<span class="reg-na">${NA}</span>` : esc(r.endDate);
+  return isPastDue(r) ? `<span class="reg-due late" title="Past due and not closed">${esc(end)} ⚠</span>` : esc(end);
+}
+const CAPA_COLS = [
+  ["CAPA ID", "capaIdField", "id"], ["Review ID", "auditId"], ["NC ID", "ncId"],
+  ["Process", "processName", "clip"], ["Phase", "processPhase", "clip"],
+  ["CAPA Type", "capaType", "pill:capaType"], ["RC Category", "rcCategory"],
+  ["Status", "capaStatus", (r) => pill(r.capaStatus, "capaStatus")],
+  ["Owner", "actionOwner"], ["Accountable", "accountable"],
+  ["Start", "startDate"], ["End", "endDate", dueCell], ["Effectiveness", "effectiveness", "pill:effectiveness"],
+];
 function renderCapa() {
   const q = document.getElementById("ncrcCapaSearch")?.value || "";
   const type = document.getElementById("ncrcCapaType")?.value || "";
   const status = document.getElementById("ncrcCapaStatus")?.value || "";
-  const rows = capaRows().filter(
+  const all = capaRows();
+  const rows = all.filter(
     (r) =>
       (!type || r.capaType === type) &&
       (!status || r.capaStatus === status) &&
+      (!EXTRA.capaDue || isPastDue(r)) &&
       passText(r, ["capaIdField", "ncId", "auditId", "processName", "actionOwner", "accountable"], q)
   );
+  FILTERED.capa = rows;
 
+  const cnt = (st) => rows.filter((r) => capaStatusOf(r) === st).length;
+  const open = rows.filter((r) => OPEN_CAPA.includes(capaStatusOf(r))).length;
+  const closed = cnt("Closed");
+  const decided = rows.filter((r) => capaStatusOf(r) !== "Cancelled" && capaStatusOf(r) !== "Not Set").length;
+  const pastDue = rows.filter(isPastDue).length;
+  renderKpis("capaKpis", [
+    { label: "CAPAs in view", value: rows.length, tone: "ink", sub: rows.length !== all.length ? `of ${all.length} total` : "all records" },
+    { label: "Open", value: open, tone: "blue", sub: "Pending + In Progress + Overdue" },
+    { label: "In Progress", value: cnt("In Progress"), tone: "blue", active: status === "In Progress", onClick: () => setVal("ncrcCapaStatus", "In Progress", renderCapa) },
+    { label: "Past due", value: pastDue, tone: "red", sub: "open, end date passed", active: EXTRA.capaDue, onClick: () => { EXTRA.capaDue = !EXTRA.capaDue; renderCapa(); } },
+    { label: "Closed", value: closed, tone: "green", active: status === "Closed", onClick: () => setVal("ncrcCapaStatus", "Closed", renderCapa) },
+    { label: "Closure rate", value: decided ? Math.round(closed / decided * 100) + "%" : "–", tone: "green", sub: "closed ÷ non-cancelled" },
+  ]);
+  const qEl = document.getElementById("ncrcCapaSearch");
+  renderChips("capaChips", [
+    q && { label: `Search: "${q}"`, clear: () => { qEl.value = ""; renderCapa(); } },
+    selChip("ncrcCapaType", "Type", renderCapa), selChip("ncrcCapaStatus", "Status", renderCapa),
+    EXTRA.capaDue && { label: "Past due only", clear: () => { EXTRA.capaDue = false; renderCapa(); } },
+  ].filter(Boolean));
+
+  // Board — "Not Set" column appears only when records have no recognised status, so none silently vanish.
+  const cols = CAPA_STATUSES.concat(rows.some((r) => capaStatusOf(r) === "Not Set") ? ["Not Set"] : []);
   const kanban = document.getElementById("ncrcCapaKanban");
-  kanban.innerHTML = CAPA_STATUSES.map((st) => {
-    const items = rows.filter((r) => (r.capaStatus || "Pending") === st);
-    return `<div class="kanban-col"><h4>${st}<span>${items.length}</span></h4>${items
-      .map(
-        (r) => `<div class="kanban-card" data-id="${r.id}">
-        <div class="k-id">${esc(v(r.capaIdField))}</div>
-        <div>${esc(v(r.processName))}</div>
-        <div class="muted" style="font-size:11px;">${esc(v(r.actionOwner))}</div></div>`
-      )
-      .join("")}</div>`;
+  kanban.innerHTML = cols.map((st) => {
+    const items = rows.filter((r) => capaStatusOf(r) === st);
+    return `<div class="kanban-col s-${slug(st)}">
+      <div class="kanban-head"><span>${esc(st)}</span><b>${items.length}</b></div>
+      <div class="kanban-body">${items.map((r) => {
+        const late = isPastDue(r), end = dateStr(r.endDate);
+        return `<div class="kanban-card${late ? " late" : ""}" data-id="${esc(r.id)}" tabindex="0">
+          <div class="k-top"><span class="k-id">${esc(v(r.capaIdField))}</span>${isNA(r.capaType) ? "" : pill(r.capaType, "capaType")}</div>
+          <div class="k-title" title="${esc(v(r.processName))}">${esc(v(r.processName))}</div>
+          ${isNA(r.processPhase) ? "" : `<div class="k-phase" title="${esc(r.processPhase)}">${esc(r.processPhase)}</div>`}
+          <div class="k-foot"><span class="k-owner" title="Action owner">${esc(v(r.actionOwner))}</span>
+            ${end ? `<span class="k-due${late ? " late" : ""}" title="Planned end date">${late ? "⚠ " : ""}${esc(end)}</span>` : ""}</div>
+        </div>`;
+      }).join("") || `<div class="kanban-empty">No items</div>`}</div></div>`;
   }).join("");
-  kanban.querySelectorAll(".kanban-card").forEach((c) =>
-    c.addEventListener("click", () => openDetail(c.dataset.id, "CAPA Detail"))
-  );
+  kanban.querySelectorAll(".kanban-card").forEach((c) => {
+    c.addEventListener("click", () => openDetail(c.dataset.id, "CAPA Detail"));
+    c.addEventListener("keydown", (e) => { if (e.key === "Enter") openDetail(c.dataset.id, "CAPA Detail"); });
+  });
 
-  const tbody = document.querySelector("#ncrcCapaTable tbody");
-  tbody.innerHTML = rows
-    .map(
-      (r) => `<tr class="clickable" data-id="${r.id}">
-      <td>${esc(v(r.capaIdField))}</td><td>${esc(v(r.auditId))}</td><td>${esc(v(r.ncId))}</td>
-      <td>${esc(v(r.processName))}</td><td>${esc(v(r.processPhase))}</td>
-      <td>${esc(v(r.capaType))}</td><td>${esc(v(r.rcCategory))}</td><td>${esc(v(r.capaStatus))}</td>
-      <td>${esc(v(r.actionOwner))}</td><td>${esc(v(r.accountable))}</td>
-      <td>${esc(v(r.startDate))}</td><td>${esc(v(r.endDate))}</td><td>${esc(v(r.effectiveness))}</td></tr>`
-    )
-    .join("") || `<tr><td colspan="13" style="text-align:center;color:#6b7280;padding:24px;">No CAPA records yet — add via the Audit form.</td></tr>`;
-  document.getElementById("ncrcCapaCount").textContent = `${rows.length} record(s)`;
-  tbody.querySelectorAll("tr.clickable").forEach((tr) =>
-    tr.addEventListener("click", () => openDetail(tr.dataset.id, "CAPA Detail"))
-  );
+  renderTable("ncrcCapaTable", "capa", CAPA_COLS, rows,
+    all.length ? "No CAPAs match these filters." : "No CAPA records yet — add via the Review form.", "CAPA Detail");
+  document.getElementById("ncrcCapaCount").textContent = `Showing ${rows.length} of ${all.length} CAPA record(s)`;
+  applyView("capa");
 }
 
-/* ---------- Risk cards ---------- */
+/* ---------- Risk cards + register ---------- */
+const RISK_LEVELS = ["High", "Medium", "Low"];
+const RISK_ADV = ["ncrcRiskAuditId", "ncrcRiskAuditDate", "ncrcRiskProcessName", "ncrcRiskProcessPhase", "ncrcRiskRiskId", "ncrcRiskLinkedCapaId"];
+const RISK_ADV_LABEL = { ncrcRiskAuditId: "Review ID", ncrcRiskAuditDate: "Review date", ncrcRiskProcessName: "Process", ncrcRiskProcessPhase: "Phase", ncrcRiskRiskId: "Risk ID", ncrcRiskLinkedCapaId: "Linked CAPA" };
+const isOpenRisk = (r) => !["Closed", "Mitigated", "Accepted"].includes(r.mitigation);
+const RISK_COLS = [
+  ["Risk ID", "riskId", "id"], ["Review ID", "auditId"], ["Review Date", "auditDate"],
+  ["Process", "processName", "clip"], ["Phase", "processPhase", "clip"],
+  ["Risk Exist", "riskExist"], ["Risk Type", "riskType"], ["Risk Level", "riskLevel", "pill:severity"],
+  ["Affected Dept", "affectedDepartment"], ["Risk Owner", "riskOwner"], ["Mitigation", "mitigation", "pill:mitigation"],
+  ["Linked CAPA ID", "linkedCapaId"], ["Control", "control", "clip"], ["Findings", "findings", "clip"],
+];
 function renderRisk() {
   const q = document.getElementById("ncrcRiskSearch")?.value || "";
   const lvl = document.getElementById("ncrcRiskLevel")?.value || "";
@@ -205,10 +395,12 @@ function renderRisk() {
   const fProcPhase = (document.getElementById("ncrcRiskProcessPhase")?.value || "").toLowerCase();
   const fRiskId = (document.getElementById("ncrcRiskRiskId")?.value || "").toLowerCase();
   const fLinkedCapa = (document.getElementById("ncrcRiskLinkedCapaId")?.value || "").toLowerCase();
-  const rows = riskRows().filter(
+  const all = riskRows();
+  const rows = all.filter(
     (r) =>
       (!lvl || r.riskLevel === lvl) &&
       (!mit || r.mitigation === mit) &&
+      (!EXTRA.riskNoCapa || isNA(r.linkedCapaId)) &&
       (!fAuditId || String(r.auditId ?? "").toLowerCase().includes(fAuditId)) &&
       (!fAuditDate || String(r.auditDate ?? "") === fAuditDate) &&
       (!fProcName || String(r.processName ?? "").toLowerCase().includes(fProcName)) &&
@@ -217,57 +409,93 @@ function renderRisk() {
       (!fLinkedCapa || String(r.linkedCapaId ?? "").toLowerCase().includes(fLinkedCapa)) &&
       passText(r, ["riskId", "riskType", "affectedDepartment", "riskOwner", "control", "findings"], q)
   );
+  FILTERED.risk = rows;
+
+  const cnt = (val) => rows.filter((r) => r.riskLevel === val).length;
+  const openN = rows.filter(isOpenRisk).length;
+  const noCapa = rows.filter((r) => isNA(r.linkedCapaId)).length;
+  renderKpis("riskKpis", [
+    { label: "Risks in view", value: rows.length, tone: "ink", sub: rows.length !== all.length ? `of ${all.length} total` : "all records" },
+    { label: "High", value: cnt("High"), tone: "red", active: lvl === "High", onClick: () => setVal("ncrcRiskLevel", "High", renderRisk) },
+    { label: "Medium", value: cnt("Medium"), tone: "amber", active: lvl === "Medium", onClick: () => setVal("ncrcRiskLevel", "Medium", renderRisk) },
+    { label: "Low", value: cnt("Low"), tone: "green", active: lvl === "Low", onClick: () => setVal("ncrcRiskLevel", "Low", renderRisk) },
+    { label: "Open mitigation", value: openN, tone: "blue", sub: "not Closed / Mitigated / Accepted", active: mit === "Open", onClick: () => setVal("ncrcRiskMitigation", "Open", renderRisk) },
+    { label: "No linked CAPA", value: noCapa, tone: "gray", sub: "risks without a CAPA reference", active: EXTRA.riskNoCapa, onClick: () => { EXTRA.riskNoCapa = !EXTRA.riskNoCapa; renderRisk(); } },
+  ]);
+
+  const qEl = document.getElementById("ncrcRiskSearch");
+  const advActive = RISK_ADV.filter((id) => document.getElementById(id)?.value);
+  renderChips("riskChips", [
+    q && { label: `Search: "${q}"`, clear: () => { qEl.value = ""; renderRisk(); } },
+    selChip("ncrcRiskLevel", "Level", renderRisk), selChip("ncrcRiskMitigation", "Mitigation", renderRisk),
+    EXTRA.riskNoCapa && { label: "No linked CAPA", clear: () => { EXTRA.riskNoCapa = false; renderRisk(); } },
+    ...advActive.map((id) => { const el = document.getElementById(id); return { label: `${RISK_ADV_LABEL[id]}: ${el.value}`, clear: () => { el.value = ""; renderRisk(); } }; }),
+  ].filter(Boolean));
+  const advBtn = document.getElementById("riskMoreBtn");
+  if (advBtn) advBtn.textContent = `More filters${advActive.length ? ` (${advActive.length})` : ""}`;
+
   const wrap = document.getElementById("ncrcRiskCards");
-  const field = (label, val) => `<div class="rc-field"><span class="rc-label">${esc(label)}</span><span class="rc-value">${esc(v(val))}</span></div>`;
-  wrap.innerHTML = rows
-    .map(
-      (r) => `<div class="risk-card" data-id="${r.id}">
+  const f = (label, val) => `<div class="rc-f"><span>${esc(label)}</span><b title="${esc(v(val))}">${isNA(val) ? `<i class="reg-na">${NA}</i>` : esc(val)}</b></div>`;
+  wrap.innerHTML = rows.map((r) => `<div class="risk-card lvl-${slug(r.riskLevel || "na")}" data-id="${esc(r.id)}" tabindex="0">
       <div class="rc-head"><span class="rc-id">${esc(v(r.riskId))}</span>
-        <span class="rc-level lvl-${esc(r.riskLevel || "")}">${esc(v(r.riskLevel))}</span></div>
-      <div><strong>${esc(v(r.riskType))}</strong> — ${esc(v(r.affectedDepartment))}</div>
-      <div class="rc-grid">
-        ${field("Review ID", r.auditId)}
-        ${field("Review Date", r.auditDate)}
-        ${field("Process Name", r.processName)}
-        ${field("Process Phase", r.processPhase)}
-        ${field("Risk ID", r.riskId)}
-        ${field("Risk Exist", r.riskExist)}
-        ${field("Risk Type", r.riskType)}
-        ${field("Risk Level", r.riskLevel)}
-        ${field("Affected Department", r.affectedDepartment)}
-        ${field("Risk Owner", r.riskOwner)}
-        ${field("Mitigation", r.mitigation)}
-        ${field("Linked CAPA ID", r.linkedCapaId)}
-        ${field("Control", r.control)}
-      </div>
-      <div class="rc-findings"><strong>Findings:</strong> ${esc(v(r.findings))}</div>
-      <div class="muted" style="font-size:11px;margin-top:6px;text-align:right;">Click for full detail</div></div>`
-    )
-    .join("") || `<p class="muted" style="grid-column:1/-1;text-align:center;padding:24px;">No Risk records yet — add via the Audit form.</p>`;
+        <span class="rc-pills">${pill(r.riskLevel, "severity")}${pill(r.mitigation, "mitigation")}</span></div>
+      <div class="rc-title">${esc(v(r.riskType))} <span>· ${esc(v(r.affectedDepartment))}</span></div>
+      <div class="rc-proc" title="${esc(v(r.processName))}">${esc(v(r.processName))}</div>
+      ${isNA(r.processPhase) ? "" : `<div class="rc-phase" title="${esc(r.processPhase)}">${esc(r.processPhase)}</div>`}
+      <div class="rc-grid">${f("Risk owner", r.riskOwner)}${f("Review date", r.auditDate)}${f("Linked CAPA", r.linkedCapaId)}${f("Review ID", r.auditId)}</div>
+      ${isNA(r.control) ? "" : `<div class="rc-text"><span>Control</span>${esc(r.control)}</div>`}
+      ${isNA(r.findings) ? "" : `<div class="rc-text"><span>Findings</span>${esc(r.findings)}</div>`}
+    </div>`).join("")
+    || `<p class="reg-empty" style="grid-column:1/-1;">${all.length ? "No risks match these filters." : "No Risk records yet — add via the Review form."}</p>`;
+  wrap.querySelectorAll(".risk-card").forEach((c) => {
+    c.addEventListener("click", () => openDetail(c.dataset.id, "Risk Detail"));
+    c.addEventListener("keydown", (e) => { if (e.key === "Enter") openDetail(c.dataset.id, "Risk Detail"); });
+  });
 
-  const tbody = document.querySelector("#ncrcRiskTable tbody");
-  if (tbody) {
-    tbody.innerHTML = rows
-      .map(
-        (r) => `<tr class="clickable" data-id="${r.id}">
-        <td>${esc(v(r.riskId))}</td><td>${esc(v(r.auditId))}</td><td>${esc(v(r.auditDate))}</td>
-        <td>${esc(v(r.processName))}</td><td>${esc(v(r.processPhase))}</td>
-        <td>${esc(v(r.riskExist))}</td><td>${esc(v(r.riskType))}</td><td>${esc(v(r.riskLevel))}</td>
-        <td>${esc(v(r.affectedDepartment))}</td><td>${esc(v(r.riskOwner))}</td>
-        <td>${esc(v(r.mitigation))}</td><td>${esc(v(r.linkedCapaId))}</td>
-        <td>${esc(v(r.control))}</td><td>${esc(v(r.findings))}</td></tr>`
-      )
-      .join("") || `<tr><td colspan="14" style="text-align:center;color:#6b7280;padding:24px;">No Risk records yet — add via the Audit form.</td></tr>`;
-    tbody.querySelectorAll("tr.clickable").forEach((tr) =>
-      tr.addEventListener("click", () => openDetail(tr.dataset.id, "Risk Detail"))
-    );
-  }
-
-  document.getElementById("ncrcRiskCount").textContent = `${rows.length} record(s)`;
-  wrap.querySelectorAll(".risk-card").forEach((c) =>
-    c.addEventListener("click", () => openDetail(c.dataset.id, "Risk Detail"))
-  );
+  renderTable("ncrcRiskTable", "risk", RISK_COLS, rows,
+    all.length ? "No risks match these filters." : "No Risk records yet — add via the Review form.", "Risk Detail");
+  document.getElementById("ncrcRiskCount").textContent = `Showing ${rows.length} of ${all.length} risk record(s)`;
+  applyView("risk");
 }
+
+/* ---------- View toggle (Board/Cards ↔ Table) ---------- */
+function applyView(kind) {
+  const mode = VIEWS[kind];
+  const visual = kind === "capa" ? document.getElementById("ncrcCapaKanban") : document.getElementById("ncrcRiskCards");
+  const tableWrap = document.getElementById(kind === "capa" ? "ncrcCapaTable" : "ncrcRiskTable")?.closest(".table-wrap");
+  const isTable = mode === "table";
+  if (visual) visual.style.display = isTable ? "none" : "";
+  if (tableWrap) tableWrap.style.display = isTable ? "" : "none";
+  document.querySelectorAll(`.reg-viewtoggle[data-reg="${kind}"] button`).forEach((b) => b.classList.toggle("active", b.dataset.view === mode));
+}
+document.querySelectorAll(".reg-viewtoggle").forEach((grp) => grp.addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-view]");
+  if (!b) return;
+  VIEWS[grp.dataset.reg] = b.dataset.view;
+  saveViews();
+  applyView(grp.dataset.reg);
+}));
+document.getElementById("riskMoreBtn")?.addEventListener("click", () => {
+  document.getElementById("riskAdvFilters")?.classList.toggle("open");
+});
+
+/* ---------- Clear all filters per register ---------- */
+const CLEAR_IDS = {
+  nc: ["ncrcNcSearch", "ncrcNcType", "ncrcNcSeverity", "ncrcNcCompliance"],
+  capa: ["ncrcCapaSearch", "ncrcCapaType", "ncrcCapaStatus"],
+  risk: ["ncrcRiskSearch", "ncrcRiskLevel", "ncrcRiskMitigation", ...RISK_ADV],
+};
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-reg-clear]");
+  if (!b) return;
+  const kind = b.dataset.regClear;
+  CLEAR_IDS[kind].forEach((id) => { const el = document.getElementById(id); if (el) el.value = ""; });
+  if (kind === "nc") EXTRA.ncOwner = "";
+  if (kind === "capa") EXTRA.capaDue = false;
+  if (kind === "risk") EXTRA.riskNoCapa = false;
+  SORT[kind] = null;
+  ({ nc: renderNc, capa: renderCapa, risk: renderRisk })[kind]();
+});
 
 /* ---------- Detail card modal ---------- */
 const DETAIL_FIELDS = [
@@ -290,61 +518,119 @@ const DETAIL_FIELDS = [
   ["Overdue Dates", "overdueDates"], ["Effectiveness Criteria", "effectivenessCriteria"],
   ["Effectiveness", "effectiveness"], ["Comment", "ncDescription"], ["Comments", "comments"],
 ];
+// Grouped view of the same fields; long-text fields span the full width.
+const DETAIL_SECTIONS = [
+  ["Review", ["auditId", "auditDate", "processName", "processPhase", "department", "owner"]],
+  ["Non-conformance", ["compliance", "complianceReason", "ncId", "ncType", "ncCategory", "severityLevel", "ncResponsibleDept", "verifiedBy", "targetSla", "actualSla", "ncDesc", "rootCause"]],
+  ["Risk", ["riskId", "riskExist", "riskType", "riskLevel", "affectedDepartment", "riskOwner", "mitigation", "linkedCapaId", "control", "findings"]],
+  ["CAPA", ["capaIdField", "capaNeeded", "capaType", "rcCategory", "capaStatus", "actionOwner", "accountable", "startDate", "endDate", "closureDate", "overdueDates", "effectivenessCriteria", "effectiveness"]],
+  ["Comments", ["ncDescription", "comments"]],
+];
+const LONG_FIELDS = new Set(["ncDesc", "rootCause", "control", "findings", "complianceReason", "effectivenessCriteria", "ncDescription", "comments", "processName", "processPhase"]);
+const LABEL = Object.fromEntries(DETAIL_FIELDS.map(([l, k]) => [k, l]));
+const VAL_PILL = { compliance: "compliance", ncType: "ncType", severityLevel: "severity", riskLevel: "severity", capaStatus: "capaStatus", capaType: "capaType", mitigation: "mitigation", effectiveness: "effectiveness" };
 function openDetail(id, title) {
   const r = RECORDS.find((x) => x.id === id);
   if (!r) return;
-  const html = `<div class="detail-overlay" id="detailOverlay">
+  document.getElementById("detailOverlay")?.remove();
+  const order = title.startsWith("CAPA") ? [0, 3, 1, 2, 4] : title.startsWith("Risk") ? [0, 2, 3, 1, 4] : [0, 1, 3, 2, 4];
+  const mainId = title.startsWith("CAPA") ? r.capaIdField : title.startsWith("Risk") ? r.riskId : r.ncId;
+  let hidden = 0;
+  const sections = order.map((i) => {
+    const [name, keys] = DETAIL_SECTIONS[i];
+    const filled = keys.filter((k) => !isNA(r[k]));
+    hidden += keys.length - filled.length;
+    const cells = keys.map((k) => {
+      const empty = isNA(r[k]);
+      const val = empty ? `<span class="reg-na">${NA}</span>` : VAL_PILL[k] ? pill(r[k], VAL_PILL[k]) : esc(r[k]);
+      return `<div class="dc-row${LONG_FIELDS.has(k) ? " wide" : ""}${empty ? " empty" : ""}"><span class="lbl">${esc(LABEL[k] || k)}</span><span class="val">${val}</span></div>`;
+    }).join("");
+    return `<section class="dc-sec${filled.length ? "" : " empty"}"><h4>${esc(name)}<small>${filled.length}/${keys.length}</small></h4><div class="dc-grid">${cells}</div></section>`;
+  }).join("");
+  const headPills = [
+    !isNA(r.severityLevel) && title.startsWith("NC") ? pill(r.severityLevel, "severity") : "",
+    !isNA(r.riskLevel) && title.startsWith("Risk") ? pill(r.riskLevel, "severity") : "",
+    !isNA(r.capaStatus) && title.startsWith("CAPA") ? pill(r.capaStatus, "capaStatus") : "",
+    title.startsWith("CAPA") && isPastDue(r) ? `<span class="reg-pill t-red">Past due</span>` : "",
+  ].join("");
+  const html = `<div class="detail-overlay reg-detail hide-empty" id="detailOverlay" role="dialog" aria-modal="true">
     <div class="detail-card">
-      <div style="display:flex;justify-content:space-between;align-items:center;">
-        <h3>${esc(title)}</h3>
-        <button class="btn ghost" id="detailClose">✕</button>
+      <div class="dc-head">
+        <div><div class="dc-kicker">${esc(title)}</div><h3>${esc(v(mainId))} ${headPills}</h3>
+          <div class="dc-sub">${esc(v(r.processName))}</div></div>
+        <button class="btn ghost" id="detailClose" aria-label="Close">✕</button>
       </div>
-      <div class="detail-grid">
-        ${DETAIL_FIELDS.map(
-          ([lbl, k]) => `<div class="row"><span class="lbl">${esc(lbl)}</span><span class="val">${esc(v(r[k]))}</span></div>`
-        ).join("")}
-      </div>
+      <label class="dc-toggle"><input type="checkbox" id="dcShowEmpty"> Show empty fields (${hidden})</label>
+      ${sections}
     </div></div>`;
   document.body.insertAdjacentHTML("beforeend", html);
   const ov = document.getElementById("detailOverlay");
-  ov.addEventListener("click", (e) => {
-    if (e.target.id === "detailOverlay" || e.target.id === "detailClose") ov.remove();
-  });
+  const close = () => { ov.remove(); document.removeEventListener("keydown", onKey); };
+  const onKey = (e) => { if (e.key === "Escape") close(); };
+  document.addEventListener("keydown", onKey);
+  ov.addEventListener("click", (e) => { if (e.target.id === "detailOverlay" || e.target.id === "detailClose") close(); });
+  document.getElementById("dcShowEmpty").addEventListener("change", (e) => ov.classList.toggle("hide-empty", !e.target.checked));
+  document.getElementById("detailClose").focus();
 }
 
-/* ---------- Export Excel / PDF ---------- */
+/* ---------- Export Excel / PDF (exports exactly what the register currently shows) ---------- */
 function activeSub() {
-  return document.querySelector(".sub-panel.active")?.id || "sub-nc";
+  return document.querySelector("#ncrc .sub-panel.active")?.id || "sub-nc";
+}
+const EXPORT_COLS = { nc: NC_COLS, capa: CAPA_COLS, risk: RISK_COLS };
+function exportRows(kind) { return sortRows(FILTERED[kind] || [], kind); }
+function filterSummary(kind) {
+  const chips = document.querySelectorAll(`#${kind}Chips .reg-chip`);
+  return chips.length ? "Filters: " + [...chips].map((c) => c.firstChild.textContent).join(" · ") : "Filters: none (all records)";
 }
 function exportExcel(kind) {
-  const map = { nc: ncRows(), capa: capaRows(), risk: riskRows() };
-  const rows = map[kind] || [];
+  const rows = exportRows(kind);
   const cols = DETAIL_FIELDS.map(([lbl]) => lbl);
   const data = [cols, ...rows.map((r) => DETAIL_FIELDS.map(([, k]) => v(r[k])))];
   const ws = XLSX.utils.aoa_to_sheet(data);
+  ws["!cols"] = cols.map((c) => ({ wch: Math.max(12, Math.min(40, c.length + 4)) }));
+  ws["!autofilter"] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: rows.length, c: cols.length - 1 } }) };
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, kind.toUpperCase());
-  XLSX.writeFile(wb, `${kind}-register-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  XLSX.writeFile(wb, `${kind}-register-${todayStr()}.xlsx`);
 }
 function exportPdf(kind) {
-  const map = { nc: ncRows(), capa: capaRows(), risk: riskRows() };
-  const rows = map[kind] || [];
+  const rows = exportRows(kind);
   const { jsPDF } = window.jspdf;
   const pdf = new jsPDF({ orientation: "landscape", unit: "pt", format: "a3" });
-  pdf.setFontSize(14);
-  pdf.text(`${kind.toUpperCase()} Register — ${new Date().toLocaleString()}`, 30, 30);
-  pdf.setFontSize(8);
-  const headers = ["NC ID", "CAPA ID", "Risk ID", "Review ID", "Process", "Compliance", "Status", "Owner"];
-  const body = rows.map((r) => [v(r.ncId), v(r.capaIdField), v(r.riskId), v(r.auditId),
-    v(r.processName), v(r.compliance), v(r.capaStatus || r.mitigation), v(r.actionOwner || r.riskOwner || r.owner)]);
-  let y = 60;
-  pdf.text(headers.join(" | "), 30, y); y += 14;
-  body.forEach((row) => {
-    pdf.text(row.map((c) => String(c).slice(0, 28)).join(" | "), 30, y);
-    y += 12;
-    if (y > 800) { pdf.addPage(); y = 30; }
-  });
-  pdf.save(`${kind}-register-${new Date().toISOString().slice(0, 10)}.pdf`);
+  const title = { nc: "NC Register", capa: "CAPA Register", risk: "Risk Register" }[kind];
+  const W = pdf.internal.pageSize.getWidth();
+  pdf.setFillColor(209, 32, 39); pdf.rect(0, 0, W, 6, "F");
+  pdf.setFont("helvetica", "bold"); pdf.setFontSize(16); pdf.setTextColor(31, 41, 55);
+  pdf.text(`IDH · ${title}`, 30, 34);
+  pdf.setFont("helvetica", "normal"); pdf.setFontSize(9); pdf.setTextColor(107, 114, 128);
+  pdf.text(`${rows.length} record(s) · generated ${new Date().toLocaleString()}`, 30, 50);
+  pdf.text(filterSummary(kind).slice(0, 220), 30, 63);
+  const cols = EXPORT_COLS[kind];
+  if (typeof pdf.autoTable === "function") {
+    pdf.autoTable({
+      startY: 76, margin: { left: 30, right: 30 },
+      head: [cols.map(([l]) => l)],
+      body: rows.map((r) => cols.map(([, k]) => v(r[k]))),
+      styles: { fontSize: 7.5, cellPadding: 4, overflow: "linebreak", valign: "top" },
+      headStyles: { fillColor: [31, 41, 55], textColor: 255, fontStyle: "bold" },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+      didDrawPage: () => {
+        pdf.setFontSize(8); pdf.setTextColor(150);
+        pdf.text(`Page ${pdf.internal.getNumberOfPages()}`, W - 70, pdf.internal.pageSize.getHeight() - 16);
+      },
+    });
+  } else {
+    // Fallback if the table plugin failed to load
+    pdf.setFontSize(8); pdf.setTextColor(0);
+    let y = 84;
+    pdf.text(cols.map(([l]) => l).join(" | "), 30, y); y += 14;
+    rows.forEach((r) => {
+      pdf.text(cols.map(([, k]) => String(v(r[k])).slice(0, 24)).join(" | "), 30, y);
+      y += 12; if (y > 800) { pdf.addPage(); y = 30; }
+    });
+  }
+  pdf.save(`${kind}-register-${todayStr()}.pdf`);
 }
 document.addEventListener("click", (e) => {
   const btn = e.target.closest("[data-export]");

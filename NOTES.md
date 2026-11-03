@@ -312,3 +312,18 @@ the filtered result list is correct.
 - Layout is computed (no Sequence column). One sheet = one process; multiple sheets → process selector.
 - Upload auto-renders and (checkbox, remembered per browser) auto-downloads a native .vsdx (built with JSZip). .vsdx export mirrors the screen layout.
 - Old unified-schema and legacy files still import unchanged (checked first).
+
+---
+
+## Register views update (2026-11-03) — NC / CAPA / Risk
+
+Files changed: `features.js` (nc-risk-capa block only), `index.html` (#ncrc section, cache version, jspdf-autotable script), `styles.css` (scoped `#ncrc` / `.reg-*` styles appended). Read-only views; no record writes.
+
+- KPI tiles per register (click to filter), active-filter chips with one-click remove, Clear filters.
+- NC: owner breakdown treats blank/"N/A" owner as **Unassigned** (listed last, flagged in the insight line); top 8 owners with Show all; owner click is an exact owner filter (chip) instead of free-text search.
+- CAPA: Board/Table toggle (remembered per browser); cards show type, phase, owner, end date; **past due** = open status (or not set) and end date (YYYY-MM-DD calendar string) before today. CAPAs with unrecognised status show in a "Not Set" column instead of disappearing.
+- Risk: Cards/Table toggle; compact cards coloured by level; advanced filters collapsed under "More filters (n)"; "No linked CAPA" tile.
+- Tables: sortable headers, sticky header + sticky ID column, colour badges, long text truncated with hover tooltip.
+- Detail modal: grouped sections ordered by register, empty fields hidden (toggle), Esc to close.
+- **Export scope changed:** Excel/PDF now export exactly the filtered + sorted rows shown (previously all rows). Excel keeps all fields, adds autofilter. PDF is a proper table (jspdf-autotable), with filter summary; falls back to plain text if the plugin fails to load.
+- Verified locally with a mocked firebase.js (desktop 1600px + phone 390px): filters, KPI clicks, owner filter, sort, modal, view toggle, clear, PDF + Excel export. Not tested against live Firebase / GitHub Pages.
