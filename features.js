@@ -1929,15 +1929,16 @@ if (document.readyState === "loading") {
 { try {
 // gap-analysis.js — Gap Assessment module
 // Reads/writes rows to Firestore collection "gapAssessment".
-// Excel format (8 columns, order matters):
+// Excel format (9 columns; headers matched by name, order used only as fallback):
 //   A: Gap ID
 //   B: Process Name
 //   C: Process Description
 //   D: Process Owner
-//   E: Exists?               (Yes/No)
-//   F: Severity              (Critical/High/MED/Low)
-//   G: Recommended Action
-//   H: Comment
+//   E: Division Name
+//   F: Exists?               (Yes/No)
+//   G: Severity              (Critical/High/MED/Low)
+//   H: Recommended Action
+//   I: Comment
 
 
 const COL = "gapAssessment";
@@ -1947,13 +1948,14 @@ const FIELDS = [
   { key: "processName2",      label: "Process Name",         aliases: ["process name","process","process name 2","sub-process name","sub process name","subprocess","level 2 process"] },
   { key: "processDesc",       label: "Process Description",  aliases: ["process description","description"] },
   { key: "processOwner",      label: "Process Owner",        aliases: ["process owner","owner","department"] },
+  { key: "divisionName",      label: "Division Name",        aliases: ["division name","division"] },
   { key: "exists",            label: "Exists?",              aliases: ["exists","exists?","exist","existing","existing in idh","existing in idh (y/n)","y/n","yes/no"] },
   { key: "severity",          label: "Severity",             aliases: ["severity","priority","risk"] },
   { key: "recommendedAction", label: "Recommended Action",   aliases: ["recommended action","recommendation","action"] },
   { key: "comment",           label: "Comment",              aliases: ["comment","comments","notes","note"] },
 ];
 
-const FILTER_KEYS = ["gapId", "processName2", "processDesc", "processOwner", "exists", "severity"];
+const FILTER_KEYS = ["gapId", "processName2", "processDesc", "processOwner", "divisionName", "exists", "severity"];
 
 let rows = [];
 let currentUser = null;
@@ -2135,7 +2137,9 @@ function buildHeaderMap(headerRow) {
     if (match) { map[i] = match.key; used.add(match.key); }
   });
   if (Object.keys(map).length < 4 && headerRow.length >= 8) {
-    FIELDS.forEach((f, idx) => { map[idx] = f.key; });
+    // Positional fallback: 9+ columns = current layout; 8 columns = legacy layout without Division Name.
+    const order = headerRow.length >= 9 ? FIELDS : FIELDS.filter(f => f.key !== "divisionName");
+    order.forEach((f, idx) => { map[idx] = f.key; });
   }
   return map;
 }

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>IDH · Process Assurance Tracker</title>
 <link rel="icon" href="idh-logo.png" />
-<link rel="stylesheet" href="styles.css?v=20261104-division" />
+<link rel="stylesheet" href="styles.css?v=20261104-gadivision" />
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -1401,6 +1401,7 @@
           <select id="gaFilterProcessName" data-ga-filter="processName2" style="min-width:160px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;"><option value="">All Process Name</option></select>
           <select id="gaFilterProcessDesc" data-ga-filter="processDesc" style="min-width:190px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;"><option value="">All Process Description</option></select>
           <select id="gaFilterProcessOwner" data-ga-filter="processOwner" style="min-width:160px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;"><option value="">All Process Owner</option></select>
+          <select id="gaFilterDivisionName" data-ga-filter="divisionName" style="min-width:160px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;"><option value="">All Division Name</option></select>
           <select id="gaFilterExists" data-ga-filter="exists" style="min-width:120px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;"><option value="">All Exists?</option></select>
           <select id="gaFilterSeverity" data-ga-filter="severity" style="min-width:130px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;"><option value="">All Severity</option></select>
           <button id="gaResetFilters" class="btn ghost">Reset Filters</button>
@@ -1412,13 +1413,14 @@
           #gaTable td .ga-edit, #gaTable td .ga-save, #gaTable td .ga-cancel, #gaTable td .ga-del { white-space: nowrap; }
         </style>
         <div style="overflow-x:auto;border:1px solid #cbd5e1;border-radius:8px;background:#fff;">
-          <table id="gaTable" style="width:100%;border-collapse:collapse;font-size:13px;min-width:1430px;table-layout:fixed;">
+          <table id="gaTable" style="width:100%;border-collapse:collapse;font-size:13px;min-width:1570px;table-layout:fixed;">
             <thead style="background:#1f3a8a;color:#fff;">
               <tr>
                 <th style="padding:10px;text-align:left;width:100px;border-right:1px solid #3b82f6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Gap ID</th>
                 <th style="padding:10px;text-align:left;width:140px;border-right:1px solid #3b82f6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Process Name</th>
                 <th style="padding:10px;text-align:left;width:220px;border-right:1px solid #3b82f6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Process Description</th>
                 <th style="padding:10px;text-align:left;width:140px;border-right:1px solid #3b82f6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Process Owner</th>
+                <th style="padding:10px;text-align:left;width:140px;border-right:1px solid #3b82f6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Division Name</th>
                 <th style="padding:10px;text-align:center;width:80px;border-right:1px solid #3b82f6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Exists?</th>
                 <th style="padding:10px;text-align:center;width:110px;border-right:1px solid #3b82f6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Severity</th>
                 <th style="padding:10px;text-align:left;width:180px;border-right:1px solid #3b82f6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Recommended Action</th>
@@ -1713,9 +1715,9 @@
 
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script src="classic.js?v=20261104-division"></script>
-  <script type="module" src="app.js?v=20261104-division"></script>
-  <script type="module" src="features.js?v=20261104-division"></script>
+  <script src="classic.js?v=20261104-gadivision"></script>
+  <script type="module" src="app.js?v=20261104-gadivision"></script>
+  <script type="module" src="features.js?v=20261104-gadivision"></script>
 
   <script>
   // Export-to-PDF handler (shared for dashboard sub-pages)
