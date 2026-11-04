@@ -3077,15 +3077,15 @@ function renderInsights() {
   if (!el) return;
   const critical = gaRows.filter(r => severityOf(r) === "Critical").length;
 
-  const missingByOwner = {};
+  const missingByDivision = {};
   gaRows.forEach(r => {
     if (!isNo(r.exists)) return;
-    const owner = norm(r.processOwner) || "Unassigned";
-    missingByOwner[owner] = (missingByOwner[owner] || 0) + 1;
+    const div = norm(r.divisionName) || "Unassigned";
+    missingByDivision[div] = (missingByDivision[div] || 0) + 1;
   });
-  const ownerList = Object.keys(missingByOwner).sort((a, b) => missingByOwner[b] - missingByOwner[a]);
-  const ownerBody = ownerList.length
-    ? ownerList.map(o => `<div style="display:flex;justify-content:space-between;gap:8px;padding:2px 0;"><span>${o}</span><strong style="color:#b91c1c;">${missingByOwner[o]}</strong></div>`).join("")
+  const divisionList = Object.keys(missingByDivision).sort((a, b) => missingByDivision[b] - missingByDivision[a]);
+  const divisionBody = divisionList.length
+    ? divisionList.map(d => `<div style="display:flex;justify-content:space-between;gap:8px;padding:2px 0;"><span>${d}</span><strong style="color:#b91c1c;">${missingByDivision[d]}</strong></div>`).join("")
     : "No missing processes.";
 
   const card = (bg, border, iconBg, icon, title, titleColor, body) => `
@@ -3100,7 +3100,7 @@ function renderInsights() {
   el.innerHTML = [
     card("#fef2f2", "#fecaca", "#fee2e2", "⚠️", `${critical} Critical Gaps`, "#b91c1c",
       "Immediate attention required for processes with critical severity."),
-    card("#fff7ed", "#fed7aa", "#ffedd5", "🚫", "Non-Existing Processes by Owner", "#c2410c", ownerBody),
+    card("#fff7ed", "#fed7aa", "#ffedd5", "🚫", "Non-Existing Processes by Division", "#c2410c", divisionBody),
   ].join("");
 }
 
