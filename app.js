@@ -377,6 +377,9 @@ function filterReviewRecords(records, filters = {}) {
     (!filters.departments?.length || inOwnerList(filters.departments, r.processOwner)) &&
     (!filters.processOwners?.length || inOwnerList(filters.processOwners, r.processPreparedBy)) &&
     (!filters.actionOwners?.length || inOwnerList(filters.actionOwners, r.department)) &&
+    (!filters.riskLevels?.length || inOwnerList(filters.riskLevels, r.riskLevel)) &&
+    (!filters.mitigationStatuses?.length || inOwnerList(filters.mitigationStatuses, r.mitigation)) &&
+    (!filters.capaStatuses?.length || inOwnerList(filters.capaStatuses, r.capaStatus)) &&
     (!filters.month || reviewMonth(r.auditDate) === filters.month) &&
     (!filters.months?.length || filters.months.includes(reviewMonth(r.auditDate) || UNASSIGNED))
   );
@@ -905,6 +908,9 @@ window.__writeAudit = writeAudit;
     fillRecFilter("recFilterDepartment", "processOwner", "No department (N/A)");
     fillRecFilter("recFilterProcessOwner", "processPreparedBy");
     fillRecFilter("recFilterActionOwner", "department");
+    fillRecFilter("recFilterRiskLevel", "riskLevel", "No risk level (N/A)");
+    fillRecFilter("recFilterMitigation", "mitigation", "No mitigation status (N/A)");
+    fillRecFilter("recFilterCapaStatus", "capaStatus", "No CAPA status (N/A)");
   }
 
   /* ---------- Attachments (staged in form, uploaded on save) ---------- */
@@ -1259,7 +1265,7 @@ window.__writeAudit = writeAudit;
 
   /* ---------- Records table ---------- */
   const REC_FILTER_IDS = ["recFilterAuditId","recFilterUser","recFilterProcess","recFilterPhase","recFilterDepartment",
-    "recFilterProcessOwner","recFilterActionOwner","recFilterMonth"];
+    "recFilterProcessOwner","recFilterActionOwner","recFilterMonth","recFilterRiskLevel","recFilterMitigation","recFilterCapaStatus"];
   function renderRecords() {
     const head = document.getElementById("recordsHead");
     const tbody = document.querySelector("#recordsTable tbody");
@@ -1312,10 +1318,14 @@ window.__writeAudit = writeAudit;
     const fProcOwners = msValues("recFilterProcessOwner");
     const fActionOwners = msValues("recFilterActionOwner");
     const fMonths   = msValues("recFilterMonth");
-    const anyRecFilter = [fAuditIds, fUsers, fProcSel, fPhases, fDepts, fProcOwners, fActionOwners, fMonths].some(a => a.length);
+    const fRiskLevels = msValues("recFilterRiskLevel");
+    const fMitigation = msValues("recFilterMitigation");
+    const fCapaStatus = msValues("recFilterCapaStatus");
+    const anyRecFilter = [fAuditIds, fUsers, fProcSel, fPhases, fDepts, fProcOwners, fActionOwners, fMonths, fRiskLevels, fMitigation, fCapaStatus].some(a => a.length);
     const filtered = filterReviewRecords(records, {
       auditIds: fAuditIds, users: fUsers, processes: fProcSel, phases: fPhases, departments: fDepts,
-      processOwners: fProcOwners, actionOwners: fActionOwners, months: fMonths
+      processOwners: fProcOwners, actionOwners: fActionOwners, months: fMonths,
+      riskLevels: fRiskLevels, mitigationStatuses: fMitigation, capaStatuses: fCapaStatus
     });
     const processCount = document.getElementById("reviewedProcessesCount");
     if (processCount) processCount.textContent = String(countReviewedProcesses(filtered));
