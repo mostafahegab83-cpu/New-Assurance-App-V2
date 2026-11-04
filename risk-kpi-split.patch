@@ -1,0 +1,50 @@
+diff --git a/app.js b/app.js
+index de30381..995ff06 100644
+--- a/app.js
++++ b/app.js
+@@ -1712,7 +1712,9 @@ window.__writeAudit = writeAudit;
+     const compliancePct = compliantBase ? Math.round(compliantCount / compliantBase * 100) : 0;
+ 
+     const slaAdherence = slaStats(data).pct;
+-    const openRisks = data.filter(r => r.riskExist === "Yes" && r.mitigation !== "Closed" && r.mitigation !== "Mitigated").length;
++    const riskRowsKpi = data.filter(r => r.riskExist === "Yes");
++    const openRisks = riskRowsKpi.filter(r => r.mitigation === "Open").length;
++    const acceptedRisks = riskRowsKpi.filter(r => r.mitigation === "Accepted").length;
+     const capaNeededRows = data.filter(r => r.capaNeeded === "Yes");
+     const ASSESSED_EFF = ["Effective", "Partially Effective", "Ineffective"];
+     const assessedEffRows = capaNeededRows.filter(r => ASSESSED_EFF.includes(r.effectiveness));
+@@ -1722,8 +1724,9 @@ window.__writeAudit = writeAudit;
+     setText("kpiCompliancePct", compliancePct + "%");
+     setText("kpiSlaAdherence", slaAdherence + "%");
+     setText("kpiTotalNcs", ncRows.length);
+-    setText("kpiTotalRisks", data.filter(r => r.riskExist === "Yes").length);
++    setText("kpiTotalRisks", riskRowsKpi.length);
+     setText("kpiOpenRisks", openRisks);
++    setText("kpiAcceptedRisks", acceptedRisks);
+     setText("kpiEffectiveCapa", effPct === null ? "N/A" : effPct + "%");
+ 
+     const slaSt = slaStats(data);
+diff --git a/index.html b/index.html
+index a1cf118..6bd947e 100644
+--- a/index.html
++++ b/index.html
+@@ -294,7 +294,7 @@
+ 
+       <div id="dashRisk" class="dash-sub-panel" style="display:none;">
+         <div id="riskDashboardCapture">
+-          <div class="kpis" style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;">
++          <div class="kpis" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
+             <div class="kpi" style="display:flex;align-items:center;gap:12px;">
+               <span class="kpi-icon" aria-hidden="true" style="font-size:28px;line-height:1;flex-shrink:0;">⚠️</span>
+               <span style="display:flex;flex-direction:column;"><span class="kpi-label">Total Risks</span><span class="kpi-value" id="kpiTotalRisks">0</span></span>
+@@ -303,6 +303,10 @@
+               <span class="kpi-icon" aria-hidden="true" style="font-size:28px;line-height:1;flex-shrink:0;">🚨</span>
+               <span style="display:flex;flex-direction:column;"><span class="kpi-label">Open Risks</span><span class="kpi-value" id="kpiOpenRisks">0</span></span>
+             </div>
++            <div class="kpi" style="display:flex;align-items:center;gap:12px;">
++              <span class="kpi-icon" aria-hidden="true" style="font-size:28px;line-height:1;flex-shrink:0;">🛡️</span>
++              <span style="display:flex;flex-direction:column;"><span class="kpi-label">Accepted Risks</span><span class="kpi-value" id="kpiAcceptedRisks">0</span></span>
++            </div>
+           </div>
+ 
+           <h3 class="dash-section-title">Risk</h3>

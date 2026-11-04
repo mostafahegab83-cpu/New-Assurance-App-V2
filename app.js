@@ -1712,7 +1712,9 @@ window.__writeAudit = writeAudit;
     const compliancePct = compliantBase ? Math.round(compliantCount / compliantBase * 100) : 0;
 
     const slaAdherence = slaStats(data).pct;
-    const openRisks = data.filter(r => r.riskExist === "Yes" && r.mitigation !== "Closed" && r.mitigation !== "Mitigated").length;
+    const riskRowsKpi = data.filter(r => r.riskExist === "Yes");
+    const openRisks = riskRowsKpi.filter(r => r.mitigation === "Open").length;
+    const acceptedRisks = riskRowsKpi.filter(r => r.mitigation === "Accepted").length;
     const capaNeededRows = data.filter(r => r.capaNeeded === "Yes");
     const ASSESSED_EFF = ["Effective", "Partially Effective", "Ineffective"];
     const assessedEffRows = capaNeededRows.filter(r => ASSESSED_EFF.includes(r.effectiveness));
@@ -1722,8 +1724,9 @@ window.__writeAudit = writeAudit;
     setText("kpiCompliancePct", compliancePct + "%");
     setText("kpiSlaAdherence", slaAdherence + "%");
     setText("kpiTotalNcs", ncRows.length);
-    setText("kpiTotalRisks", data.filter(r => r.riskExist === "Yes").length);
+    setText("kpiTotalRisks", riskRowsKpi.length);
     setText("kpiOpenRisks", openRisks);
+    setText("kpiAcceptedRisks", acceptedRisks);
     setText("kpiEffectiveCapa", effPct === null ? "N/A" : effPct + "%");
 
     const slaSt = slaStats(data);
