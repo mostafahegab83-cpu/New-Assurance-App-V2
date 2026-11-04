@@ -2298,7 +2298,7 @@ if (document.readyState !== "loading") wire();
 // process-validation.js — Process Validation Interviews module
 // Firestore collection: "processValidation".
 // Excel import expects ONLY these 5 columns (matched by header text):
-//   Document Title | Document Type | Document Code | Process Owner | Company Name
+//   Document Title | Document Type | Document Code | Process Owner | Division Name | Company Name
 // Remaining fields (Process Exists?, Evidence Exists?, Automated?, Status,
 // Comments) are filled manually per row via the row's Edit / Save controls.
 
@@ -2310,6 +2310,7 @@ const IMPORT_FIELDS = [
   { key: "docType",      label: "Document Type",   aliases: ["document type","type"] },
   { key: "docCode",      label: "Document Code",   aliases: ["document code","code","doc code"] },
   { key: "processOwner", label: "Process Owner",   aliases: ["process owner","owner"] },
+  { key: "divisionName", label: "Division Name",   aliases: ["division name","division"] },
   { key: "companyName",  label: "Company Name",    aliases: ["company name","company"] },
 ];
 
@@ -2322,7 +2323,7 @@ const MANUAL_FIELDS = [
 ];
 
 const ALL_KEYS = [...IMPORT_FIELDS.map(f => f.key), ...MANUAL_FIELDS.map(f => f.key)];
-const FILTER_KEYS = ["docTitle", "docType", "docCode", "processOwner", "companyName"];
+const FILTER_KEYS = ["docTitle", "docType", "docCode", "processOwner", "divisionName", "companyName"];
 
 let rows = [];
 let rawRows = [];
@@ -2587,7 +2588,7 @@ async function importExcel(file) {
 
   const headerMap = buildHeaderMap(aoa[0]);
   if (!Object.keys(headerMap).length) {
-    toast("No matching headers. Expected: Document Title, Document Type, Document Code, Process Owner, Company Name.");
+    toast("No matching headers. Expected: Document Title, Document Type, Document Code, Process Owner, Division Name, Company Name.");
     return;
   }
   const mapped = [];
@@ -2748,7 +2749,7 @@ const isYes = v => yn(v) === "yes";
 
 /* ---------- Dedupe (same signature as process-validation.js) ---------- */
 function rowSignature(r) {
-  const parts = ["docTitle", "docType", "docCode", "processOwner", "companyName"]
+  const parts = ["docTitle", "docType", "docCode", "processOwner", "divisionName", "companyName"]
     .map(k => String(r[k] ?? "").trim().toLowerCase());
   const key = parts.join("|");
   return parts.some(Boolean) ? key : `id:${r.id}`;

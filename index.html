@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>IDH · Process Assurance Tracker</title>
 <link rel="icon" href="idh-logo.png" />
-<link rel="stylesheet" href="styles.css?v=20261104-riskkpi" />
+<link rel="stylesheet" href="styles.css?v=20261104-division" />
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -1455,18 +1455,20 @@
           <select id="pvFilterDocType" data-pv-filter="docType" style="min-width:145px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;"><option value="">All Document Type</option></select>
           <select id="pvFilterDocCode" data-pv-filter="docCode" style="min-width:145px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;"><option value="">All Document Code</option></select>
           <select id="pvFilterProcessOwner" data-pv-filter="processOwner" style="min-width:155px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;"><option value="">All Process Owner</option></select>
+          <select id="pvFilterDivisionName" data-pv-filter="divisionName" style="min-width:155px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;"><option value="">All Division Name</option></select>
           <select id="pvFilterCompanyName" data-pv-filter="companyName" style="min-width:155px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;"><option value="">All Company Name</option></select>
           <button id="pvResetFilters" class="btn ghost">Reset Filters</button>
         </div>
 
         <div style="overflow-x:auto;border:1px solid #cbd5e1;border-radius:8px;background:#fff;">
-          <table id="pvTable" style="width:100%;border-collapse:collapse;font-size:13px;min-width:1215px;table-layout:fixed;">
+          <table id="pvTable" style="width:100%;border-collapse:collapse;font-size:13px;min-width:1330px;table-layout:fixed;">
             <thead style="background:#1f3a8a;color:#fff;">
               <tr>
                 <th style="padding:10px;text-align:left;width:170px;border-right:1px solid #3b82f6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Document Title</th>
                 <th style="padding:10px;text-align:left;width:95px;border-right:1px solid #3b82f6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Document Type</th>
                 <th style="padding:10px;text-align:left;width:85px;border-right:1px solid #3b82f6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Document Code</th>
                 <th style="padding:10px;text-align:left;width:115px;border-right:1px solid #3b82f6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Process Owner</th>
+                <th style="padding:10px;text-align:left;width:115px;border-right:1px solid #3b82f6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Division Name</th>
                 <th style="padding:10px;text-align:left;width:115px;border-right:1px solid #3b82f6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Company Name</th>
                 <th style="padding:10px;text-align:center;width:105px;border-right:1px solid #3b82f6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Process Exists?</th>
                 <th style="padding:10px;text-align:center;width:110px;border-right:1px solid #3b82f6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Evidence Exists?</th>
@@ -1480,7 +1482,7 @@
           </table>
         </div>
         <div id="pvEmpty" style="text-align:center;padding:24px;color:#6b7280;">
-          No rows yet. Import an Excel file (Document Title, Document Type, Document Code, Process Owner, Company Name) or add a row to get started.
+          No rows yet. Import an Excel file (Document Title, Document Type, Document Code, Process Owner, Division Name, Company Name) or add a row to get started.
         </div>
       </div>
 
@@ -1711,9 +1713,9 @@
 
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script src="classic.js?v=20261104-riskkpi"></script>
-  <script type="module" src="app.js?v=20261104-riskkpi"></script>
-  <script type="module" src="features.js?v=20261104-riskkpi"></script>
+  <script src="classic.js?v=20261104-division"></script>
+  <script type="module" src="app.js?v=20261104-division"></script>
+  <script type="module" src="features.js?v=20261104-division"></script>
 
   <script>
   // Export-to-PDF handler (shared for dashboard sub-pages)
