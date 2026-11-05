@@ -449,7 +449,7 @@ const {
 } = firebaseApi;
 
 const ADMIN_EMAILS = Array.isArray(firebaseApi.ADMIN_EMAILS) ? firebaseApi.ADMIN_EMAILS : [];
-const VIEWER_EMAILS = (Array.isArray(firebaseApi.VIEWER_EMAILS) ? firebaseApi.VIEWER_EMAILS : [])
+const FULL_ACCESS_EMAILS = (Array.isArray(firebaseApi.FULL_ACCESS_EMAILS) ? firebaseApi.FULL_ACCESS_EMAILS : [])
   .map(e => String(e).trim().toLowerCase())
   .filter(Boolean);
 const safeCall = (fn) => {
@@ -525,7 +525,8 @@ async function getApprovedUserDoc(email) {
 }
 
 // Current session info — populated by auth gate at bottom of file
-window.__session = { user: null, email: null, isAdmin: false, isViewer: false };
+// Before sign-in every visitor is a public, view-only viewer (no login needed).
+window.__session = { user: null, email: null, isAdmin: false, isViewer: true, isPublic: true };
 
 /* ===== Dashboard-only (limited access) users ===== */
 const VIEWER_ALLOWED_TABS = ["dashboard", "gapAnalysis"];
@@ -552,6 +553,7 @@ function goToHomeTab() {
 }
 window.__goToHomeTab = goToHomeTab;
 function applyViewerRestrictions(on) {
+  document.body.classList.toggle("viewer-mode", !!on);
   document.querySelectorAll(".tab[data-tab]").forEach(t => {
     const allowed = !on || VIEWER_ALLOWED_TABS.includes(t.dataset.tab);
     t.style.display = allowed ? "" : "none";
@@ -3347,10 +3349,53 @@ function describeAuthError(err) {
 
   if (!overlay || !loginForm) return;
 
+  const closeBtn = document.getElementById("loginClose");
+  let keepLoginOpen = false;   // keep the sign-in box visible to show a rejection message
+  function openLogin() {
+    loginError.style.color = "#dc2626";
+    loginError.textContent = "";
+    overlay.style.display = "flex";
+    setTimeout(() => emailInput?.focus(), 0);
+  }
+  function closeLogin() {
+    overlay.style.display = "none";
+    if (passwordInput) passwordInput.value = "";
+  }
+  window.__openLogin = openLogin;
+  if (closeBtn) closeBtn.addEventListener("click", (e) => { e.preventDefault(); closeLogin(); });
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) closeLogin(); });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && overlay.style.display !== "none") closeLogin();
+  });
+
+  function enterPublicView() {
+    window.__session = { user: null, email: null, isAdmin: false, isViewer: true, isPublic: true };
+    applyViewerRestrictions(true);
+    const emailLabel = document.getElementById("currentUserEmail");
+    if (emailLabel) emailLabel.textContent = "View only";
+    if (logoutBtn) { logoutBtn.textContent = "Sign in"; logoutBtn.title = "Sign in for full access (authorized users only)"; }
+    document.querySelectorAll("[data-admin-only]").forEach(el => { el.style.display = "none"; });
+    // Dashboards are readable without a login (see firestore.rules)
+    window.__startComplianceSync?.();
+    if (!keepLoginOpen) closeLogin();
+    keepLoginOpen = false;
+  }
+
   observeAuthState(async (user) => {
     if (user) {
       const email = (user.email || "").toLowerCase();
       const admin = ADMIN_EMAILS.map(e => String(e).toLowerCase()).includes(email);
+
+      // Only the full-access list (and admins) may sign in. Everyone else
+      // uses the site without a login, as a view-only visitor.
+      if (!admin && !FULL_ACCESS_EMAILS.includes(email)) {
+        keepLoginOpen = true;
+        overlay.style.display = "flex";
+        loginError.style.color = "#dc2626";
+        loginError.textContent = "This account does not have edit access. You can view the dashboards without signing in.";
+        await signOutUser();
+        return;
+      }
 
       // Approval check: admins are always approved; for other users, fall back to allow access
       // when the approval collection is unavailable or not configured yet.
@@ -3372,13 +3417,16 @@ function describeAuthError(err) {
       }
 
       if (!approved) {
+        keepLoginOpen = true;
+        overlay.style.display = "flex";
         loginError.textContent = "Your account is not approved yet. Contact the administrator.";
         await signOutUser();
         return;
       }
 
-      const viewer = !admin && VIEWER_EMAILS.includes(email);
-      window.__session = { user, email, isAdmin: admin, isViewer: viewer };
+      const viewer = false;   // signed-in users always have full access
+      window.__session = { user, email, isAdmin: admin, isViewer: viewer, isPublic: false };
+      if (logoutBtn) { logoutBtn.textContent = "Logout"; logoutBtn.title = "Sign out"; }
       applyViewerRestrictions(viewer);
       // Auto-fill the User Name field with the logged-in email and HARD lock it
       lockUserNameField(email);
@@ -3401,14 +3449,7 @@ function describeAuthError(err) {
       window.__initAdminPanel?.();
       window.__startComplianceSync?.();
     } else {
-      window.__session = { user: null, email: null, isAdmin: false, isViewer: false };
-      applyViewerRestrictions(false);
-      const emailLabel = document.getElementById("currentUserEmail");
-      if (emailLabel) emailLabel.textContent = "";
-      window.__stopComplianceSync?.();
-      goToHomeTab();
-      overlay.style.display = "flex";
-      if (passwordInput) passwordInput.value = "";
+      enterPublicView();
     }
   });
 
@@ -3423,7 +3464,12 @@ function describeAuthError(err) {
   });
 
   if (logoutBtn) {
-    logoutBtn.addEventListener("click", async () => {
+    logoutBtn.addEventListener("click", async (e) => {
+      if (!window.__session?.user) {   // public viewer: button reads "Sign in"
+        e.preventDefault(); e.stopPropagation();
+        openLogin();
+        return;
+      }
       try { await signOutUser(); } catch (err) { console.error(err); }
     });
   }

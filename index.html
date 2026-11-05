@@ -54,14 +54,23 @@
   .ms-opt:hover{background:#f8fafc;}
   .ms-opt input{margin:0;}
   .ms-empty{padding:8px;font-size:12px;color:#6b7280;text-align:center;}
+  /* Public view-only visitors (no login): hide actions they cannot perform */
+  body.viewer-mode [data-dashsub="dashReports"],
+  body.viewer-mode #dashReports,
+  body.viewer-mode #btnPublishPdf,
+  body.viewer-mode #findingsSection .fs-add,
+  body.viewer-mode #findingsSection td.no-print,
+  body.viewer-mode #findingsSection th.no-print,
+  body.viewer-mode #findingsSection col.no-print{display:none !important;}
 </style>
 </head>
 <body>
   <!-- ==================== LOGIN OVERLAY ==================== -->
-  <div id="loginOverlay" style="position:fixed;inset:0;background:#f5f7fa;display:flex;align-items:center;justify-content:center;z-index:9999;">
+  <div id="loginOverlay" style="position:fixed;inset:0;background:rgba(15,23,42,.55);display:none;align-items:center;justify-content:center;z-index:9999;">
     <form id="loginForm" style="background:#fff;padding:32px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.1);min-width:320px;max-width:90vw;">
       <img src="idh-logo.png" alt="IDH" style="height:48px;display:block;margin:0 auto 16px;" />
-      <h2 style="margin:0 0 16px;text-align:center;font-size:18px;color:#1f2937;">Sign in</h2>
+      <h2 style="margin:0 0 6px;text-align:center;font-size:18px;color:#1f2937;">Sign in</h2>
+      <p style="margin:0 0 16px;text-align:center;font-size:12px;color:#6b7280;">For authorized users only. Viewing the dashboards does not need a login.</p>
       <input id="loginEmail" type="email" placeholder="Email" required autocomplete="username" style="width:100%;padding:10px;margin-bottom:8px;border:1px solid #e3e8ef;border-radius:6px;font-size:14px;" />
       <input id="loginPassword" type="password" placeholder="Password" required autocomplete="current-password" style="width:100%;padding:10px;margin-bottom:12px;border:1px solid #e3e8ef;border-radius:6px;font-size:14px;" />
       <button type="submit" style="width:100%;padding:10px;background:#d12027;color:#fff;border:none;border-radius:6px;font-weight:600;cursor:pointer;font-size:14px;">Sign in</button>
@@ -69,6 +78,9 @@
         <a href="#" id="forgotPasswordLink" style="font-size:13px;color:#d12027;text-decoration:none;font-weight:600;">Forgot password?</a>
       </p>
       <p id="loginError" style="color:#dc2626;font-size:13px;margin:8px 0 0;min-height:18px;text-align:center;"></p>
+      <p style="margin:4px 0 0;text-align:center;">
+        <a href="#" id="loginClose" style="font-size:13px;color:#475569;text-decoration:none;">&larr; Continue as viewer</a>
+      </p>
     </form>
   </div>
 
@@ -92,7 +104,7 @@
       <button class="tab" data-tab="admin" role="tab" data-admin-only style="display:none;">Admin</button>
       <div style="margin-left:auto; display:flex; flex-direction:column; align-items:flex-end; gap:2px;">
         <span id="currentUserEmail" style="font-size:12px; color:#475569; line-height:1;"></span>
-        <button id="logoutBtn" class="tab" title="Sign out">Logout</button>
+        <button id="logoutBtn" class="tab" title="Sign in for full access (authorized users only)">Sign in</button>
       </div>
     </nav>
   </header>
