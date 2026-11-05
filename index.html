@@ -889,12 +889,13 @@
         <div class="reg-kpis" id="ncKpis"></div>
         <div class="filters reg-toolbar">
           <input type="search" id="ncrcNcSearch" placeholder="Search NC ID, process, root cause…" />
-          <select id="ncrcNcType"><option value="">All NC Types</option><option>Major</option><option>Minor</option><option>Enhancement</option></select>
-          <select id="ncrcNcSeverity"><option value="">All Severities</option><option>Low</option><option>Medium</option><option>High</option><option>Critical</option></select>
-          <select id="ncrcNcCompliance"><option value="">All Compliance</option><option>Non-Compliant</option><option>Observation</option><option>Compliant</option></select>
-          <select id="ncrcNcProcess" title="Filter by process name" style="max-width:220px;"><option value="">All Processes</option></select>
-          <select id="ncrcNcPhase" title="Filter by process phase" style="max-width:220px;"><option value="">All Phases</option></select>
-          <select id="ncrcNcRespOwner" title="Filter by responsible owner" style="max-width:200px;"><option value="">All Resp. Owners</option></select>
+          <!-- Multi-select filters (rendered as checkbox dropdowns by features.js) -->
+          <select id="ncrcNcType" multiple data-placeholder="NC Type"><option>Major</option><option>Minor</option><option>Enhancement</option></select>
+          <select id="ncrcNcSeverity" multiple data-placeholder="Severity"><option>Critical</option><option>High</option><option>Medium</option><option>Low</option></select>
+          <select id="ncrcNcCompliance" multiple data-placeholder="Compliance"><option>Non-Compliant</option><option>Observation</option><option>Compliant</option></select>
+          <select id="ncrcNcProcess" multiple data-placeholder="Process"></select>
+          <select id="ncrcNcPhase" multiple data-placeholder="Phase"></select>
+          <select id="ncrcNcRespOwner" multiple data-placeholder="Resp. Owner"></select>
           <button class="btn ghost sm" type="button" data-reg-clear="nc">Clear filters</button>
           <span class="spacer"></span>
           <button class="btn" data-export="nc-excel">Export Excel</button>
@@ -1737,8 +1738,8 @@
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script src="classic.js?v=20261104-gadivision"></script>
-  <script type="module" src="app.js?v=20261104-gadivision"></script>
-  <script type="module" src="features.js?v=20261104-gadivision"></script>
+  <script type="module" src="app.js?v=20261105-ncmulti"></script>
+  <script type="module" src="features.js?v=20261105-ncmulti"></script>
   <script type="module" src="ai-analyst.js?v=20261105-ai5"></script>
 
   <script>
