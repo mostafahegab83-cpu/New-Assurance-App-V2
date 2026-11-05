@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>IDH · Process Assurance Tracker</title>
 <link rel="icon" href="idh-logo.png" />
-<link rel="stylesheet" href="styles.css?v=20261104-gadivision" />
+<link rel="stylesheet" href="styles.css?v=20261105-allmulti" />
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -932,8 +932,12 @@
         <div class="reg-kpis" id="capaKpis"></div>
         <div class="filters reg-toolbar">
           <input type="search" id="ncrcCapaSearch" placeholder="Search CAPA ID, NC ID, process, owner…" />
-          <select id="ncrcCapaType"><option value="">All CAPA Types</option><option>Corrective</option><option>Preventive</option></select>
-          <select id="ncrcCapaStatus"><option value="">All Statuses</option><option>In Progress</option><option>Pending</option><option>Closed</option><option>Cancelled</option><option>Overdue</option></select>
+          <!-- Multi-select filters (rendered as checkbox dropdowns by features.js) -->
+          <select id="ncrcCapaType" multiple data-placeholder="CAPA Type"><option>Corrective</option><option>Preventive</option></select>
+          <select id="ncrcCapaStatus" multiple data-placeholder="Status"><option>In Progress</option><option>Pending</option><option>Closed</option><option>Cancelled</option><option>Overdue</option></select>
+          <select id="ncrcCapaProcess" multiple data-placeholder="Process"></select>
+          <select id="ncrcCapaPhase" multiple data-placeholder="Phase"></select>
+          <select id="ncrcCapaOwner" multiple data-placeholder="Owner"></select>
           <button class="btn ghost sm" type="button" data-reg-clear="capa">Clear filters</button>
           <span class="spacer"></span>
           <div class="reg-viewtoggle" data-reg="capa" role="group" aria-label="View">
@@ -955,8 +959,12 @@
         <div class="reg-kpis" id="riskKpis"></div>
         <div class="filters reg-toolbar">
           <input type="search" id="ncrcRiskSearch" placeholder="Search risk ID, type, owner, findings…" />
-          <select id="ncrcRiskLevel"><option value="">All Risk Levels</option><option>High</option><option>Medium</option><option>Low</option></select>
-          <select id="ncrcRiskMitigation"><option value="">All Mitigation</option><option>Open</option><option>Mitigated</option><option>Accepted</option><option>Closed</option></select>
+          <!-- Multi-select filters (rendered as checkbox dropdowns by features.js) -->
+          <select id="ncrcRiskLevel" multiple data-placeholder="Risk Level"><option>High</option><option>Medium</option><option>Low</option></select>
+          <select id="ncrcRiskMitigation" multiple data-placeholder="Mitigation"><option>Open</option><option>Mitigated</option><option>Accepted</option><option>Closed</option></select>
+          <select id="ncrcRiskProcessName" multiple data-placeholder="Process"></select>
+          <select id="ncrcRiskProcessPhase" multiple data-placeholder="Phase"></select>
+          <select id="ncrcRiskOwner" multiple data-placeholder="Risk Owner"></select>
           <button class="btn sm" type="button" id="riskMoreBtn">More filters</button>
           <button class="btn ghost sm" type="button" data-reg-clear="risk">Clear filters</button>
           <span class="spacer"></span>
@@ -967,12 +975,11 @@
           <button class="btn primary" data-export="risk-pdf">Export PDF</button>
         </div>
         <div class="filters reg-adv" id="riskAdvFilters">
-          <label>Review ID<input type="search" id="ncrcRiskAuditId" placeholder="e.g. IDRDAPMK-26-04-01" /></label>
+          <div class="adv-f">Review ID<select id="ncrcRiskAuditId" multiple data-placeholder="Review ID"></select></div>
           <label>Review date<input type="date" id="ncrcRiskAuditDate" /></label>
-          <label>Process name<input type="search" id="ncrcRiskProcessName" placeholder="Process" /></label>
-          <label>Process phase<input type="search" id="ncrcRiskProcessPhase" placeholder="Phase" /></label>
-          <label>Risk ID<input type="search" id="ncrcRiskRiskId" placeholder="R-…" /></label>
-          <label>Linked CAPA ID<input type="search" id="ncrcRiskLinkedCapaId" placeholder="PA-…" /></label>
+          <div class="adv-f">Risk Type<select id="ncrcRiskType" multiple data-placeholder="Risk Type"></select></div>
+          <div class="adv-f">Risk ID<select id="ncrcRiskRiskId" multiple data-placeholder="Risk ID"></select></div>
+          <div class="adv-f">Linked CAPA ID<select id="ncrcRiskLinkedCapaId" multiple data-placeholder="Linked CAPA ID"></select></div>
         </div>
         <div class="reg-chips" id="riskChips"></div>
         <div class="risk-cards" id="ncrcRiskCards"></div>
@@ -1738,8 +1745,8 @@
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script src="classic.js?v=20261104-gadivision"></script>
-  <script type="module" src="app.js?v=20261105-ncmulti"></script>
-  <script type="module" src="features.js?v=20261105-ncmulti"></script>
+  <script type="module" src="app.js?v=20261105-allmulti"></script>
+  <script type="module" src="features.js?v=20261105-allmulti"></script>
   <script type="module" src="ai-analyst.js?v=20261105-ai5"></script>
 
   <script>

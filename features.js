@@ -376,13 +376,22 @@ const CAPA_COLS = [
 ];
 function renderCapa() {
   const q = document.getElementById("ncrcCapaSearch")?.value || "";
-  const type = document.getElementById("ncrcCapaType")?.value || "";
-  const status = document.getElementById("ncrcCapaStatus")?.value || "";
   const all = capaRows();
+  ["ncrcCapaType", "ncrcCapaStatus"].forEach(msRefresh);
+  const type = msPicked("ncrcCapaType");
+  const status = msPicked("ncrcCapaStatus");
+  const proc = fillNcMulti("ncrcCapaProcess", all.map((r) => clean(r.processName)));
+  const phase = fillNcMulti("ncrcCapaPhase",
+    all.filter((r) => !proc.length || proc.includes(clean(r.processName))).map((r) => clean(r.processPhase)), false);
+  const owner = fillNcMulti("ncrcCapaOwner", all.map((r) => clean(r.actionOwner)));
+  const pass = (picked, v) => !picked.length || picked.includes(v);
   const rows = all.filter(
     (r) =>
-      (!type || r.capaType === type) &&
-      (!status || r.capaStatus === status) &&
+      pass(type, r.capaType) &&
+      pass(status, r.capaStatus) &&
+      pass(proc, clean(r.processName)) &&
+      pass(phase, clean(r.processPhase)) &&
+      pass(owner, clean(r.actionOwner)) &&
       (!EXTRA.capaDue || isPastDue(r)) &&
       passText(r, ["capaIdField", "ncId", "auditId", "processName", "actionOwner", "accountable"], q)
   );
@@ -396,15 +405,16 @@ function renderCapa() {
   renderKpis("capaKpis", [
     { label: "CAPAs in view", value: rows.length, tone: "ink", sub: rows.length !== all.length ? `of ${all.length} total` : "all records" },
     { label: "Open", value: open, tone: "blue", sub: "Pending + In Progress + Overdue" },
-    { label: "In Progress", value: cnt("In Progress"), tone: "blue", active: status === "In Progress", onClick: () => setVal("ncrcCapaStatus", "In Progress", renderCapa) },
+    { label: "In Progress", value: cnt("In Progress"), tone: "blue", active: status.includes("In Progress"), onClick: () => msToggle("ncrcCapaStatus", "In Progress", renderCapa) },
     { label: "Past due", value: pastDue, tone: "red", sub: "open, end date passed", active: EXTRA.capaDue, onClick: () => { EXTRA.capaDue = !EXTRA.capaDue; renderCapa(); } },
-    { label: "Closed", value: closed, tone: "green", active: status === "Closed", onClick: () => setVal("ncrcCapaStatus", "Closed", renderCapa) },
+    { label: "Closed", value: closed, tone: "green", active: status.includes("Closed"), onClick: () => msToggle("ncrcCapaStatus", "Closed", renderCapa) },
     { label: "Closure rate", value: decided ? Math.round(closed / decided * 100) + "%" : "–", tone: "green", sub: "closed ÷ non-cancelled" },
   ]);
   const qEl = document.getElementById("ncrcCapaSearch");
   renderChips("capaChips", [
     q && { label: `Search: "${q}"`, clear: () => { qEl.value = ""; renderCapa(); } },
-    selChip("ncrcCapaType", "Type", renderCapa), selChip("ncrcCapaStatus", "Status", renderCapa),
+    ...msChips("ncrcCapaType", "Type", renderCapa), ...msChips("ncrcCapaStatus", "Status", renderCapa),
+    ...msChips("ncrcCapaProcess", "Process", renderCapa), ...msChips("ncrcCapaPhase", "Phase", renderCapa), ...msChips("ncrcCapaOwner", "Owner", renderCapa),
     EXTRA.capaDue && { label: "Past due only", clear: () => { EXTRA.capaDue = false; renderCapa(); } },
   ].filter(Boolean));
 
@@ -439,8 +449,11 @@ function renderCapa() {
 
 /* ---------- Risk cards + register ---------- */
 const RISK_LEVELS = ["High", "Medium", "Low"];
-const RISK_ADV = ["ncrcRiskAuditId", "ncrcRiskAuditDate", "ncrcRiskProcessName", "ncrcRiskProcessPhase", "ncrcRiskRiskId", "ncrcRiskLinkedCapaId"];
-const RISK_ADV_LABEL = { ncrcRiskAuditId: "Review ID", ncrcRiskAuditDate: "Review date", ncrcRiskProcessName: "Process", ncrcRiskProcessPhase: "Phase", ncrcRiskRiskId: "Risk ID", ncrcRiskLinkedCapaId: "Linked CAPA" };
+// "More filters" panel: Review date stays a date box; the rest are multi-selects.
+const RISK_ADV = ["ncrcRiskAuditId", "ncrcRiskAuditDate", "ncrcRiskType", "ncrcRiskRiskId", "ncrcRiskLinkedCapaId"];
+const RISK_ADV_MULTI = ["ncrcRiskAuditId", "ncrcRiskType", "ncrcRiskRiskId", "ncrcRiskLinkedCapaId"];
+const RISK_MULTI_IDS = ["ncrcRiskLevel", "ncrcRiskMitigation", "ncrcRiskProcessName", "ncrcRiskProcessPhase", "ncrcRiskOwner", ...RISK_ADV_MULTI];
+const CAPA_MULTI_IDS = ["ncrcCapaType", "ncrcCapaStatus", "ncrcCapaProcess", "ncrcCapaPhase", "ncrcCapaOwner"];
 const isOpenRisk = (r) => !["Closed", "Mitigated", "Accepted"].includes(r.mitigation);
 const RISK_COLS = [
   ["Risk ID", "riskId", "id"], ["Review ID", "auditId"], ["Review Date", "auditDate"],
@@ -451,26 +464,33 @@ const RISK_COLS = [
 ];
 function renderRisk() {
   const q = document.getElementById("ncrcRiskSearch")?.value || "";
-  const lvl = document.getElementById("ncrcRiskLevel")?.value || "";
-  const mit = document.getElementById("ncrcRiskMitigation")?.value || "";
-  const fAuditId = (document.getElementById("ncrcRiskAuditId")?.value || "").toLowerCase();
-  const fAuditDate = document.getElementById("ncrcRiskAuditDate")?.value || "";
-  const fProcName = (document.getElementById("ncrcRiskProcessName")?.value || "").toLowerCase();
-  const fProcPhase = (document.getElementById("ncrcRiskProcessPhase")?.value || "").toLowerCase();
-  const fRiskId = (document.getElementById("ncrcRiskRiskId")?.value || "").toLowerCase();
-  const fLinkedCapa = (document.getElementById("ncrcRiskLinkedCapaId")?.value || "").toLowerCase();
   const all = riskRows();
+  ["ncrcRiskLevel", "ncrcRiskMitigation"].forEach(msRefresh);
+  const lvl = msPicked("ncrcRiskLevel");
+  const mit = msPicked("ncrcRiskMitigation");
+  const proc = fillNcMulti("ncrcRiskProcessName", all.map((r) => clean(r.processName)));
+  const phase = fillNcMulti("ncrcRiskProcessPhase",
+    all.filter((r) => !proc.length || proc.includes(clean(r.processName))).map((r) => clean(r.processPhase)), false);
+  const owner = fillNcMulti("ncrcRiskOwner", all.map((r) => clean(r.riskOwner)));
+  const fAuditId = fillNcMulti("ncrcRiskAuditId", all.map((r) => clean(r.auditId)));
+  const fAuditDate = document.getElementById("ncrcRiskAuditDate")?.value || "";
+  const fType = fillNcMulti("ncrcRiskType", all.map((r) => clean(r.riskType)));
+  const fRiskId = fillNcMulti("ncrcRiskRiskId", all.map((r) => clean(r.riskId)));
+  const fLinkedCapa = fillNcMulti("ncrcRiskLinkedCapaId", all.map((r) => clean(r.linkedCapaId)));
+  const pass = (picked, v) => !picked.length || picked.includes(v);
   const rows = all.filter(
     (r) =>
-      (!lvl || r.riskLevel === lvl) &&
-      (!mit || r.mitigation === mit) &&
+      pass(lvl, r.riskLevel) &&
+      pass(mit, r.mitigation) &&
+      pass(proc, clean(r.processName)) &&
+      pass(phase, clean(r.processPhase)) &&
+      pass(owner, clean(r.riskOwner)) &&
       (!EXTRA.riskNoCapa || isNA(r.linkedCapaId)) &&
-      (!fAuditId || String(r.auditId ?? "").toLowerCase().includes(fAuditId)) &&
+      pass(fAuditId, clean(r.auditId)) &&
       (!fAuditDate || String(r.auditDate ?? "") === fAuditDate) &&
-      (!fProcName || String(r.processName ?? "").toLowerCase().includes(fProcName)) &&
-      (!fProcPhase || String(r.processPhase ?? "").toLowerCase().includes(fProcPhase)) &&
-      (!fRiskId || String(r.riskId ?? "").toLowerCase().includes(fRiskId)) &&
-      (!fLinkedCapa || String(r.linkedCapaId ?? "").toLowerCase().includes(fLinkedCapa)) &&
+      pass(fType, clean(r.riskType)) &&
+      pass(fRiskId, clean(r.riskId)) &&
+      pass(fLinkedCapa, clean(r.linkedCapaId)) &&
       passText(r, ["riskId", "riskType", "affectedDepartment", "riskOwner", "control", "findings"], q)
   );
   FILTERED.risk = rows;
@@ -480,20 +500,23 @@ function renderRisk() {
   const noCapa = rows.filter((r) => isNA(r.linkedCapaId)).length;
   renderKpis("riskKpis", [
     { label: "Risks in view", value: rows.length, tone: "ink", sub: rows.length !== all.length ? `of ${all.length} total` : "all records" },
-    { label: "High", value: cnt("High"), tone: "red", active: lvl === "High", onClick: () => setVal("ncrcRiskLevel", "High", renderRisk) },
-    { label: "Medium", value: cnt("Medium"), tone: "amber", active: lvl === "Medium", onClick: () => setVal("ncrcRiskLevel", "Medium", renderRisk) },
-    { label: "Low", value: cnt("Low"), tone: "green", active: lvl === "Low", onClick: () => setVal("ncrcRiskLevel", "Low", renderRisk) },
-    { label: "Open mitigation", value: openN, tone: "blue", sub: "not Closed / Mitigated / Accepted", active: mit === "Open", onClick: () => setVal("ncrcRiskMitigation", "Open", renderRisk) },
+    { label: "High", value: cnt("High"), tone: "red", active: lvl.includes("High"), onClick: () => msToggle("ncrcRiskLevel", "High", renderRisk) },
+    { label: "Medium", value: cnt("Medium"), tone: "amber", active: lvl.includes("Medium"), onClick: () => msToggle("ncrcRiskLevel", "Medium", renderRisk) },
+    { label: "Low", value: cnt("Low"), tone: "green", active: lvl.includes("Low"), onClick: () => msToggle("ncrcRiskLevel", "Low", renderRisk) },
+    { label: "Open mitigation", value: openN, tone: "blue", sub: "not Closed / Mitigated / Accepted", active: mit.includes("Open"), onClick: () => msToggle("ncrcRiskMitigation", "Open", renderRisk) },
     { label: "No linked CAPA", value: noCapa, tone: "gray", sub: "risks without a CAPA reference", active: EXTRA.riskNoCapa, onClick: () => { EXTRA.riskNoCapa = !EXTRA.riskNoCapa; renderRisk(); } },
   ]);
 
   const qEl = document.getElementById("ncrcRiskSearch");
-  const advActive = RISK_ADV.filter((id) => document.getElementById(id)?.value);
+  const advActive = [...fAuditId, ...(fAuditDate ? [fAuditDate] : []), ...fType, ...fRiskId, ...fLinkedCapa];
   renderChips("riskChips", [
     q && { label: `Search: "${q}"`, clear: () => { qEl.value = ""; renderRisk(); } },
-    selChip("ncrcRiskLevel", "Level", renderRisk), selChip("ncrcRiskMitigation", "Mitigation", renderRisk),
+    ...msChips("ncrcRiskLevel", "Level", renderRisk), ...msChips("ncrcRiskMitigation", "Mitigation", renderRisk),
+    ...msChips("ncrcRiskProcessName", "Process", renderRisk), ...msChips("ncrcRiskProcessPhase", "Phase", renderRisk), ...msChips("ncrcRiskOwner", "Risk Owner", renderRisk),
     EXTRA.riskNoCapa && { label: "No linked CAPA", clear: () => { EXTRA.riskNoCapa = false; renderRisk(); } },
-    ...advActive.map((id) => { const el = document.getElementById(id); return { label: `${RISK_ADV_LABEL[id]}: ${el.value}`, clear: () => { el.value = ""; renderRisk(); } }; }),
+    ...msChips("ncrcRiskAuditId", "Review ID", renderRisk),
+    fAuditDate && { label: `Review date: ${fAuditDate}`, clear: () => { document.getElementById("ncrcRiskAuditDate").value = ""; renderRisk(); } },
+    ...msChips("ncrcRiskType", "Risk Type", renderRisk), ...msChips("ncrcRiskRiskId", "Risk ID", renderRisk), ...msChips("ncrcRiskLinkedCapaId", "Linked CAPA", renderRisk),
   ].filter(Boolean));
   const advBtn = document.getElementById("riskMoreBtn");
   if (advBtn) advBtn.textContent = `More filters${advActive.length ? ` (${advActive.length})` : ""}`;
@@ -546,8 +569,8 @@ document.getElementById("riskMoreBtn")?.addEventListener("click", () => {
 /* ---------- Clear all filters per register ---------- */
 const CLEAR_IDS = {
   nc: ["ncrcNcSearch", "ncrcNcType", "ncrcNcSeverity", "ncrcNcCompliance", "ncrcNcProcess", "ncrcNcPhase", "ncrcNcRespOwner"],
-  capa: ["ncrcCapaSearch", "ncrcCapaType", "ncrcCapaStatus"],
-  risk: ["ncrcRiskSearch", "ncrcRiskLevel", "ncrcRiskMitigation", ...RISK_ADV],
+  capa: ["ncrcCapaSearch", ...CAPA_MULTI_IDS],
+  risk: ["ncrcRiskSearch", ...RISK_MULTI_IDS, "ncrcRiskAuditDate"],
 };
 document.addEventListener("click", (e) => {
   const b = e.target.closest("[data-reg-clear]");
@@ -715,14 +738,13 @@ document.addEventListener("click", (e) => {
   document.getElementById(id)?.addEventListener("input", renderNc)
 );
 NC_MULTI_IDS.forEach(msRefresh);
-["ncrcCapaSearch", "ncrcCapaType", "ncrcCapaStatus"].forEach((id) =>
+["ncrcCapaSearch", ...CAPA_MULTI_IDS].forEach((id) =>
   document.getElementById(id)?.addEventListener("input", renderCapa)
 );
-["ncrcRiskSearch", "ncrcRiskLevel", "ncrcRiskMitigation",
- "ncrcRiskAuditId", "ncrcRiskAuditDate", "ncrcRiskProcessName",
- "ncrcRiskProcessPhase", "ncrcRiskRiskId", "ncrcRiskLinkedCapaId"].forEach((id) =>
+["ncrcRiskSearch", "ncrcRiskAuditDate", ...RISK_MULTI_IDS].forEach((id) =>
   document.getElementById(id)?.addEventListener("input", renderRisk)
 );
+[...CAPA_MULTI_IDS, ...RISK_MULTI_IDS].forEach(msRefresh);
 
 function renderAll() { renderNc(); renderCapa(); renderRisk(); }
 
