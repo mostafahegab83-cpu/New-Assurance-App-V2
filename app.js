@@ -1544,6 +1544,20 @@ window.__writeAudit = writeAudit;
       mitigation: msValues("filterMitigation")
     });
   }
+  // Read-only hook for the in-browser AI Analyst (ai-analyst.js): same filtered
+  // dataset the Dashboard renders, returned as copies so persisted records are untouched.
+  window.__getDashboardData = () => ({
+    rows: getFiltered().map(r => ({ ...r })),
+    excludedUnrated,
+    filters: {
+      month: document.getElementById("dashFilterMonth")?.value || "",
+      search: document.getElementById("filterSearch")?.value || "",
+      departments: msValues("filterDept"), actionOwners: msValues("filterDepartment"),
+      processes: msValues("filterProcess"), processOwners: msValues("filterProcessOwner"),
+      compliance: msValues("filterCompliance"), riskLevels: msValues("filterRiskLevel"),
+      mitigation: msValues("filterMitigation")
+    }
+  });
 
   // Init multi-selects + wire change events
   FILTER_IDS.forEach(id => { const el = document.getElementById(id); if (el) { initMultiSelect(el); el.addEventListener("change", renderDashboard); } });
