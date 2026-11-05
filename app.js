@@ -2625,7 +2625,8 @@ window.__writeAudit = writeAudit;
           || (scope === "kpis" && section === "scope")
           || (scope === "charts" && (section === "charts" || section === "taskPerformance"))
           || (scope === "table"  && (section === "scheduleVariance" || section === "deptOwner"))
-          || (scope === "findings" && section === "findings");
+          || (scope === "findings" && section === "findings")
+          || (scope === "aiAnalysis" && (section === "aiAnalysis" || section === "scope"));
         el.style.display = show ? "" : "none";
       });
     }
@@ -2718,11 +2719,12 @@ window.__writeAudit = writeAudit;
         const findings = document.getElementById("findingsSection");
         const scopeBar = document.getElementById("dashScopeBar");
         const deptOwner = capture.querySelector('[data-section="deptOwner"]');
+        const aiSection = document.getElementById("aiAnalysisSection"); // only visible when ticked + has content
         if (scope === "all") {
           const riskKpis = document.querySelector("#riskDashboardCapture .kpis");
           const riskRow = getSharedChartRow(["chartRiskType","chartRiskLevel","chartRiskMitigation"]);
           const riskFindings = document.getElementById("findingsSectionRisk");
-          orderedBlocks = [header, scopeBar, kpis, chartsBlock, scheduleVar, deptOwner, findings, riskKpis, riskRow, riskFindings];
+          orderedBlocks = [header, scopeBar, kpis, chartsBlock, scheduleVar, deptOwner, findings, aiSection, riskKpis, riskRow, riskFindings];
         } else {
           orderedBlocks = [header];
           if (scope === "kpis") orderedBlocks.push(scopeBar, kpis);
@@ -2730,6 +2732,7 @@ window.__writeAudit = writeAudit;
           if (scope === "taskPerformance") orderedBlocks.push(getChartCard("chartTaskPerformance"));
           if (scope === "charts") orderedBlocks.push(chartsBlock);
           if (scope === "findings") orderedBlocks.push(findings);
+          if (scope === "aiAnalysis") orderedBlocks.push(scopeBar, aiSection);
         }
       }
       const seen = new Set();
@@ -2747,7 +2750,12 @@ window.__writeAudit = writeAudit;
           : (["scheduleVariance"].includes(el.dataset?.section) || el.id === "findingsSection" || el.id === "findingsSectionRisk")
             ? el.querySelectorAll("tbody tr") : [];
         const top = el.getBoundingClientRect().top;
-        if (el.dataset?.section === "charts") {
+        if (el.dataset?.section === "aiAnalysis") {
+          // long AI text: cut between paragraphs / bullets / headings
+          return Array.from(el.querySelectorAll("h4, p, li")).slice(1)
+            .map(n => n.getBoundingClientRect().top - top - 2);
+        }
+                if (el.dataset?.section === "charts") {
           // cut between chart rows
           return Array.from(el.querySelectorAll(".charts")).filter(r => r.offsetHeight > 0).slice(1)
             .map(r => r.getBoundingClientRect().top - top - 5);

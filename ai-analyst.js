@@ -210,11 +210,12 @@ function mount() {
       </summary>
       <div class="ai-body">
         <div class="ai-controls">
-          <label>Model <select id="aiModel">${Object.entries(MODELS).map(([k, m]) => `<option value="${k}">${m.label}</option>`).join("")}</select></label>
+          <label>Model <select id="aiModel">${Object.entries(MODELS).map(([k, m]) => `<option value="${k}"${k === "fast" ? " selected" : ""}>${m.label}</option>`).join("")}</select></label>
           <label>Language <select id="aiLang">${Object.entries(LANGS).map(([k, l]) => `<option value="${k}">${l}</option>`).join("")}</select></label>
           <button id="aiAnalyze" class="btn primary">Analyze current view</button>
           <button id="aiStop" class="btn ghost" hidden>Stop</button>
           <span class="spacer"></span>
+          <label class="ai-pdf-toggle" title="Adds the latest AI result as a section in Export to PDF / Publish PDF link"><input type="checkbox" id="aiIncludePdf" checked /> Include in PDF export</label>
           <button id="aiCopy" class="btn ghost" hidden>Copy</button>
         </div>
         <div class="ai-ask">
@@ -246,14 +247,46 @@ function mount() {
     $("aiOutput").innerHTML = `<p class="ai-error">${esc(msg)}</p>`;
   };
 
-  async function run(userPrompt) {
+  // Fill the hidden PDF section (#aiAnalysisSection inside #dashboardCapture) with the latest result.
+  const filtersText = f => {
+    const names = { search: "Search", departments: "Department", actionOwners: "Action Owner", processes: "Process",
+      processOwners: "Process Owner", compliance: "Compliance", riskLevels: "Risk Level", mitigation: "Mitigation" };
+    const parts = [`Month: ${f.month || "All"}`];
+    Object.entries(names).forEach(([k, label]) => { const v = f[k]; if (Array.isArray(v) ? v.length : v) parts.push(`${label}: ${Array.isArray(v) ? v.join(", ") : v}`); });
+    return parts.join(" · ");
+  };
+  let pdfMeta = null; // { title, filters, model, at }
+  const syncPdfSection = () => {
+    const sec = document.getElementById("aiAnalysisSection");
+    if (!sec) return;
+    const on = $("aiIncludePdf").checked && !!lastText && !!pdfMeta;
+    sec.classList.toggle("ai-include", on);
+    if (!on) { sec.innerHTML = ""; return; }
+    sec.innerHTML = `<h3 class="dash-section-title">${esc(pdfMeta.title)}</h3>`
+      + `<p class="ai-pdf-meta">AI-generated in the browser (${esc(pdfMeta.model)}) on ${esc(pdfMeta.at)} · Filters at analysis: ${esc(pdfMeta.filters)}. Draft for review — figures come from the dashboard; verify before acting.</p>`
+      + `<div class="ai-pdf-body" dir="auto">${renderMd(lastText)}</div>`;
+  };
+  // Warn in the PDF if filters changed after the analysis was generated.
+  const sameFilters = () => {
+    try { return pdfMeta && filtersText(window.__getDashboardData().filters) === pdfMeta.filters; } catch { return true; }
+  };
+  ["btnExportPdf", "btnPublishPdf"].forEach(id => document.getElementById(id)?.addEventListener("click", () => {
+    syncPdfSection();
+    const sec = document.getElementById("aiAnalysisSection");
+    if (sec?.classList.contains("ai-include") && !sameFilters()) {
+      sec.querySelector(".ai-pdf-meta")?.insertAdjacentHTML("afterend",
+        `<p class="ai-pdf-warn">⚠ Dashboard filters were changed after this analysis was generated — re-run the analysis to match this export.</p>`);
+    }
+  }, true)); // capture phase: runs before app.js builds the PDF
+
+  async function run(userPrompt, title) {
     if (busy) return;
     if (typeof window.__getDashboardData !== "function") return fail(new Error("Dashboard data not ready yet."));
     const payload = window.__getDashboardData();
     if (!payload.rows.length) { $("aiOutput").innerHTML = `<p class="muted">No rated records in the current filters — nothing to analyse.</p>`; return; }
     const facts = buildFacts(payload);
     $("aiFacts").textContent = JSON.stringify(facts, null, 2);
-    setBusy(true); $("aiCopy").hidden = true; lastText = "";
+    setBusy(true); $("aiCopy").hidden = true; lastText = ""; pdfMeta = null; syncPdfSection();
     $("aiOutput").innerHTML = `<p class="muted">Loading model…</p>`;
     // Visible download status: %, elapsed time, stall warning.
     const t0 = Date.now(); let lastP = -1, lastChange = Date.now(), lastText2 = "";
@@ -289,6 +322,8 @@ function mount() {
         $("aiOutput").innerHTML = renderMd(lastText);
       }
       $("aiCopy").hidden = !lastText;
+      pdfMeta = { title, filters: filtersText(payload.filters), model: loadedModel.replace(/-MLC$/, ""), at: new Date().toLocaleString() };
+      syncPdfSection();
     } catch (e) {
       clearInterval(timer);
       progress(null);
@@ -296,11 +331,12 @@ function mount() {
     } finally { setBusy(false); }
   }
 
-  $("aiAnalyze").addEventListener("click", () => run(analysisPrompt));
+  $("aiAnalyze").addEventListener("click", () => run(analysisPrompt, "AI Analysis"));
+  $("aiIncludePdf").addEventListener("change", syncPdfSection);
   const ask = () => {
     const q = $("aiQuestion").value.trim();
     if (!q) return $("aiQuestion").focus();
-    run(facts => `Answer this question using only the FACTS. Question: ${q}\n\nFACTS:\n${JSON.stringify(facts)}`);
+    run(facts => `Answer this question using only the FACTS. Question: ${q}\n\nFACTS:\n${JSON.stringify(facts)}`, `AI Answer — ${q}`);
   };
   $("aiAsk").addEventListener("click", ask);
   $("aiQuestion").addEventListener("keydown", e => { if (e.key === "Enter") ask(); });
