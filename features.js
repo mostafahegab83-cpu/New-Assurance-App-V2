@@ -250,38 +250,78 @@ const NC_COLS = [
 ];
 // Fill a filter dropdown with distinct values, keeping the current pick
 // (even if it is no longer in the list, so the user can still clear it).
-function fillNcSelect(id, allLabel, values) {
+const NC_MULTI_IDS = ["ncrcNcType", "ncrcNcSeverity", "ncrcNcCompliance", "ncrcNcProcess", "ncrcNcPhase", "ncrcNcRespOwner"];
+// Selected values of a multi-select filter ([] = no filter)
+const msPicked = (id) => {
   const el = document.getElementById(id);
-  if (!el) return "";
-  const cur = el.value;
+  return el ? Array.from(el.selectedOptions).map((o) => o.value).filter(Boolean) : [];
+};
+const msRefresh = (id) => {
+  const el = document.getElementById(id);
+  if (!el) return;
+  window.__initMultiSelect?.(el);
+  el._msRefresh?.();
+};
+// Rebuild a data-driven multi-select, keeping current picks. When keepMissing is
+// false, picks no longer in the list are dropped (used for Phase vs. Process).
+function fillNcMulti(id, values, keepMissing = true) {
+  const el = document.getElementById(id);
+  if (!el) return [];
+  let cur = msPicked(id);
   const list = [...new Set(values.filter(Boolean))].sort((a, b) => a.localeCompare(b));
-  if (cur && !list.includes(cur)) list.unshift(cur);
-  const html = `<option value="">${esc(allLabel)}</option>` + list.map((v) => `<option value="${esc(v).replace(/"/g, "&quot;")}">${esc(v)}</option>`).join("");
-  if (el.dataset.opts !== html) { el.innerHTML = html; el.dataset.opts = html; }
-  el.value = cur;
+  if (keepMissing) cur.forEach((v) => { if (!list.includes(v)) list.unshift(v); });
+  else cur = cur.filter((v) => list.includes(v));
+  const key = list.join("\u0001");
+  if (el.dataset.opts !== key) {
+    el.innerHTML = list.map((v) => `<option value="${esc(v).replace(/"/g, "&quot;")}">${esc(v)}</option>`).join("");
+    el.dataset.opts = key;
+  }
+  Array.from(el.options).forEach((o) => { o.selected = cur.includes(o.value); });
+  msRefresh(id);
   return cur;
+}
+// One removable chip per picked value
+function msChips(id, label, render) {
+  return msPicked(id).map((v) => ({
+    label: `${label}: ${v}`,
+    clear: () => {
+      const el = document.getElementById(id);
+      Array.from(el.options).forEach((o) => { if (o.value === v) o.selected = false; });
+      msRefresh(id); render();
+    },
+  }));
+}
+// KPI tile click: add/remove that value from the multi-select
+function msToggle(id, val, render) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const o = Array.from(el.options).find((x) => x.value === val);
+  if (o) o.selected = !o.selected;
+  msRefresh(id); render();
 }
 function renderNc() {
   // Process, Phase and Responsible Owner dropdowns are built from the data.
   // Phase options follow the selected process so only relevant phases show.
   const base = ncRows();
-  const proc = fillNcSelect("ncrcNcProcess", "All Processes", base.map((r) => clean(r.processName)));
-  const phase = fillNcSelect("ncrcNcPhase", "All Phases",
-    base.filter((r) => !proc || clean(r.processName) === proc).map((r) => clean(r.processPhase)));
-  const resp = fillNcSelect("ncrcNcRespOwner", "All Resp. Owners", base.map(ownerOf));
+  ["ncrcNcType", "ncrcNcSeverity", "ncrcNcCompliance"].forEach(msRefresh);
+  const proc = fillNcMulti("ncrcNcProcess", base.map((r) => clean(r.processName)));
+  const phase = fillNcMulti("ncrcNcPhase",
+    base.filter((r) => !proc.length || proc.includes(clean(r.processName))).map((r) => clean(r.processPhase)), false);
+  const resp = fillNcMulti("ncrcNcRespOwner", base.map(ownerOf));
   const q = document.getElementById("ncrcNcSearch")?.value || "";
-  const type = document.getElementById("ncrcNcType")?.value || "";
-  const sev = document.getElementById("ncrcNcSeverity")?.value || "";
-  const comp = document.getElementById("ncrcNcCompliance")?.value || "";
+  const type = msPicked("ncrcNcType");
+  const sev = msPicked("ncrcNcSeverity");
+  const comp = msPicked("ncrcNcCompliance");
+  const pass = (picked, v) => !picked.length || picked.includes(v);
   // Breakdown follows the dropdown/search filters; the owner pick narrows only the register below it.
   const scoped = ncRows().filter(
     (r) =>
-      (!type || r.ncType === type) &&
-      (!sev || r.severityLevel === sev) &&
-      (!comp || r.compliance === comp) &&
-      (!proc || clean(r.processName) === proc) &&
-      (!phase || clean(r.processPhase) === phase) &&
-      (!resp || ownerOf(r) === resp) &&
+      pass(type, r.ncType) &&
+      pass(sev, r.severityLevel) &&
+      pass(comp, r.compliance) &&
+      pass(proc, clean(r.processName)) &&
+      pass(phase, clean(r.processPhase)) &&
+      pass(resp, ownerOf(r)) &&
       passText(r, ["ncId", "auditId", "processName", "processPhase", "rootCause", "ncDesc", "ncResponsibleDept"], q)
   );
   renderNcOwnerBreakdown(scoped);
@@ -292,18 +332,18 @@ function renderNc() {
   const cnt = (f, val) => rows.filter((r) => r[f] === val).length;
   renderKpis("ncKpis", [
     { label: "NCs in view", value: rows.length, tone: "ink", sub: rows.length !== all.length ? `of ${all.length} total` : "all records" },
-    { label: "Non-Compliant", value: cnt("compliance", "Non-Compliant"), tone: "red", active: comp === "Non-Compliant", onClick: () => setVal("ncrcNcCompliance", "Non-Compliant", renderNc) },
-    { label: "Observation", value: cnt("compliance", "Observation"), tone: "amber", active: comp === "Observation", onClick: () => setVal("ncrcNcCompliance", "Observation", renderNc) },
-    { label: "Major", value: cnt("ncType", "Major"), tone: "red", active: type === "Major", onClick: () => setVal("ncrcNcType", "Major", renderNc) },
-    { label: "Minor", value: cnt("ncType", "Minor"), tone: "amber", active: type === "Minor", onClick: () => setVal("ncrcNcType", "Minor", renderNc) },
-    { label: "Critical", value: cnt("severityLevel", "Critical"), tone: "crit", active: sev === "Critical", onClick: () => setVal("ncrcNcSeverity", "Critical", renderNc) },
-    { label: "High", value: cnt("severityLevel", "High"), tone: "red", active: sev === "High", onClick: () => setVal("ncrcNcSeverity", "High", renderNc) },
+    { label: "Non-Compliant", value: cnt("compliance", "Non-Compliant"), tone: "red", active: comp.includes("Non-Compliant"), onClick: () => msToggle("ncrcNcCompliance", "Non-Compliant", renderNc) },
+    { label: "Observation", value: cnt("compliance", "Observation"), tone: "amber", active: comp.includes("Observation"), onClick: () => msToggle("ncrcNcCompliance", "Observation", renderNc) },
+    { label: "Major", value: cnt("ncType", "Major"), tone: "red", active: type.includes("Major"), onClick: () => msToggle("ncrcNcType", "Major", renderNc) },
+    { label: "Minor", value: cnt("ncType", "Minor"), tone: "amber", active: type.includes("Minor"), onClick: () => msToggle("ncrcNcType", "Minor", renderNc) },
+    { label: "Critical", value: cnt("severityLevel", "Critical"), tone: "crit", active: sev.includes("Critical"), onClick: () => msToggle("ncrcNcSeverity", "Critical", renderNc) },
+    { label: "High", value: cnt("severityLevel", "High"), tone: "red", active: sev.includes("High"), onClick: () => msToggle("ncrcNcSeverity", "High", renderNc) },
   ]);
   const qEl = document.getElementById("ncrcNcSearch");
   renderChips("ncChips", [
     q && { label: `Search: "${q}"`, clear: () => { qEl.value = ""; renderNc(); } },
-    selChip("ncrcNcType", "Type", renderNc), selChip("ncrcNcSeverity", "Severity", renderNc), selChip("ncrcNcCompliance", "Compliance", renderNc),
-    selChip("ncrcNcProcess", "Process", renderNc), selChip("ncrcNcPhase", "Phase", renderNc), selChip("ncrcNcRespOwner", "Resp. Owner", renderNc),
+    ...msChips("ncrcNcType", "Type", renderNc), ...msChips("ncrcNcSeverity", "Severity", renderNc), ...msChips("ncrcNcCompliance", "Compliance", renderNc),
+    ...msChips("ncrcNcProcess", "Process", renderNc), ...msChips("ncrcNcPhase", "Phase", renderNc), ...msChips("ncrcNcRespOwner", "Resp. Owner", renderNc),
     EXTRA.ncOwner && { label: `Owner: ${EXTRA.ncOwner}`, clear: () => { EXTRA.ncOwner = ""; renderNc(); } },
   ].filter(Boolean));
 
@@ -513,7 +553,12 @@ document.addEventListener("click", (e) => {
   const b = e.target.closest("[data-reg-clear]");
   if (!b) return;
   const kind = b.dataset.regClear;
-  CLEAR_IDS[kind].forEach((id) => { const el = document.getElementById(id); if (el) el.value = ""; });
+  CLEAR_IDS[kind].forEach((id) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (el.multiple) { Array.from(el.options).forEach((o) => { o.selected = false; }); el._msRefresh?.(); }
+    else el.value = "";
+  });
   if (kind === "nc") EXTRA.ncOwner = "";
   if (kind === "capa") EXTRA.capaDue = false;
   if (kind === "risk") EXTRA.riskNoCapa = false;
@@ -665,15 +710,11 @@ document.addEventListener("click", (e) => {
 });
 
 /* ---------- Filter wiring ---------- */
-["ncrcNcSearch", "ncrcNcType", "ncrcNcSeverity", "ncrcNcCompliance", "ncrcNcRespOwner"].forEach((id) =>
+// Phase options follow the picked processes; picks that no longer apply are dropped in renderNc.
+["ncrcNcSearch", ...NC_MULTI_IDS].forEach((id) =>
   document.getElementById(id)?.addEventListener("input", renderNc)
 );
-// Changing the process resets the phase, since phases belong to a process.
-document.getElementById("ncrcNcProcess")?.addEventListener("input", () => {
-  const ph = document.getElementById("ncrcNcPhase"); if (ph) ph.value = "";
-  renderNc();
-});
-document.getElementById("ncrcNcPhase")?.addEventListener("input", renderNc);
+NC_MULTI_IDS.forEach(msRefresh);
 ["ncrcCapaSearch", "ncrcCapaType", "ncrcCapaStatus"].forEach((id) =>
   document.getElementById(id)?.addEventListener("input", renderCapa)
 );

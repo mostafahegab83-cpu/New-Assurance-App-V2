@@ -1515,6 +1515,8 @@ window.__writeAudit = writeAudit;
   document.addEventListener('click', () => {
     document.querySelectorAll('.ms-wrap.open').forEach(w => w.classList.remove('open'));
   });
+  // Shared with features.js (NC Register filters)
+  window.__initMultiSelect = initMultiSelect;
 
   /* ---------- Filters & Dashboard ---------- */
   const FILTER_IDS = ["filterProcessOwner","filterDept","filterDepartment","filterProcess","filterCompliance","filterRiskLevel","filterMitigation"];
