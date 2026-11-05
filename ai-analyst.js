@@ -12,6 +12,7 @@
 const WEBLLM_URL = "https://esm.run/@mlc-ai/web-llm@0.2.87";
 
 const MODELS = {
+  tiny:    { label: "Tiny — Qwen2.5 0.5B (~400 MB, quick test)", f16: "Qwen2.5-0.5B-Instruct-q4f16_1-MLC", f32: "Qwen2.5-0.5B-Instruct-q4f32_1-MLC" },
   fast:    { label: "Fast — Qwen2.5 1.5B (~1 GB)",     f16: "Qwen2.5-1.5B-Instruct-q4f16_1-MLC", f32: "Qwen2.5-1.5B-Instruct-q4f32_1-MLC" },
   quality: { label: "Better — Qwen2.5 3B (~2 GB)",     f16: "Qwen2.5-3B-Instruct-q4f16_1-MLC",   f32: "Qwen2.5-3B-Instruct-q4f32_1-MLC" }
 };
@@ -254,8 +255,26 @@ function mount() {
     $("aiFacts").textContent = JSON.stringify(facts, null, 2);
     setBusy(true); $("aiCopy").hidden = true; lastText = "";
     $("aiOutput").innerHTML = `<p class="muted">Loading model…</p>`;
+    // Visible download status: %, elapsed time, stall warning.
+    const t0 = Date.now(); let lastP = -1, lastChange = Date.now(), lastText2 = "";
+    const fmt = ms => { const s = Math.floor(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
+    const paint = () => {
+      const fromCache = /cache/i.test(lastText2) && /Loading model from cache/i.test(lastText2);
+      const pctTxt = lastP < 0 ? "starting" : Math.round(lastP * 100) + "%";
+      const stalled = Date.now() - lastChange > 90000;
+      $("aiOutput").innerHTML =
+        `<p><strong>${fromCache ? "Loading model from cache" : "Downloading model (first time only)"}: ${pctTxt}</strong> · elapsed ${fmt(Date.now() - t0)}</p>`
+        + `<p class="muted">${esc(lastText2 || "Preparing…")}</p>`
+        + (fromCache ? "" : `<p class="muted">Keep this tab open. Next time it loads from cache in seconds.</p>`)
+        + (stalled ? `<p class="ai-error">No progress for 90 seconds. Your network may be slow or blocking huggingface.co (company firewall / VPN). Try another network, or press Stop and pick the Tiny model.</p>` : "");
+    };
+    const timer = setInterval(paint, 1000);
     try {
-      const eng = await ensureEngine($("aiModel").value, r => progress(r.progress, r.text));
+      const eng = await ensureEngine($("aiModel").value, r => {
+        if (r.progress !== lastP || r.text !== lastText2) lastChange = Date.now();
+        lastP = r.progress; lastText2 = r.text; progress(r.progress, r.text); paint();
+      });
+      clearInterval(timer);
       progress(null);
       $("aiOutput").innerHTML = `<p class="muted">Analysing ${facts.kpis.ratedSteps} records…</p>`;
       const stream = await eng.chat.completions.create({
@@ -271,6 +290,7 @@ function mount() {
       }
       $("aiCopy").hidden = !lastText;
     } catch (e) {
+      clearInterval(timer);
       progress(null);
       if (!/abort|interrupt/i.test(String(e?.message))) fail(e);
     } finally { setBusy(false); }
@@ -284,7 +304,10 @@ function mount() {
   };
   $("aiAsk").addEventListener("click", ask);
   $("aiQuestion").addEventListener("keydown", e => { if (e.key === "Enter") ask(); });
-  $("aiStop").addEventListener("click", () => { try { engine?.interruptGenerate(); } catch {} });
+  $("aiStop").addEventListener("click", () => {
+    try { engine?.interruptGenerate(); } catch {}
+    if (busy && !loadedModel) location.reload(); // abort a download in progress (already-fetched chunks stay cached)
+  });
   $("aiCopy").addEventListener("click", async () => {
     try { await navigator.clipboard.writeText(lastText); $("aiCopy").textContent = "Copied ✓"; setTimeout(() => $("aiCopy").textContent = "Copy", 1500); } catch {}
   });
