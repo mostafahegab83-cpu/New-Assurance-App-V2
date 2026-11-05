@@ -10,11 +10,20 @@ service cloud.firestore {
       return isSignedIn()
         && request.auth.token.email in ['mostafa.hegab83@gmail.com'];
     }
+    // FULL-ACCESS users: the only accounts allowed to sign in and write.
+    // Keep in sync with FULL_ACCESS_EMAIL_LIST in firebase.js (lower-case here).
+    function fullAccessEmails() {
+      return [
+        'mostafa.hegab83@gmail.com',
+        'mostafa.hegab@idhcorp.com',
+        'ahmed.shaker@idhcorp.com',
+        'ahmed.nasr@idhcorp.com'
+      ];
+    }
     function isApproved() {
-      return isSignedIn() && (
-        isSuperAdmin()
-        || exists(/databases/$(database)/documents/approved_users/$(request.auth.token.email))
-      );
+      return isSignedIn()
+        && request.auth.token.email is string
+        && (isSuperAdmin() || request.auth.token.email.lower() in fullAccessEmails());
     }
     function isAdmin() {
       return isSuperAdmin() || (
@@ -37,8 +46,10 @@ service cloud.firestore {
     }
 
     // --- Compliance records ---------------------------------------------
+    // PUBLIC VIEW: Findings + Risk dashboards read this without a login.
     match /compliance_records/{id} {
-      allow read, create, update: if isApproved();
+      allow read:                 if true;
+      allow create, update:       if isApproved();
       allow delete:               if isAdmin();
     }
     match /records/{id} {
@@ -85,14 +96,18 @@ service cloud.firestore {
     }
 
     // --- Gap Assessment -------------------------------------------------
+    // PUBLIC VIEW: Gap Assessment Dashboard reads this without a login.
     match /gapAssessment/{id} {
-      allow read, create, update: if isApproved();
+      allow read:                 if true;
+      allow create, update:       if isApproved();
       allow delete:               if isApproved();
     }
 
     // --- Process Validation Interviews ----------------------------------
+    // PUBLIC VIEW: Process Validation Dashboard reads this without a login.
     match /processValidation/{id} {
-      allow read, create, update: if isApproved();
+      allow read:                 if true;
+      allow create, update:       if isApproved();
       allow delete:               if isApproved();
     }
 

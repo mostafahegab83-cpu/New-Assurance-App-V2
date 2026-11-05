@@ -25,23 +25,29 @@ const firebaseConfig = {
 // Admin emails — full delete & user-management rights
 export const ADMIN_EMAILS = ["mostafa.hegab83@gmail.com"];
 
-// Dashboard-only (view-only) users.
-// These accounts can ONLY see:
-//   Dashboard  -> Findings Dashboard + Risk Dashboard
+// FULL-ACCESS users — the ONLY accounts that can sign in.
+// They can view and take action on every page.
+// Everyone else opens the site WITHOUT logging in, as a view-only visitor:
+//   Dashboard    -> Findings Dashboard + Risk Dashboard
 //   Gap Analysis -> Gap Assessment Dashboard + Process Validation Dashboard
 //
-// Add limited-access emails below, one email per line.
+// Add or remove full-access emails below, one email per line.
 // IMPORTANT: Do not add quotation marks, commas, or brackets here.
-const VIEWER_EMAIL_LIST = `
-sherien.gergis@almokhtabar.com
-hend.elsherbini@idhcorp.com
-Sherif.ElZeiny@idhcorp.com
+// Keep this list in sync with fullAccessEmails() in firestore.rules.
+const FULL_ACCESS_EMAIL_LIST = `
+mostafa.hegab83@gmail.com
+Mostafa.Hegab@IDHCORP.com
+ahmed.shaker@idhcorp.com
+Ahmed.Nasr@IDHCORP.com
 `;
 
-export const VIEWER_EMAILS = VIEWER_EMAIL_LIST
+export const FULL_ACCESS_EMAILS = FULL_ACCESS_EMAIL_LIST
   .split(/\s+/)
   .map(email => email.trim().toLowerCase())
   .filter(Boolean);
+
+// Kept for backward compatibility; viewers no longer sign in.
+export const VIEWER_EMAILS = [];
 
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);

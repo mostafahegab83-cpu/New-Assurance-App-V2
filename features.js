@@ -2897,9 +2897,10 @@ function init() {
   // Subscribe only while signed in. Subscribing before sign-in failed with
   // "Missing or insufficient permissions" and killed the listener for good,
   // leaving this dashboard blank even after a successful login.
-  onAuthStateChanged(auth, user => {
-    if (user) { subscribe(); }
-    else { unsubscribe(); rows = []; }
+  onAuthStateChanged(auth, () => {
+    // Dashboards are view-able without a login, so (re)subscribe on every
+    // auth change. Re-subscribing also revives a listener that failed earlier.
+    unsubscribe(); subscribe();
   });
   document.querySelectorAll('.subtab[data-gasub="gapDashboard"]').forEach(btn => {
     btn.addEventListener("click", () => setTimeout(renderAll, 30));
@@ -3146,9 +3147,10 @@ function init() {
   const panel = document.getElementById("gapAssessmentDashboard");
   if (!panel) return;
   // Subscribe only while signed in (see note in process-validation-dashboard.js).
-  onAuthStateChanged(auth, user => {
-    if (user) { subscribe(); }
-    else { unsubscribe(); gaRows = []; }
+  onAuthStateChanged(auth, () => {
+    // Dashboards are view-able without a login, so (re)subscribe on every
+    // auth change. Re-subscribing also revives a listener that failed earlier.
+    unsubscribe(); subscribe();
   });
   document.querySelectorAll('.subtab[data-gasub="gapAssessmentDashboard"]').forEach(btn => {
     btn.addEventListener("click", () => setTimeout(renderAll, 30));
