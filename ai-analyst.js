@@ -261,12 +261,12 @@ function mount() {
     const paint = () => {
       const fromCache = /cache/i.test(lastText2) && /Loading model from cache/i.test(lastText2);
       const pctTxt = lastP < 0 ? "starting" : Math.round(lastP * 100) + "%";
-      const stalled = Date.now() - lastChange > 90000;
+      const stalled = Date.now() - lastChange > 300000; // progress updates only per ~32 MB chunk
       $("aiOutput").innerHTML =
         `<p><strong>${fromCache ? "Loading model from cache" : "Downloading model (first time only)"}: ${pctTxt}</strong> · elapsed ${fmt(Date.now() - t0)}</p>`
         + `<p class="muted">${esc(lastText2 || "Preparing…")}</p>`
-        + (fromCache ? "" : `<p class="muted">Keep this tab open. Next time it loads from cache in seconds.</p>`)
-        + (stalled ? `<p class="ai-error">No progress for 90 seconds. Your network may be slow or blocking huggingface.co (company firewall / VPN). Try another network, or press Stop and pick the Tiny model.</p>` : "");
+        + (fromCache ? "" : `<p class="muted">Progress updates after each ~32 MB chunk, so it can pause for a while on slow connections. Keep this tab open; next time it loads from cache in seconds.</p>`)
+        + (stalled ? `<p class="ai-error">No new chunk for 5 minutes. The connection may be very slow or blocking huggingface.co (company firewall / VPN). Try another network, or press Stop and pick the Tiny model. Chunks already downloaded are kept.</p>` : "");
     };
     const timer = setInterval(paint, 1000);
     try {
