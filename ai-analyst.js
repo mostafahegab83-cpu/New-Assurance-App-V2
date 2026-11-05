@@ -160,6 +160,53 @@ function analysisPrompt(facts) {
   ].join("\n");
 }
 
+// ---------- Quick summary: plain rules over the same facts (no model, no GPU, instant) ----------
+function quickSummary(f) {
+  const k = f.kpis || {}, L = [], li = t => L.push("- " + t), head = t => L.push("## " + t);
+  const rate = v => v == null ? "not measurable" : `${v}% (${v >= 85 ? "good" : v >= 70 ? "needs attention" : "poor"})`;
+  const top = obj => Object.entries(obj || {}).filter(([n]) => n !== "Not set").sort((a, b) => b[1] - a[1]);
+  const issues = x => [x.findings ? `${x.findings} finding(s)` : "", x.compliancePct != null ? `compliance ${x.compliancePct}%` : "", x.capaOverdue ? `${x.capaOverdue} overdue CAPA` : "", x.highRisks ? `${x.highRisks} high risk(s)` : ""].filter(Boolean).join(", ");
+
+  head("Overall picture");
+  li(`${k.reviewedProcesses} process(es) reviewed across ${k.ratedSteps} rated step(s), with ${k.totalFindings} finding(s).`);
+  li(`Compliance ${rate(k.compliancePct)} · SLA adherence ${rate(k.slaAdherencePct)}${k.lateSlaTasks ? ` (${k.lateSlaTasks} late task(s))` : ""} · Effective CAPA ${rate(k.effectiveCapaPct)}.`);
+  li(`CAPA needed: ${k.capaNeeded}, overdue: ${k.capaOverdue}. Risks: ${k.risks}, open high: ${k.openHighRisks}.`);
+
+  const hp = (f.hotspotProcesses || []).slice(0, 3), hd = (f.hotspotDepartments || []).slice(0, 2), ho = (f.hotspotActionOwners || []).slice(0, 2);
+  if (hp.length || hd.length || ho.length) {
+    head("Hotspots");
+    hp.forEach(x => li(`Process **${x.name}**: ${issues(x)}.`));
+    hd.forEach(x => li(`Department **${x.name}**: ${issues(x)}.`));
+    ho.forEach(x => li(`Action owner **${x.name}**: ${issues(x)}.`));
+  }
+
+  const rep = f.repeatFindings || [], cat = top(f.findings?.byCategory), rea = top(f.findings?.byReason);
+  if (rep.length || cat.length || rea.length) {
+    head("Repeat & systemic issues");
+    rep.slice(0, 4).forEach(x => li(`${x.process}: findings in ${x.monthsWithFindings} different review months.`));
+    if (cat.length) li(`Top finding categories: ${cat.slice(0, 3).map(([n, c]) => `${n} (${c})`).join(", ")}.`);
+    if (rea.length) li(`Top reasons: ${rea.slice(0, 3).map(([n, c]) => `${n} (${c})`).join(", ")}.`);
+  }
+
+  const acts = [];
+  if (k.openHighRisks) acts.push(`Risk owners: mitigate the ${k.openHighRisks} open high risk(s) first.`);
+  if (k.capaOverdue) { const d = (f.hotspotActionOwners || []).find(x => x.capaOverdue) || (f.hotspotDepartments || []).find(x => x.capaOverdue); acts.push(`Action owners: close the ${k.capaOverdue} overdue CAPA(s)${d ? `, starting with ${d.name} (${d.capaOverdue})` : ""}.`); }
+  if (hp[0] && (k.compliancePct == null || k.compliancePct < 85)) acts.push(`Process owner of ${hp[0].name}: review the findings and agree corrective actions.`);
+  if (rep[0]) acts.push(`Quality / process owners: run a root-cause review for repeat findings in ${rep[0].process}.`);
+  if (k.slaAdherencePct != null && k.slaAdherencePct < 85) acts.push(`Department heads: follow up the ${k.lateSlaTasks} late SLA task(s).`);
+  if (acts.length) { head("Recommended actions"); acts.slice(0, 5).forEach(li); }
+
+  const dq = f.dataQuality || {}, gaps = [
+    [dq.findingsWithoutCategory, "finding(s) without a category"], [dq.findingsWithoutReason, "finding(s) without a reason"],
+    [dq.findingsWithoutRootCause, "finding(s) without a root cause"], [dq.capaWithoutStatus, "CAPA(s) without a status"],
+    [dq.capaClosedNotAssessedForEffectiveness, "closed CAPA(s) not assessed for effectiveness"], [dq.stepsExcludedAsUnrated, "step(s) excluded as unrated"]
+  ].filter(([n]) => n > 0);
+  if (gaps.length) { head("Data quality"); gaps.forEach(([n, t]) => li(`${n} ${t}.`)); }
+
+  L.push("", "Rule-based summary from the dashboard figures (no AI model). Use \"Analyze current view\" for a written AI analysis.");
+  return L.join("\n");
+}
+
 // ---------- Tiny markdown renderer (headings, bullets, bold) ----------
 function renderMd(md) {
   const lines = esc(md).split("\n");
@@ -212,6 +259,7 @@ function mount() {
         <div class="ai-controls">
           <label>Model <select id="aiModel">${Object.entries(MODELS).map(([k, m]) => `<option value="${k}"${k === "fast" ? " selected" : ""}>${m.label}</option>`).join("")}</select></label>
           <label>Language <select id="aiLang">${Object.entries(LANGS).map(([k, l]) => `<option value="${k}">${l}</option>`).join("")}</select></label>
+          <button id="aiQuick" class="btn" title="Instant summary from the dashboard figures. No download, no graphics card needed.">⚡ Quick summary</button>
           <button id="aiAnalyze" class="btn primary">Analyze current view</button>
           <button id="aiStop" class="btn ghost" hidden>Stop</button>
           <span class="spacer"></span>
@@ -233,7 +281,7 @@ function mount() {
 
   const setBusy = on => {
     busy = on;
-    $("aiAnalyze").disabled = on; $("aiAsk").disabled = on;
+    $("aiAnalyze").disabled = on; $("aiAsk").disabled = on; $("aiQuick").disabled = on;
     $("aiStop").hidden = !on;
   };
   const progress = (p, text) => {
@@ -263,7 +311,7 @@ function mount() {
     sec.classList.toggle("ai-include", on);
     if (!on) { sec.innerHTML = ""; return; }
     sec.innerHTML = `<h3 class="dash-section-title">${esc(pdfMeta.title)}</h3>`
-      + `<p class="ai-pdf-meta">AI-generated in the browser (${esc(pdfMeta.model)}) on ${esc(pdfMeta.at)} · Filters at analysis: ${esc(pdfMeta.filters)}. Draft for review — figures come from the dashboard; verify before acting.</p>`
+      + `<p class="ai-pdf-meta">${pdfMeta.rules ? "Rule-based summary (no AI model)" : `AI-generated in the browser (${esc(pdfMeta.model)})`} on ${esc(pdfMeta.at)} · Filters at analysis: ${esc(pdfMeta.filters)}. Draft for review — figures come from the dashboard; verify before acting.</p>`
       + `<div class="ai-pdf-body" dir="auto">${renderMd(lastText)}</div>`;
   };
   // Warn in the PDF if filters changed after the analysis was generated.
@@ -332,6 +380,19 @@ function mount() {
   }
 
   $("aiAnalyze").addEventListener("click", () => run(analysisPrompt, "AI Analysis"));
+  $("aiQuick").addEventListener("click", () => {
+    if (busy) return;
+    if (typeof window.__getDashboardData !== "function") return fail(new Error("Dashboard data not ready yet."));
+    const payload = window.__getDashboardData();
+    if (!payload.rows.length) { $("aiOutput").innerHTML = `<p class="muted">No rated records in the current filters — nothing to summarise.</p>`; return; }
+    const facts = buildFacts(payload);
+    $("aiFacts").textContent = JSON.stringify(facts, null, 2);
+    lastText = quickSummary(facts);
+    $("aiOutput").innerHTML = renderMd(lastText);
+    $("aiCopy").hidden = false;
+    pdfMeta = { title: "Quick summary", filters: filtersText(payload.filters), model: "rules", rules: true, at: new Date().toLocaleString() };
+    syncPdfSection();
+  });
   $("aiIncludePdf").addEventListener("change", syncPdfSection);
   const ask = () => {
     const q = $("aiQuestion").value.trim();
@@ -352,4 +413,4 @@ function mount() {
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", mount);
 else mount();
 
-export { buildFacts, renderMd }; // exported for tests
+export { buildFacts, renderMd, quickSummary }; // exported for tests
