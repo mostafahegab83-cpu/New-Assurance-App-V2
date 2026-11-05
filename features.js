@@ -248,7 +248,27 @@ const NC_COLS = [
   ["Severity", "severityLevel", "pill:severity"], ["Category", "ncCategory"],
   ["Resp. Owner", "ncResponsibleDept"], ["Root Cause", "rootCause", "clip"], ["Verified By", "verifiedBy"],
 ];
+// Fill a filter dropdown with distinct values, keeping the current pick
+// (even if it is no longer in the list, so the user can still clear it).
+function fillNcSelect(id, allLabel, values) {
+  const el = document.getElementById(id);
+  if (!el) return "";
+  const cur = el.value;
+  const list = [...new Set(values.filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  if (cur && !list.includes(cur)) list.unshift(cur);
+  const html = `<option value="">${esc(allLabel)}</option>` + list.map((v) => `<option value="${esc(v).replace(/"/g, "&quot;")}">${esc(v)}</option>`).join("");
+  if (el.dataset.opts !== html) { el.innerHTML = html; el.dataset.opts = html; }
+  el.value = cur;
+  return cur;
+}
 function renderNc() {
+  // Process, Phase and Responsible Owner dropdowns are built from the data.
+  // Phase options follow the selected process so only relevant phases show.
+  const base = ncRows();
+  const proc = fillNcSelect("ncrcNcProcess", "All Processes", base.map((r) => clean(r.processName)));
+  const phase = fillNcSelect("ncrcNcPhase", "All Phases",
+    base.filter((r) => !proc || clean(r.processName) === proc).map((r) => clean(r.processPhase)));
+  const resp = fillNcSelect("ncrcNcRespOwner", "All Resp. Owners", base.map(ownerOf));
   const q = document.getElementById("ncrcNcSearch")?.value || "";
   const type = document.getElementById("ncrcNcType")?.value || "";
   const sev = document.getElementById("ncrcNcSeverity")?.value || "";
@@ -259,7 +279,10 @@ function renderNc() {
       (!type || r.ncType === type) &&
       (!sev || r.severityLevel === sev) &&
       (!comp || r.compliance === comp) &&
-      passText(r, ["ncId", "auditId", "processName", "rootCause", "ncDesc", "ncResponsibleDept"], q)
+      (!proc || clean(r.processName) === proc) &&
+      (!phase || clean(r.processPhase) === phase) &&
+      (!resp || ownerOf(r) === resp) &&
+      passText(r, ["ncId", "auditId", "processName", "processPhase", "rootCause", "ncDesc", "ncResponsibleDept"], q)
   );
   renderNcOwnerBreakdown(scoped);
   const rows = EXTRA.ncOwner ? scoped.filter((r) => ownerOf(r) === EXTRA.ncOwner) : scoped;
@@ -280,6 +303,7 @@ function renderNc() {
   renderChips("ncChips", [
     q && { label: `Search: "${q}"`, clear: () => { qEl.value = ""; renderNc(); } },
     selChip("ncrcNcType", "Type", renderNc), selChip("ncrcNcSeverity", "Severity", renderNc), selChip("ncrcNcCompliance", "Compliance", renderNc),
+    selChip("ncrcNcProcess", "Process", renderNc), selChip("ncrcNcPhase", "Phase", renderNc), selChip("ncrcNcRespOwner", "Resp. Owner", renderNc),
     EXTRA.ncOwner && { label: `Owner: ${EXTRA.ncOwner}`, clear: () => { EXTRA.ncOwner = ""; renderNc(); } },
   ].filter(Boolean));
 
@@ -481,7 +505,7 @@ document.getElementById("riskMoreBtn")?.addEventListener("click", () => {
 
 /* ---------- Clear all filters per register ---------- */
 const CLEAR_IDS = {
-  nc: ["ncrcNcSearch", "ncrcNcType", "ncrcNcSeverity", "ncrcNcCompliance"],
+  nc: ["ncrcNcSearch", "ncrcNcType", "ncrcNcSeverity", "ncrcNcCompliance", "ncrcNcProcess", "ncrcNcPhase", "ncrcNcRespOwner"],
   capa: ["ncrcCapaSearch", "ncrcCapaType", "ncrcCapaStatus"],
   risk: ["ncrcRiskSearch", "ncrcRiskLevel", "ncrcRiskMitigation", ...RISK_ADV],
 };
@@ -641,9 +665,15 @@ document.addEventListener("click", (e) => {
 });
 
 /* ---------- Filter wiring ---------- */
-["ncrcNcSearch", "ncrcNcType", "ncrcNcSeverity", "ncrcNcCompliance"].forEach((id) =>
+["ncrcNcSearch", "ncrcNcType", "ncrcNcSeverity", "ncrcNcCompliance", "ncrcNcRespOwner"].forEach((id) =>
   document.getElementById(id)?.addEventListener("input", renderNc)
 );
+// Changing the process resets the phase, since phases belong to a process.
+document.getElementById("ncrcNcProcess")?.addEventListener("input", () => {
+  const ph = document.getElementById("ncrcNcPhase"); if (ph) ph.value = "";
+  renderNc();
+});
+document.getElementById("ncrcNcPhase")?.addEventListener("input", renderNc);
 ["ncrcCapaSearch", "ncrcCapaType", "ncrcCapaStatus"].forEach((id) =>
   document.getElementById(id)?.addEventListener("input", renderCapa)
 );
