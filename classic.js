@@ -588,9 +588,9 @@
   const esc = (s) => String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 
   const charts = {};
-  const PALETTE = ["#2563EB","#10B981","#F59E0B","#8B5CF6","#EF4444",
-                   "#06B6D4","#4F46E5","#EC4899","#14B8A6","#F97316",
-                   "#84CC16","#0EA5E9","#A855F7","#DC2626","#059669"];
+  const PALETTE = ["#2b72b8","#10B981","#F59E0B","#8B5CF6","#EF4444",
+                   "#06B6D4","#4F46E5","#EC4899","#14B8A6","#d97706",
+                   "#84CC16","#0EA5E9","#A855F7","#c8102e","#059669"];
 
   /* ---------- Sub-tabs ---------- */
   function initSubTabs() {
@@ -1719,7 +1719,7 @@
     box.style.display = 'block';
     box.style.background = '#fff4f4';
     box.style.border = '1px solid #c62828';
-    box.style.color = '#7f1d1d';
+    box.style.color = '#7a0c1c';
     box.innerHTML = '<strong>Validation issues (' + state.validation.length + '):</strong><ul style="margin:6px 0 0 18px;padding:0;">'
       + state.validation.map(e => `<li>${esc(e)}</li>`).join('') + '</ul>';
   }

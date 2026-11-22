@@ -21,7 +21,7 @@ const ATT_MAX = 10 * 1024 * 1024;
 const SET_DOC = "main";
 
 const PHASES = ["Define", "Measure", "Analysis", "Improvement", "Control"];
-const PHASE_COLOR = { Define: "#0ea5e9", Measure: "#2563eb", Analysis: "#7c3aed", Improvement: "#0d9488", Control: "#475569" };
+const PHASE_COLOR = { Define: "#0ea5e9", Measure: "#2b72b8", Analysis: "#7c3aed", Improvement: "#0d9488", Control: "#475569" };
 const STATUSES = ["Not Started", "In Progress", "Completed", "On Hold", "No Reply", "Escalated"];
 const HEALTHS = ["Completed", "On track", "At risk", "Delayed", "Escalated", "No reply", "Not started", "On hold", "Unscheduled"];
 const HEALTH_STYLE = {
@@ -316,8 +316,8 @@ function setSaveState(kind, msg) {
   const el = $("#ppSaveState"); if (!el) return;
   clearTimeout(saveTimer);
   if (kind === "saving") { el.textContent = "Saving…"; el.style.color = "#64748b"; }
-  else if (kind === "saved") { el.textContent = "✓ All changes saved"; el.style.color = "#16a34a"; saveTimer = setTimeout(() => { el.textContent = ""; }, 3000); }
-  else { el.textContent = "⚠ Not saved: " + (msg || "error"); el.style.color = "#dc2626"; }
+  else if (kind === "saved") { el.textContent = "✓ All changes saved"; el.style.color = "#2f7d32"; saveTimer = setTimeout(() => { el.textContent = ""; }, 3000); }
+  else { el.textContent = "⚠ Not saved: " + (msg || "error"); el.style.color = "#c8102e"; }
 }
 const stamp = () => ({ updatedAtMs: Date.now(), updatedBy: window.__session?.email || "", updatedAt: serverTimestamp() });
 
@@ -422,9 +422,9 @@ function renderEntrySummary(list, c) {
   const chip = (label, val, color) => `<span class="pp-chip"><b style="color:${color}">${val}</b> ${label}</span>`;
   el.innerHTML = n ? [
     chip("actions shown", `${n}${n !== rows.length ? " / " + rows.length : ""}`, "#1f3a8a"),
-    chip("completed", list.filter(r => r.status === "Completed").length, "#16a34a"),
-    chip("in progress", list.filter(r => r.status === "In Progress").length, "#2563eb"),
-    chip("delayed", D.filter(d => d.health === "Delayed").length, "#dc2626"),
+    chip("completed", list.filter(r => r.status === "Completed").length, "#2f7d32"),
+    chip("in progress", list.filter(r => r.status === "In Progress").length, "#2b72b8"),
+    chip("delayed", D.filter(d => d.health === "Delayed").length, "#c8102e"),
     chip("escalated", list.filter(r => r.status === "Escalated").length, "#9f1239"),
     chip("no reply", list.filter(r => r.status === "No Reply").length, "#9a3412"),
     chip("overall progress", Math.round(avg(list.map(r => r.percent))) + "%", "#1f3a8a"),
@@ -950,7 +950,7 @@ const pick = r => ({ status: r.status, percent: r.percent, actualStart: r.actual
 /* =====================================================================
    PROGRESS DASHBOARD (public)
    ===================================================================== */
-const COLORS = { done: "#16a34a", prog: "#2563eb", hold: "#7c3aed", todo: "#cbd5e1", late: "#dc2626", risk: "#d97706", ink: "#1f3a8a" };
+const COLORS = { done: "#2f7d32", prog: "#2b72b8", hold: "#7c3aed", todo: "#cbd5e1", late: "#c8102e", risk: "#d97706", ink: "#1f3a8a" };
 
 function aggHealth(items) {   // items: [{r,d}]
   if (!items.length) return "Not started";

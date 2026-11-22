@@ -2099,12 +2099,12 @@ function cellEdit(r, f) {
 function actionsHtml(id, isEdit) {
   if (isEdit) {
     return `
-      <button class="ga-save" title="Save" style="background:#16a34a;color:#fff;border:none;border-radius:4px;padding:4px 10px;margin-right:4px;cursor:pointer;">Save</button>
+      <button class="ga-save" title="Save" style="background:#2f7d32;color:#fff;border:none;border-radius:4px;padding:4px 10px;margin-right:4px;cursor:pointer;">Save</button>
       <button class="ga-cancel" title="Cancel" style="background:#64748b;color:#fff;border:none;border-radius:4px;padding:4px 10px;margin-right:4px;cursor:pointer;">Cancel</button>
       <button class="ga-del" title="Delete" style="background:#b91c1c;color:#fff;border:none;border-radius:4px;padding:4px 10px;cursor:pointer;">Delete</button>`;
   }
   return `
-    <button class="ga-edit" title="Edit" style="background:#2563eb;color:#fff;border:none;border-radius:4px;padding:4px 10px;margin-right:4px;cursor:pointer;">Edit</button>
+    <button class="ga-edit" title="Edit" style="background:#2b72b8;color:#fff;border:none;border-radius:4px;padding:4px 10px;margin-right:4px;cursor:pointer;">Edit</button>
     <button class="ga-del" title="Delete" style="background:#b91c1c;color:#fff;border:none;border-radius:4px;padding:4px 10px;cursor:pointer;">Delete</button>`;
 }
 
@@ -2996,8 +2996,8 @@ function stackedBar(pctYes) {
     ? `<div style="width:${w}%;background:${color};color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:4px 3px;white-space:nowrap;">${label}%</div>`
     : "";
   return `<div style="display:flex;width:100%;border-radius:6px;overflow:hidden;height:30px;">
-    ${cell(yes, "#16a34a", yes)}
-    ${cell(no, "#dc2626", no)}
+    ${cell(yes, "#2f7d32", yes)}
+    ${cell(no, "#c8102e", no)}
   </div>`;
 }
 
@@ -3138,7 +3138,7 @@ function heatColor(val, max) {
   const ratio = max > 0 ? val / max : 0;
   if (ratio >= 0.75) return "#b91c1c";  // deep red
   if (ratio >= 0.5)  return "#ef4444";
-  if (ratio >= 0.25) return "#f97316";
+  if (ratio >= 0.25) return "#d97706";
   return "#fbbf24";
 }
 function heatText(val, max) {

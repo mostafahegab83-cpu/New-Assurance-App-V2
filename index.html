@@ -7,7 +7,9 @@
 <link rel="icon" href="idh-logo.png" />
 <link rel="stylesheet" href="styles.css?v=20261105-allmulti" />
 <script src="embed.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="hub-look.js?v=hub1"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
@@ -22,14 +24,14 @@
   #findingsSection .fs-kpis span{background:#f3f4f6;padding:4px 10px;border-radius:999px;color:#374151;}
   #findingsSection .fs-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;}
   #findingsSection .fs-item{border:1px solid #e3e8ef;border-left-width:4px;border-radius:8px;padding:10px 12px;background:#fafbfc;}
-  #findingsSection .fs-item.fs-sev-high{border-left-color:#dc2626;background:#fef2f2;}
+  #findingsSection .fs-item.fs-sev-high{border-left-color:#c8102e;background:#fef2f2;}
   #findingsSection .fs-item.fs-sev-med{border-left-color:#f59e0b;background:#fffbeb;}
-  #findingsSection .fs-item.fs-sev-low{border-left-color:#16a34a;background:#f0fdf4;}
+  #findingsSection .fs-item.fs-sev-low{border-left-color:#2f7d32;background:#f0fdf4;}
   #findingsSection .fs-row{display:flex;gap:8px;align-items:center;margin-bottom:4px;flex-wrap:wrap;}
   #findingsSection .fs-badge{font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:2px 8px;border-radius:999px;color:#fff;background:#6b7280;}
-  #findingsSection .fs-badge.fs-sev-high{background:#dc2626;}
+  #findingsSection .fs-badge.fs-sev-high{background:#c8102e;}
   #findingsSection .fs-badge.fs-sev-med{background:#f59e0b;}
-  #findingsSection .fs-badge.fs-sev-low{background:#16a34a;}
+  #findingsSection .fs-badge.fs-sev-low{background:#2f7d32;}
   #findingsSection .fs-cat{font-size:12px;font-weight:700;color:#1f3a8a;}
   #findingsSection .fs-tag{font-size:11px;color:#6b7280;background:#fff;border:1px solid #e3e8ef;padding:1px 8px;border-radius:999px;}
   #findingsSection .fs-msg{margin:0;font-size:13px;line-height:1.5;color:#1f2937;}
@@ -41,7 +43,7 @@
   .ms-btn{width:100%;text-align:left;background:#fff;border:1px solid #cbd5e1;border-radius:6px;padding:7px 28px 7px 10px;font-size:13px;color:#1f2937;cursor:pointer;position:relative;line-height:1.2;min-height:34px;}
   .ms-btn::after{content:"▾";position:absolute;right:10px;top:50%;transform:translateY(-50%);color:#64748b;font-size:11px;pointer-events:none;}
   .ms-btn:hover{border-color:#94a3b8;}
-  .ms-wrap.open .ms-btn{border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,.15);}
+  .ms-wrap.open .ms-btn{border-color:#2b72b8;box-shadow:0 0 0 2px rgba(37,99,235,.15);}
   .ms-label{display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .ms-panel{display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:1000;min-width:max(100%,280px);max-width:420px;max-height:280px;overflow:auto;background:#fff;border:1px solid #cbd5e1;border-radius:8px;box-shadow:0 8px 24px rgba(15,23,42,.12);padding:6px;}
   .ms-wrap.open .ms-panel{display:block;}
@@ -50,7 +52,7 @@
   .ms-actions button:hover{background:#e2e8f0;}
   .ms-search{padding:2px 4px 6px;}
   .ms-search input{width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:6px;padding:6px 8px;font-size:13px;outline:none;}
-  .ms-search input:focus{border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,.15);}
+  .ms-search input:focus{border-color:#2b72b8;box-shadow:0 0 0 2px rgba(37,99,235,.15);}
   .ms-opt{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;font-size:13px;color:#1f2937;cursor:pointer;}
   .ms-opt:hover{background:#f8fafc;}
   .ms-opt input{margin:0;}
@@ -74,11 +76,11 @@
       <p style="margin:0 0 16px;text-align:center;font-size:12px;color:#6b7280;">For authorized users only. Viewing the dashboards does not need a login.</p>
       <input id="loginEmail" type="email" placeholder="Email" required autocomplete="username" style="width:100%;padding:10px;margin-bottom:8px;border:1px solid #e3e8ef;border-radius:6px;font-size:14px;" />
       <input id="loginPassword" type="password" placeholder="Password" required autocomplete="current-password" style="width:100%;padding:10px;margin-bottom:12px;border:1px solid #e3e8ef;border-radius:6px;font-size:14px;" />
-      <button type="submit" style="width:100%;padding:10px;background:#d12027;color:#fff;border:none;border-radius:6px;font-weight:600;cursor:pointer;font-size:14px;">Sign in</button>
+      <button type="submit" style="width:100%;padding:10px;background:#c8102e;color:#fff;border:none;border-radius:6px;font-weight:600;cursor:pointer;font-size:14px;">Sign in</button>
       <p style="margin:12px 0 0;text-align:center;">
-        <a href="#" id="forgotPasswordLink" style="font-size:13px;color:#d12027;text-decoration:none;font-weight:600;">Forgot password?</a>
+        <a href="#" id="forgotPasswordLink" style="font-size:13px;color:#c8102e;text-decoration:none;font-weight:600;">Forgot password?</a>
       </p>
-      <p id="loginError" style="color:#dc2626;font-size:13px;margin:8px 0 0;min-height:18px;text-align:center;"></p>
+      <p id="loginError" style="color:#c8102e;font-size:13px;margin:8px 0 0;min-height:18px;text-align:center;"></p>
       <p style="margin:4px 0 0;text-align:center;">
         <a href="#" id="loginClose" style="font-size:13px;color:#475569;text-decoration:none;">&larr; Continue as viewer</a>
       </p>
@@ -128,11 +130,11 @@
     .home-tile[data-go="admin"] .home-icon{background:#efeaff;color:#7c3aed;}
     .home-tile[data-go="audit"] .home-icon{background:#fff1e6;color:#ea580c;}
     .home-tile[data-go="ncrc"] .home-icon{background:#fff7dc;color:#d97706;}
-    .home-tile[data-go="dashboard"] .home-icon{background:#e6f0ff;color:#2563eb;}
-    .home-tile[data-go="documentControl"] .home-icon{background:#fdecec;color:#dc2626;}
+    .home-tile[data-go="dashboard"] .home-icon{background:#e6f0ff;color:#2b72b8;}
+    .home-tile[data-go="documentControl"] .home-icon{background:#fdecec;color:#c8102e;}
     .home-tile[data-go="processInventory"] .home-icon{background:#fff4d6;color:#b45309;}
     .home-tile[data-go="gapAnalysis"] .home-icon{background:#e6f7f2;color:#0d9488;}
-    .home-tile[data-go="processMap"] .home-icon{background:#e6f6ec;color:#16a34a;}
+    .home-tile[data-go="processMap"] .home-icon{background:#e6f6ec;color:#2f7d32;}
     @media (max-width: 1024px){.home-tiles{grid-template-columns:repeat(3,1fr);}.home-hero{padding:24px 32px;}.home-hero h1{font-size:34px;}}
     @media (max-width: 640px){.home-tiles{grid-template-columns:repeat(2,1fr);}.home-hero{flex-direction:column;text-align:center;padding:32px 20px;}.home-hero img{max-height:180px;}.home-hero h1{font-size:28px;}}
     /* NC/Risk & CAPA sub-nav */
@@ -403,7 +405,7 @@
             <div style="display:flex;gap:6px;align-items:center;">
               <input type="text" id="stepNumber" placeholder="Auto" style="flex:1;" />
               <button type="button" id="btnAutoStepNo" title="Auto-generate next step number for this process"
-                style="padding:6px 10px;border:1px solid #2563eb;background:#2563eb;color:#fff;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;white-space:nowrap;">Auto</button>
+                style="padding:6px 10px;border:1px solid #2b72b8;background:#2b72b8;color:#fff;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;white-space:nowrap;">Auto</button>
             </div>
           </label>
           <label>User Name<input list="dlUser" id="userName" placeholder="N/A" /><datalist id="dlUser"></datalist></label>
@@ -430,12 +432,12 @@
           .task-perf-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
           .task-perf-row > span:first-child{min-width:130px;font-weight:600;color:#374151;}
           .task-perf-badge{padding:6px 16px;border-radius:999px;font-weight:700;color:#fff;background:#9ca3af;display:inline-block;}
-          .task-perf-badge.red{background:#dc2626;}
+          .task-perf-badge.red{background:#c8102e;}
           .task-perf-badge.yellow{background:#f59e0b;}
-          .task-perf-badge.green{background:#16a34a;}
+          .task-perf-badge.green{background:#2f7d32;}
           .tp-btn{padding:6px 16px;border:1px solid #d1d5db;background:#fff;border-radius:6px;cursor:pointer;font-size:13px;font-weight:500;}
           .tp-btn:hover{background:#f3f4f6;}
-          .tp-btn.active{background:#2563eb;color:#fff;border-color:#2563eb;}
+          .tp-btn.active{background:#2b72b8;color:#fff;border-color:#2b72b8;}
         </style>
         <div class="grid">
           <div class="full task-perf-wrap">
@@ -1001,7 +1003,7 @@
         #documentControl .dc-kpi .lbl{font-size:11px;font-weight:700;color:#6b7280;letter-spacing:.5px;text-transform:uppercase;}
         #documentControl .dc-kpi .val{font-size:28px;font-weight:700;margin-top:6px;color:#1f3a8a;}
         #documentControl .dc-kpi.warn .val{color:#f59e0b;}
-        #documentControl .dc-kpi.danger .val{color:#d12027;}
+        #documentControl .dc-kpi.danger .val{color:#c8102e;}
         #documentControl .dc-toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px;}
         #documentControl .dc-toolbar input,#documentControl .dc-toolbar select{padding:8px 10px;border:1px solid #cfd6df;border-radius:6px;font-size:13px;background:#fff;}
         #documentControl .dc-toolbar .spacer{flex:1;}
@@ -1014,7 +1016,7 @@
         #documentControl .pill.approved{background:#d1fae5;color:#065f46;}
         #documentControl .pill.review{background:#fef3c7;color:#92400e;}
         #documentControl .pill.obsolete{background:#fee2e2;color:#991b1b;}
-        #documentControl .link-open{display:inline-block;padding:4px 14px;background:#d12027;color:#fff;border-radius:6px;text-decoration:none;font-size:12px;font-weight:600;}
+        #documentControl .link-open{display:inline-block;padding:4px 14px;background:#c8102e;color:#fff;border-radius:6px;text-decoration:none;font-size:12px;font-weight:600;}
         #documentControl .link-open.disabled{background:#cbd5e1;pointer-events:none;}
         /* Modal */
         .dc-modal{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:flex-start;justify-content:center;z-index:1000;overflow-y:auto;padding:40px 16px;}
@@ -1029,7 +1031,7 @@
         .dc-grid .hint{font-weight:400;color:#6b7280;font-size:11px;margin-top:-2px;}
         .dc-modal .actions{display:flex;justify-content:flex-end;gap:8px;margin-top:20px;}
         .dc-modal .actions .btn-cancel{background:#fff;color:#374151;border:1px solid #cfd6df;padding:8px 18px;border-radius:6px;cursor:pointer;font-weight:600;}
-        .dc-modal .actions .btn-save{background:#d12027;color:#fff;border:none;padding:8px 18px;border-radius:6px;cursor:pointer;font-weight:600;}
+        .dc-modal .actions .btn-save{background:#c8102e;color:#fff;border:none;padding:8px 18px;border-radius:6px;cursor:pointer;font-weight:600;}
         #documentControl .row-overdue{background:#fef2f2;}
         #documentControl .row-due{background:#fffbeb;}
       </style>
@@ -1179,7 +1181,7 @@
         #processInventory .pi-form-grid input{padding:7px 10px;border:1px solid #cfd6df;border-radius:6px;font-size:13px;}
         #processInventory .btn{padding:6px 14px;border:1px solid #cfd6df;background:#fff;border-radius:6px;cursor:pointer;font-weight:600;font-size:13px;}
         #processInventory .btn.primary{background:#1f3a8a;color:#fff;border-color:#1f3a8a;}
-        #processInventory .btn.danger{background:#d12027;color:#fff;border-color:#d12027;}
+        #processInventory .btn.danger{background:#c8102e;color:#fff;border-color:#c8102e;}
         /* Sub-tabs */
         #processInventory .pi-subtabs{display:flex;gap:6px;border-bottom:1px solid #e3e8ef;margin-bottom:14px;}
         #processInventory .pi-subtab{padding:8px 16px;border:none;background:transparent;cursor:pointer;font-weight:600;font-size:13px;color:#6b7280;border-bottom:2px solid transparent;}
@@ -1313,7 +1315,7 @@
               <h3>Dashboard Insights</h3>
               <ul class="insight-list" id="pidInsights"><li>Loading insights…</li></ul>
               <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                <button class="full-report-btn" id="pidExportPdf" style="background:#2563eb;color:#fff;border-color:#2563eb;">Export to PDF</button>
+                <button class="full-report-btn" id="pidExportPdf" style="background:#2b72b8;color:#fff;border-color:#2b72b8;">Export to PDF</button>
               </div>
             </div>
           </div>
@@ -1537,11 +1539,11 @@
           <!-- KPI CARDS -->
           <div id="gdKpis" style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:16px;">
             <div class="gd-kpi" style="background:#fff;border:1px solid #cbd5e1;border-radius:10px;padding:18px;display:flex;align-items:center;gap:16px;">
-              <div style="width:64px;height:64px;border-radius:50%;background:#16a34a;display:flex;align-items:center;justify-content:center;color:#fff;font-size:28px;flex-shrink:0;">✅</div>
+              <div style="width:64px;height:64px;border-radius:50%;background:#2f7d32;display:flex;align-items:center;justify-content:center;color:#fff;font-size:28px;flex-shrink:0;">✅</div>
               <div style="flex:1;text-align:center;">
-                <div style="color:#16a34a;font-size:13px;font-weight:700;letter-spacing:.5px;">PROCESS EXISTS</div>
-                <div id="gdPePct" style="color:#16a34a;font-size:34px;font-weight:800;line-height:1;margin:4px 0;">0%</div>
-                <div style="font-size:12px;"><span style="color:#16a34a;font-weight:600;">Yes: <span id="gdPeYes">0%</span></span> &nbsp;|&nbsp; <span style="color:#dc2626;font-weight:600;">No: <span id="gdPeNo">0%</span></span></div>
+                <div style="color:#2f7d32;font-size:13px;font-weight:700;letter-spacing:.5px;">PROCESS EXISTS</div>
+                <div id="gdPePct" style="color:#2f7d32;font-size:34px;font-weight:800;line-height:1;margin:4px 0;">0%</div>
+                <div style="font-size:12px;"><span style="color:#2f7d32;font-weight:600;">Yes: <span id="gdPeYes">0%</span></span> &nbsp;|&nbsp; <span style="color:#c8102e;font-weight:600;">No: <span id="gdPeNo">0%</span></span></div>
                 <div style="color:#6b7280;font-size:12px;margin-top:2px;">of total processes</div>
               </div>
             </div>
@@ -1550,7 +1552,7 @@
               <div style="flex:1;text-align:center;">
                 <div style="color:#1d4ed8;font-size:13px;font-weight:700;letter-spacing:.5px;">EVIDENCE EXISTS</div>
                 <div id="gdEvPct" style="color:#1d4ed8;font-size:34px;font-weight:800;line-height:1;margin:4px 0;">0%</div>
-                <div style="font-size:12px;"><span style="color:#1d4ed8;font-weight:600;">Yes: <span id="gdEvYes">0%</span></span> &nbsp;|&nbsp; <span style="color:#dc2626;font-weight:600;">No: <span id="gdEvNo">0%</span></span></div>
+                <div style="font-size:12px;"><span style="color:#1d4ed8;font-weight:600;">Yes: <span id="gdEvYes">0%</span></span> &nbsp;|&nbsp; <span style="color:#c8102e;font-weight:600;">No: <span id="gdEvNo">0%</span></span></div>
                 <div style="color:#6b7280;font-size:12px;margin-top:2px;">of total processes</div>
               </div>
             </div>
@@ -1559,7 +1561,7 @@
               <div style="flex:1;text-align:center;">
                 <div style="color:#7c3aed;font-size:13px;font-weight:700;letter-spacing:.5px;">AUTOMATED</div>
                 <div id="gdAuPct" style="color:#7c3aed;font-size:34px;font-weight:800;line-height:1;margin:4px 0;">0%</div>
-                <div style="font-size:12px;"><span style="color:#7c3aed;font-weight:600;">Yes: <span id="gdAuYes">0%</span></span> &nbsp;|&nbsp; <span style="color:#dc2626;font-weight:600;">No: <span id="gdAuNo">0%</span></span></div>
+                <div style="font-size:12px;"><span style="color:#7c3aed;font-weight:600;">Yes: <span id="gdAuYes">0%</span></span> &nbsp;|&nbsp; <span style="color:#c8102e;font-weight:600;">No: <span id="gdAuNo">0%</span></span></div>
                 <div style="color:#6b7280;font-size:12px;margin-top:2px;">of total processes</div>
               </div>
             </div>
@@ -1570,9 +1572,9 @@
             <div style="text-align:center;font-weight:700;color:#0f172a;font-size:20px;">Performance by Process Owner – 100% Stacked Bar Chart</div>
             <div style="text-align:center;color:#6b7280;font-size:13px;margin-bottom:14px;">(Percentage of Processes)</div>
             <div style="text-align:right;font-size:13px;margin-bottom:10px;">
-              <span style="display:inline-block;width:14px;height:14px;background:#16a34a;vertical-align:middle;margin-right:4px;"></span>Yes
+              <span style="display:inline-block;width:14px;height:14px;background:#2f7d32;vertical-align:middle;margin-right:4px;"></span>Yes
               &nbsp;&nbsp;
-              <span style="display:inline-block;width:14px;height:14px;background:#dc2626;vertical-align:middle;margin-right:4px;"></span>No
+              <span style="display:inline-block;width:14px;height:14px;background:#c8102e;vertical-align:middle;margin-right:4px;"></span>No
             </div>
             <div style="overflow-x:auto;">
               <table id="gdStackTable" class="gd-stack" style="width:100%;border-collapse:collapse;font-size:14px;table-layout:fixed;">
@@ -1625,7 +1627,7 @@
               <div style="width:40px;height:40px;border-radius:10px;background:#fee2e2;display:flex;align-items:center;justify-content:center;font-size:20px;">⚠️</div>
               <div>
                 <div style="font-size:10px;font-weight:700;color:#6b7280;letter-spacing:.5px;">MISSING PROCESSES</div>
-                <div id="gadKpiMissing" style="font-size:22px;font-weight:800;color:#dc2626;line-height:1.1;">0</div>
+                <div id="gadKpiMissing" style="font-size:22px;font-weight:800;color:#c8102e;line-height:1.1;">0</div>
                 <div id="gadKpiMissingSub" style="font-size:11px;color:#6b7280;">0% of total</div>
               </div>
             </div>
@@ -1633,7 +1635,7 @@
               <div style="width:40px;height:40px;border-radius:10px;background:#fee2e2;display:flex;align-items:center;justify-content:center;font-size:20px;">🛡️</div>
               <div>
                 <div style="font-size:10px;font-weight:700;color:#6b7280;letter-spacing:.5px;">CRITICAL GAPS</div>
-                <div id="gadKpiCritical" style="font-size:22px;font-weight:800;color:#dc2626;line-height:1.1;">0</div>
+                <div id="gadKpiCritical" style="font-size:22px;font-weight:800;color:#c8102e;line-height:1.1;">0</div>
                 <div style="font-size:11px;color:#6b7280;">Critical severity</div>
               </div>
             </div>
@@ -1641,7 +1643,7 @@
               <div style="width:40px;height:40px;border-radius:10px;background:#dcfce7;display:flex;align-items:center;justify-content:center;font-size:20px;">✅</div>
               <div>
                 <div style="font-size:10px;font-weight:700;color:#6b7280;letter-spacing:.5px;">COMPLIANCE RATE</div>
-                <div id="gadKpiCompliance" style="font-size:22px;font-weight:800;color:#16a34a;line-height:1.1;">0%</div>
+                <div id="gadKpiCompliance" style="font-size:22px;font-weight:800;color:#2f7d32;line-height:1.1;">0%</div>
                 <div style="font-size:11px;color:#6b7280;">Processes exist</div>
               </div>
             </div>
@@ -1714,15 +1716,15 @@
         #planProgress .pp-plan > span{white-space:nowrap;}
         #planProgress .pp-health{display:inline-block;margin-top:4px;font-size:11px;font-weight:700;border-radius:6px;padding:2px 7px;}
         #planProgress .pp-in{width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:6px;padding:6px 7px;font:inherit;font-size:12px;background:#fff;}
-        #planProgress .pp-in:focus{outline:none;border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,.15);}
+        #planProgress .pp-in:focus{outline:none;border-color:#2b72b8;box-shadow:0 0 0 2px rgba(37,99,235,.15);}
         #planProgress .pp-pct{display:flex;align-items:center;gap:3px;}
         #planProgress .pp-pct input{width:56px;}
         #planProgress .pp-bar{height:5px;border-radius:3px;background:#e5e7eb;margin-top:6px;overflow:hidden;}
-        #planProgress .pp-bar i{display:block;height:100%;background:#2563eb;border-radius:3px;transition:width .25s;}
-        #planProgress tr[data-st="Completed"] .pp-bar i{background:#16a34a;}
+        #planProgress .pp-bar i{display:block;height:100%;background:#2b72b8;border-radius:3px;transition:width .25s;}
+        #planProgress tr[data-st="Completed"] .pp-bar i{background:#2f7d32;}
         #planProgress .pp-act{white-space:nowrap;}
         #planProgress .pp-act button{border:1px solid #cbd5e1;background:#fff;border-radius:6px;width:26px;height:28px;cursor:pointer;font-size:13px;margin-right:2px;}
-        #planProgress .pp-act button:hover:not(:disabled){background:#eff6ff;border-color:#2563eb;}
+        #planProgress .pp-act button:hover:not(:disabled){background:#eff6ff;border-color:#2b72b8;}
         #planProgress .pp-act button:disabled{opacity:.35;cursor:default;}
         #planProgress .pp-empty{text-align:center;padding:34px 20px;border:2px dashed #cbd5e1;border-radius:12px;background:#fff;color:#475569;}
         #planProgress .pp-empty h3{margin:0 0 6px;color:#1f3a8a;}
@@ -1732,7 +1734,7 @@
         #planProgress .pp-chips{margin-top:4px;}
         #planProgress .pp-subchip{border:1px solid #cbd5e1;background:#f8fafc;color:#475569;border-radius:999px;font-size:11px;font-weight:700;padding:2px 9px;cursor:pointer;}
         #planProgress .pp-subchip.has{background:#eff6ff;border-color:#93c5fd;color:#1e40af;}
-        #planProgress .pp-subchip:hover{border-color:#2563eb;}
+        #planProgress .pp-subchip:hover{border-color:#2b72b8;}
         .pp-modal h3{margin:0 0 14px;color:#1f3a8a;}
         .pp-dh{display:flex;gap:16px;justify-content:space-between;align-items:flex-start;border-bottom:1px solid #e5e7eb;padding-bottom:12px;margin-bottom:12px;}
         .pp-dh h3{margin:2px 0 6px;font-size:17px;line-height:1.3;}
@@ -1753,7 +1755,7 @@
         .pp-subtable input[type=date].pp-in{font-size:11.5px;padding:4px 3px;}
         .pp-sub-btns{white-space:nowrap;text-align:right;}
         .pp-sub-btns button,.pp-clip{border:1px solid #cbd5e1;background:#fff;border-radius:6px;min-width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;gap:2px;cursor:pointer;font-size:12px;padding:0 5px;margin-left:2px;}
-        .pp-sub-btns button:hover,.pp-clip:hover{border-color:#2563eb;background:#eff6ff;}
+        .pp-sub-btns button:hover,.pp-clip:hover{border-color:#2b72b8;background:#eff6ff;}
         .pp-sub-att td{border-top:0 !important;padding-top:0 !important;}
         .pp-addsub{display:flex;gap:8px;align-items:flex-start;}
         .pp-addsub textarea{flex:1;border:1px solid #cbd5e1;border-radius:6px;padding:8px;font:inherit;font-size:13px;resize:vertical;min-height:36px;}
@@ -1872,7 +1874,7 @@
         #planDashboard .pd-g-lane{position:relative;min-height:34px;background-image:linear-gradient(to right,rgba(148,163,184,.28) 1px,transparent 1px);background-repeat:repeat-x;}
         #planDashboard .pd-g-ticks{background-image:none;}
         #planDashboard .pd-g-ticks span{position:absolute;top:6px;font-size:10px;color:#64748b;transform:translateX(2px);}
-        #planDashboard .pd-g-ticks em{position:absolute;top:-1px;font-style:normal;background:#dc2626;color:#fff;border-radius:4px;padding:1px 6px;font-size:10px;transform:translateX(-50%);z-index:3;white-space:nowrap;}
+        #planDashboard .pd-g-ticks em{position:absolute;top:-1px;font-style:normal;background:#c8102e;color:#fff;border-radius:4px;padding:1px 6px;font-size:10px;transform:translateX(-50%);z-index:3;white-space:nowrap;}
         #planDashboard .pd-g-tbd{display:flex;align-items:center;justify-content:center;font-size:10px;color:#64748b;}
         #planDashboard .pd-g-row{border-bottom:1px solid #f1f5f9;}
         #planDashboard .pd-g-row:hover{background:#f8fafc;}
@@ -1881,13 +1883,13 @@
         #planDashboard .pd-g-ph span{font-size:11px;color:#64748b;}
         #planDashboard .pd-bar{position:absolute;top:8px;height:18px;border:1px solid;border-radius:5px;overflow:hidden;box-sizing:border-box;}
         #planDashboard .pd-bar i{position:absolute;left:0;top:0;bottom:0;}
-        #planDashboard .pd-bar.late{border-color:#dc2626 !important;border-width:2px;}
+        #planDashboard .pd-bar.late{border-color:#c8102e !important;border-width:2px;}
         #planDashboard .pd-bar.risk{border-color:#d97706 !important;border-width:2px;}
         #planDashboard .pd-bar.open{border-right-style:dashed;}
         #planDashboard .pd-bar.ongoing{border-style:dashed;}
         #planDashboard .pd-bar.ongoing b{position:relative;font-size:10px;color:#334155;padding-left:8px;line-height:16px;font-weight:600;}
         #planDashboard .pd-bl{position:absolute;top:10px;font-size:10px;font-weight:700;color:#334155;white-space:nowrap;}
-        #planDashboard .pd-today{position:absolute;top:0;bottom:0;width:2px;background:#dc2626;z-index:2;opacity:.8;}
+        #planDashboard .pd-today{position:absolute;top:0;bottom:0;width:2px;background:#c8102e;z-index:2;opacity:.8;}
         #planDashboard .pd-tbd{font-size:10px;font-weight:700;border:1px dashed;border-radius:6px;padding:1px 6px;}
         #planDashboard .pd-dot{flex:0 0 auto;width:20px;height:20px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;}
         #planDashboard .pd-legend{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:12px;padding-top:10px;border-top:1px solid #eef2f7;}
@@ -2220,5 +2222,6 @@
   })();
   </script>
 
+<link rel="stylesheet" href="hub-look.css?v=hub1" />
 </body>
 </html>

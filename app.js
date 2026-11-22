@@ -1769,23 +1769,23 @@ window.__writeAudit = writeAudit;
     // ---------- Charts ----------
     // Fixed category specs so legend always shows every category with its color.
     const CAT_COMPLIANCE  = { labels:["Compliant","Non-Compliant","Observation"],
-                              colors:["#16a34a","#dc2626","#f59e0b"] };
+                              colors:["#2f7d32","#c8102e","#f59e0b"] };
     const CAT_NC_CATEGORY = { labels:["People","Process","Technology"],
-                              colors:["#2563eb","#16a34a","#f97316"] };
+                              colors:["#2b72b8","#2f7d32","#d97706"] };
     const CAT_RISK_LEVEL  = { labels:["Low","Medium","High"],
-                              colors:["#16a34a","#f59e0b","#dc2626"] };
+                              colors:["#2f7d32","#f59e0b","#c8102e"] };
     const CAT_MITIGATION  = { labels:["Open","Accepted","Mitigated","Closed"],
-                              colors:["#dc2626","#f59e0b","#16a34a","#2563eb"] };
+                              colors:["#c8102e","#f59e0b","#2f7d32","#2b72b8"] };
     const CAT_CAPA_STATUS = { labels:["Pending","In Progress","Closed","Overdue","Cancelled"],
-                              colors:["#f59e0b","#2563eb","#16a34a","#dc2626","#6b7280"] };
+                              colors:["#f59e0b","#2b72b8","#2f7d32","#c8102e","#6b7280"] };
     const CAT_CAPA_TYPE   = { labels:["Corrective","Preventive"],
-                              colors:["#dc2626","#2563eb"] };
+                              colors:["#c8102e","#2b72b8"] };
     const CAT_NC_REASON   = { labels:["Evidence & Documentation","Process Compliance","SLA Adherence"],
-                              colors:["#dc2626","#2563eb","#f59e0b"] };
+                              colors:["#c8102e","#2b72b8","#f59e0b"] };
     const CAT_RC_CATEGORY = { labels:["Improper Root Cause Analysis","CAPA Design Failure","CAPA Implementation Failure","Effectiveness Verification Failure"],
-                              colors:["#dc2626","#f59e0b","#2563eb","#16a34a"] };
+                              colors:["#c8102e","#f59e0b","#2b72b8","#2f7d32"] };
     const CAT_RISK_TYPE   = { labels:["Operational","Compliance","Financial","Reputational"],
-                              colors:["#2563eb","#16a34a","#f59e0b","#dc2626"] };
+                              colors:["#2b72b8","#2f7d32","#f59e0b","#c8102e"] };
 
     // Section 1: Compliance & NC
     drawPieCountPct("chartCompliance", counts(data, "compliance", false), CAT_COMPLIANCE);
@@ -1940,7 +1940,7 @@ window.__writeAudit = writeAudit;
 
   function renderBreakdownRows(breakdown, color) {
     const total = breakdown.reduce((a, b) => a + b.count, 0);
-    const swatch = color || "#2563eb";
+    const swatch = color || "#2b72b8";
     if (!breakdown.length) {
       return '<div style="color:#777;font-size:13px;padding:8px 0;">No sub-category data recorded for this slice.</div>';
     }
@@ -1991,7 +1991,7 @@ window.__writeAudit = writeAudit;
     const cmap = colorMap || getChartColorMap(chartId);
 
     if (activeLabel) {
-      const swatch = color || cmap[normalizeChartLabel(activeLabel)] || "#2563eb";
+      const swatch = color || cmap[normalizeChartLabel(activeLabel)] || "#2b72b8";
       const subRows = getChartDrilldownRows(drill, activeLabel);
       const breakdown = buildChartBreakdown(subRows, drill.subField);
       const total = subRows.length;
@@ -2009,7 +2009,7 @@ window.__writeAudit = writeAudit;
       .map(r => String(r[drill.parentField] || "").trim())
       .filter(v => v && v.toUpperCase() !== "N/A")));
     const groups = parentLabels.map(parent => {
-      const parentSwatch = cmap[normalizeChartLabel(parent)] || "#2563eb";
+      const parentSwatch = cmap[normalizeChartLabel(parent)] || "#2b72b8";
       const subRows = getChartDrilldownRows(drill, parent);
       const breakdown = buildChartBreakdown(subRows, drill.subField);
       const total = subRows.length;
@@ -2047,7 +2047,7 @@ window.__writeAudit = writeAudit;
       document.body.appendChild(modal);
     }
     const box = modal.querySelector("#chartDrilldownBox");
-    const swatch = color || "#2563eb";
+    const swatch = color || "#2b72b8";
     const rows = renderBreakdownRows(breakdown, swatch);
     box.innerHTML = `
       <div style="padding:14px 18px;border-bottom:1px solid #eee;display:flex;align-items:center;gap:10px;">
@@ -2097,7 +2097,7 @@ window.__writeAudit = writeAudit;
     }
     if (drill) renderChartDrilldownPanel(id, drill, null, null, getChartColorMap(id, labels, colors));
     charts[id] = new Chart(ctx, {
-      type: "pie",
+      type: "doughnut", cutout: "55%",
       data: { labels, datasets: [{ data: values, backgroundColor: colors }] },
       options: {
         responsive: true, maintainAspectRatio: false,
@@ -2180,7 +2180,7 @@ window.__writeAudit = writeAudit;
     }
     if (!ctx) return;
     const labels = ["Right & On Time", "Right but Late", "Wrong Execution", "Not Done"];
-    const colors = ["#16a34a", "#f59e0b", "#dc2626", "#7f1d1d"];
+    const colors = ["#2f7d32", "#f59e0b", "#c8102e", "#7a0c1c"];
     const counts = [0, 0, 0, 0];
     (rows || []).forEach(r => {
       const done = String(r.taskDone || "").trim().toLowerCase();
@@ -2238,7 +2238,7 @@ window.__writeAudit = writeAudit;
   }
 
 
-  const palette = ["#d12027","#16a34a","#f97316","#16a34a","#06b6d4","#7c3aed","#db2777","#d97706","#6b7280"];
+  const palette = ["#c8102e","#2f7d32","#d97706","#2f7d32","#06b6d4","#7c3aed","#db2777","#d97706","#6b7280"];
 
   function drawBar(id, obj) {
     const ctx = document.getElementById(id);
@@ -2267,7 +2267,7 @@ window.__writeAudit = writeAudit;
   }
   function drawRiskLevelPie(id, obj) {
     const order = ["High", "Medium", "Low"];
-    const colorMap = { High: "#dc2626", Medium: "#f59e0b", Low: "#16a34a" };
+    const colorMap = { High: "#c8102e", Medium: "#f59e0b", Low: "#2f7d32" };
     const labels = order.filter(k => obj[k]);
     const values = labels.map(k => obj[k]);
     const colors = labels.map(k => colorMap[k]);
@@ -2275,7 +2275,7 @@ window.__writeAudit = writeAudit;
     const ctx = document.getElementById(id);
     if (charts[id]) charts[id].destroy();
     charts[id] = new Chart(ctx, {
-      type: "pie",
+      type: "doughnut", cutout: "55%",
       data: { labels, datasets: [{ data: values, backgroundColor: colors }] },
       options: {
         responsive: true, maintainAspectRatio: false,
@@ -2314,7 +2314,7 @@ window.__writeAudit = writeAudit;
     const total = values.reduce((a, b) => a + b, 0);
     if (charts[id]) charts[id].destroy();
     charts[id] = new Chart(ctx, {
-      type: "pie",
+      type: "doughnut", cutout: "55%",
       data: { labels, datasets: [{ data: values, backgroundColor: palette }] },
       options: {
         responsive: true, maintainAspectRatio: false,
@@ -2364,7 +2364,7 @@ window.__writeAudit = writeAudit;
       type: "doughnut",
       data: { labels: ["Completed", "Remaining"],
         datasets: [{ data: [pct, 100 - pct],
-          backgroundColor: ["#16a34a","#e5e7eb"], borderWidth: 0 }] },
+          backgroundColor: ["#2f7d32","#e5e7eb"], borderWidth: 0 }] },
       options: { circumference: 180, rotation: 270, cutout: "70%",
         responsive: true, maintainAspectRatio: false,
         plugins: { legend: { position: "bottom", labels: { boxWidth: 12 } } } }
@@ -2390,8 +2390,8 @@ window.__writeAudit = writeAudit;
     charts[id] = new Chart(ctx, {
       type:"bar",
       data:{ labels, datasets:[
-        { label:"Target SLA", data:target, backgroundColor:"#16a34a" },
-        { label:"Actual SLA", data:actual, backgroundColor:"#d12027" }
+        { label:"Target SLA", data:target, backgroundColor:"#2f7d32" },
+        { label:"Actual SLA", data:actual, backgroundColor:"#c8102e" }
       ]},
       options:{ responsive:true, maintainAspectRatio:false,
         plugins:{ legend:{ position:"bottom" } },
@@ -2402,7 +2402,7 @@ window.__writeAudit = writeAudit;
   function drawStackedByDept(id, ncData) {
     const depts = [...new Set(ncData.map(r => r.department || NA))];
     const severities = ["Low","Medium","High","Critical"];
-    const colorMap = { Low:"#16a34a", Medium:"#f59e0b", High:"#dc2626", Critical:"#7f1d1d" };
+    const colorMap = { Low:"#2f7d32", Medium:"#f59e0b", High:"#c8102e", Critical:"#7a0c1c" };
     const datasets = severities.map(s => ({
       label:s, backgroundColor: colorMap[s],
       data: depts.map(d => ncData.filter(r => (r.department||NA)===d && r.severityLevel===s).length)
@@ -2431,8 +2431,8 @@ window.__writeAudit = writeAudit;
     if (charts[id]) charts[id].destroy();
     charts[id] = new Chart(ctx, {
       data:{ labels, datasets:[
-        { type:"bar", label:"Count", data:values, backgroundColor:"#16a34a", yAxisID:"y", order:2 },
-        { type:"line", label:"Cumulative %", data:cumPct, borderColor:"#d12027", backgroundColor:"#d12027", yAxisID:"y1", tension:0.2, order:1 }
+        { type:"bar", label:"Count", data:values, backgroundColor:"#2f7d32", yAxisID:"y", order:2 },
+        { type:"line", label:"Cumulative %", data:cumPct, borderColor:"#c8102e", backgroundColor:"#c8102e", yAxisID:"y1", tension:0.2, order:1 }
       ]},
       options:{ responsive:true, maintainAspectRatio:false,
         plugins:{ legend:{ position:"bottom" } },
@@ -2487,7 +2487,7 @@ window.__writeAudit = writeAudit;
     charts[id] = new Chart(ctx, {
       type:"bar",
       data:{ labels:Object.keys(buckets), datasets:[{ data:Object.values(buckets),
-        backgroundColor:["#16a34a","#f59e0b","#ea580c","#dc2626","#6b7280"] }] },
+        backgroundColor:["#2f7d32","#f59e0b","#ea580c","#c8102e","#6b7280"] }] },
       options:{ responsive:true, maintainAspectRatio:false,
         plugins:{ legend:{display:false} },
         scales:{ y:{ beginAtZero:true, ticks:{precision:0} } } }
@@ -2497,11 +2497,11 @@ window.__writeAudit = writeAudit;
   function drawPhaseStacked(id, data) {
     const phases = [...new Set(data.map(r => r.processPhase || NA))];
     const ds = [
-      { label:"Compliant", backgroundColor:"#16a34a",
+      { label:"Compliant", backgroundColor:"#2f7d32",
         data: phases.map(p => data.filter(r=>(r.processPhase||NA)===p && r.compliance==="Compliant").length) },
       { label:"Observation", backgroundColor:"#f59e0b",
         data: phases.map(p => data.filter(r=>(r.processPhase||NA)===p && r.compliance==="Observation").length) },
-      { label:"Non-Compliant", backgroundColor:"#dc2626",
+      { label:"Non-Compliant", backgroundColor:"#c8102e",
         data: phases.map(p => data.filter(r=>(r.processPhase||NA)===p && r.compliance==="Non-Compliant").length) },
     ];
     const ctx = document.getElementById(id);
@@ -2533,8 +2533,8 @@ window.__writeAudit = writeAudit;
     charts[id] = new Chart(ctx, {
       type:"bar",
       data:{ labels, datasets:[
-        { label:"Compliance %", data: stats.map(s=>s.pct), backgroundColor:"#16a34a" },
-        { label:"NCs", data: stats.map(s=>s.ncs), backgroundColor:"#dc2626" },
+        { label:"Compliance %", data: stats.map(s=>s.pct), backgroundColor:"#2f7d32" },
+        { label:"NCs", data: stats.map(s=>s.ncs), backgroundColor:"#c8102e" },
         { label:"SLA Breaches", data: stats.map(s=>s.breaches), backgroundColor:"#f59e0b" },
       ]},
       options:{ indexAxis:"y", responsive:true, maintainAspectRatio:false,
@@ -2565,9 +2565,9 @@ window.__writeAudit = writeAudit;
     charts[id] = new Chart(ctx, {
       type:"line",
       data:{ labels, datasets:[
-        { label:"Compliance %", data:compPct, borderColor:"#16a34a", backgroundColor:"#16a34a", yAxisID:"y", tension:0.2 },
-        { label:"SLA Adherence %", data:slaPct, borderColor:"#16a34a", backgroundColor:"#16a34a", yAxisID:"y", tension:0.2 },
-        { label:"NC Count", data:ncCount, borderColor:"#dc2626", backgroundColor:"#dc2626", yAxisID:"y1", tension:0.2 },
+        { label:"Compliance %", data:compPct, borderColor:"#2f7d32", backgroundColor:"#2f7d32", yAxisID:"y", tension:0.2 },
+        { label:"SLA Adherence %", data:slaPct, borderColor:"#2f7d32", backgroundColor:"#2f7d32", yAxisID:"y", tension:0.2 },
+        { label:"NC Count", data:ncCount, borderColor:"#c8102e", backgroundColor:"#c8102e", yAxisID:"y1", tension:0.2 },
       ]},
       options:{ responsive:true, maintainAspectRatio:false,
         plugins:{ legend:{position:"bottom"} },
@@ -3047,7 +3047,7 @@ window.__writeAudit = writeAudit;
   function showImportProgress(total) {
     const ov = document.createElement("div");
     ov.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10000;display:flex;align-items:center;justify-content:center;";
-    ov.innerHTML = `<div style="background:#fff;color:#111;min-width:320px;max-width:520px;border-radius:10px;padding:20px;font:14px/1.45 system-ui,sans-serif;box-shadow:0 10px 40px rgba(0,0,0,.3)"><h3 style="margin:0 0 8px">Saving…</h3><p data-msg style="margin:0 0 10px">Saving 0 of ${total} record(s)…</p><div style="height:8px;background:#e5e7eb;border-radius:4px;overflow:hidden"><div data-bar style="height:100%;width:0;background:#2563eb;transition:width .2s"></div></div></div>`;
+    ov.innerHTML = `<div style="background:#fff;color:#111;min-width:320px;max-width:520px;border-radius:10px;padding:20px;font:14px/1.45 system-ui,sans-serif;box-shadow:0 10px 40px rgba(0,0,0,.3)"><h3 style="margin:0 0 8px">Saving…</h3><p data-msg style="margin:0 0 10px">Saving 0 of ${total} record(s)…</p><div style="height:8px;background:#e5e7eb;border-radius:4px;overflow:hidden"><div data-bar style="height:100%;width:0;background:#2b72b8;transition:width .2s"></div></div></div>`;
     document.body.appendChild(ov);
     const msg = ov.querySelector("[data-msg]"), bar = ov.querySelector("[data-bar]");
     return {
@@ -3298,7 +3298,7 @@ window.__writeAudit = writeAudit;
         return String(a.id).localeCompare(String(b.id));
       });
       status.textContent = "Connected — syncs across devices";
-      status.style.color = "#16a34a";
+      status.style.color = "#2f7d32";
       window.__paRecords = records;
       updateDataLists();
       renderDashboard();
@@ -3307,7 +3307,7 @@ window.__writeAudit = writeAudit;
       console.error(err);
       unsubscribeRecords = null;
       status.textContent = "Connection error — check Firestore rules";
-      status.style.color = "#dc2626";
+      status.style.color = "#c8102e";
       toast("Firestore error: " + (err.message || err.code));
     });
   }
@@ -3356,7 +3356,7 @@ function describeAuthError(err) {
   const closeBtn = document.getElementById("loginClose");
   let keepLoginOpen = false;   // keep the sign-in box visible to show a rejection message
   function openLogin() {
-    loginError.style.color = "#dc2626";
+    loginError.style.color = "#c8102e";
     loginError.textContent = "";
     overlay.style.display = "flex";
     setTimeout(() => emailInput?.focus(), 0);
@@ -3395,7 +3395,7 @@ function describeAuthError(err) {
       if (!admin && !FULL_ACCESS_EMAILS.includes(email)) {
         keepLoginOpen = true;
         overlay.style.display = "flex";
-        loginError.style.color = "#dc2626";
+        loginError.style.color = "#c8102e";
         loginError.textContent = "This account does not have edit access. You can view the dashboards without signing in.";
         await signOutUser();
         return;
@@ -3483,7 +3483,7 @@ function describeAuthError(err) {
   if (forgotLink) {
     forgotLink.addEventListener("click", async (e) => {
       e.preventDefault();
-      loginError.style.color = "#dc2626";
+      loginError.style.color = "#c8102e";
       const defaultEmail = (emailInput.value || "").trim();
       const email = (defaultEmail || window.prompt("Enter your email address to receive a password reset link:") || "").trim();
       if (!email) {
@@ -3502,7 +3502,7 @@ function describeAuthError(err) {
         loginError.textContent = "If this email belongs to an account, Firebase has sent a reset link. Check the inbox and spam folder.";
       } catch (err) {
         console.error("Password reset failed:", err);
-        loginError.style.color = "#dc2626";
+        loginError.style.color = "#c8102e";
         loginError.textContent = describeAuthError(err);
       } finally {
         forgotLink.removeAttribute("aria-busy");

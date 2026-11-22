@@ -1,0 +1,114 @@
+/* ==========================================================================
+   Hub look & feel — makes the Assurance Tracker match the Strategic Planning &
+   PMO Dashboard (Manrope / JetBrains Mono, cream canvas, dark top bar, red accent,
+   rounded white cards, mono KPI numbers). Loaded LAST so it overrides styles.css
+   and the inline <style> blocks. Delete this file's <link> to revert the look.
+   ========================================================================== */
+:root{
+  --hub-ink:#10131a; --hub-ink2:#2a2f3a; --hub-muted:#6b7280; --hub-bg:#f7f5f0; --hub-line:#e7e3da;
+  --hub-red:#c8102e; --hub-red-d:#9d0c24; --hub-green:#2f7d32; --hub-amber:#b45309; --hub-blue:#2b72b8;
+  --hub-dark:#0e1118; --hub-mono:'JetBrains Mono',ui-monospace,Menlo,Consolas,monospace; --hub-sans:'Manrope',system-ui,'Segoe UI',Arial,sans-serif;
+  --bg:var(--hub-bg); --border:var(--hub-line); --text:var(--hub-ink); --muted:var(--hub-muted);
+  --primary:var(--hub-red); --primary-hover:var(--hub-red-d); --danger:var(--hub-red); --success:var(--hub-green); --warning:var(--hub-amber);
+  --radius:10px; --shadow:none;
+}
+body{font-family:var(--hub-sans)!important;background:var(--hub-bg)!important;color:var(--hub-ink);font-size:14px;line-height:1.45}
+button,input,select,textarea{font-family:inherit}
+
+/* ---------- top bar ---------- */
+body .app-header{background:var(--hub-dark);border-bottom:2px solid var(--hub-red);padding:8px 20px;display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+body .app-header .brand{margin:0;gap:10px}
+body .app-header .brand-logo{height:34px;background:#fff;border-radius:6px;padding:3px 7px}
+body .app-header .brand-text h1{color:#fff;font-size:12px;letter-spacing:.3px;font-weight:800;margin:0}
+body .app-header .brand-sub{color:#9aa1b0!important;font-family:var(--hub-mono);font-size:8.5px;letter-spacing:1.4px;text-transform:uppercase;margin:2px 0 0}
+body .app-header .brand-sub #syncStatus{color:#4ade80!important}
+body .app-header .tabs{flex:1;flex-wrap:wrap;gap:6px;align-items:center}
+body .app-header .tab{background:#ffffff0d;color:#c9ced9;border-radius:5px;padding:7px 12px;font-weight:700;font-size:12px}
+body .app-header .tab:hover{background:#ffffff1c;color:#fff}
+body .app-header .tab.active{background:var(--hub-red);color:#fff}
+body .app-header #currentUserEmail{color:#cfd4df!important;font-size:11px;font-weight:700}
+body .app-header #logoutBtn{background:#ffffff14;border:1px solid #ffffff30;color:#fff;padding:4px 12px}
+
+/* ---------- layout ---------- */
+body .container{max-width:1360px;padding:22px 20px 60px}
+
+/* ---------- sub tabs (pill style like the hub's sub bar) ---------- */
+body .subtabs,body #processInventory .pi-subtabs{display:flex;gap:6px;flex-wrap:wrap;background:var(--hub-dark);border:0;border-radius:10px;padding:8px 10px;margin:0 0 16px}
+body .subtab,body #processInventory .pi-subtab{background:#ffffff0d;color:#c9ced9;border:0;border-radius:6px;padding:7px 13px;margin:0;font-weight:700;font-size:12.5px;cursor:pointer}
+body .subtab:hover,body #processInventory .pi-subtab:hover{background:#ffffff1c;color:#fff}
+body .subtab.active,body #processInventory .pi-subtab.active{background:var(--hub-red);color:#fff;border:0}
+
+/* ---------- filters ---------- */
+body .filters{background:#fff;border:1px solid var(--hub-line);border-radius:10px;padding:12px 14px;gap:10px}
+body .filters input,body .filters select,body .ms-btn,body .ms-search input{border:1px solid #d9d4c8;border-radius:6px;background:#fff;color:var(--hub-ink);font-size:13px;font-weight:500}
+body .ms-btn{padding:8px 28px 8px 10px;min-height:36px}
+body .ms-btn:hover{border-color:#bdb7a7}
+body .ms-wrap.open .ms-btn,body .filters input:focus,body .filters select:focus,body .ms-search input:focus{border-color:var(--hub-red);box-shadow:0 0 0 2px #c8102e22;outline:none}
+body .ms-panel{border:1px solid var(--hub-line);border-radius:10px;box-shadow:0 12px 32px #0002}
+body .ms-opt:hover{background:#f7f5f0}
+body .ms-actions button{background:#f4f1ea;border-color:var(--hub-line);color:var(--hub-ink2)}
+body .records-month-filter,body .reviewed-processes{font-size:12.5px}
+body .reviewed-processes strong{font-family:var(--hub-mono)}
+
+/* ---------- buttons ---------- */
+body .btn{font-weight:700;font-size:13px;border:1px solid var(--hub-line);border-radius:6px;background:#fff;color:var(--hub-ink);padding:8px 14px}
+body .btn:hover{background:#fff;border-color:#c9c3b6}
+body .btn.primary{background:var(--hub-red);border-color:var(--hub-red);color:#fff}
+body .btn.primary:hover{background:var(--hub-red-d);border-color:var(--hub-red-d)}
+body .btn.danger{background:#fff;color:var(--hub-red);border-color:#f0b8c0}
+
+/* ---------- scope bar ---------- */
+body .scope-bar{background:#fff;border:1px solid var(--hub-line);border-radius:10px;font-size:12.5px;padding:10px 14px}
+body .scope-bar b{font-family:var(--hub-mono)}
+
+/* ---------- KPI tiles ---------- */
+body .kpis{gap:12px}
+body .kpi{background:#fff!important;border:1px solid var(--hub-line)!important;border-radius:10px;padding:14px 16px;min-height:112px;box-shadow:none;position:relative;overflow:hidden}
+body .kpi:before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--hub-line)}
+body .kpi.kpi-red:before{background:var(--hub-red)} body .kpi.kpi-orange:before{background:#f59e0b} body .kpi.kpi-green:before{background:var(--hub-green)}
+body .kpi .kpi-label{order:2;color:var(--hub-ink)!important;font-size:12px;font-weight:700;text-transform:none;letter-spacing:0}
+body .kpi .kpi-value{order:1;font-family:var(--hub-mono);font-size:28px;font-weight:700;line-height:1.1;color:var(--hub-ink)}
+body .kpi .kpi-status{order:3;font-size:11.5px;font-weight:700}
+body .kpi .kpi-sub{order:4;font-family:var(--hub-mono);font-size:9.5px;color:var(--hub-muted)!important}
+body .kpi.kpi-red .kpi-value,body .kpi.kpi-red .kpi-status{color:var(--hub-red)!important}
+body .kpi.kpi-orange .kpi-value,body .kpi.kpi-orange .kpi-status{color:var(--hub-amber)!important}
+body .kpi.kpi-green .kpi-value,body .kpi.kpi-green .kpi-status{color:var(--hub-green)!important}
+body .kpi .kpi-icon{font-size:22px!important;opacity:.9}
+
+/* ---------- chart cards ---------- */
+body .charts{gap:14px}
+body .chart-card{background:#fff;border:1px solid var(--hub-line);border-radius:10px;box-shadow:none;padding:16px 18px}
+body .chart-card h3{color:var(--hub-ink);font-size:15px;font-weight:800;margin:0 0 10px}
+body .chart-msg{font-size:12px;font-weight:600;color:var(--hub-ink2)}
+body .dash-section-title,body #dashboard h3.dash-section-title{font-size:15px;font-weight:800;color:var(--hub-ink);margin:22px 0 10px}
+body .card{border-radius:10px}
+
+/* ---------- tables ---------- */
+body .table-wrap{background:#fff;border:1px solid var(--hub-line);border-radius:10px;box-shadow:none}
+body th{background:#faf8f3;color:var(--hub-muted);font-family:var(--hub-mono);font-size:9.5px;letter-spacing:1px;font-weight:500;border-bottom:1px solid var(--hub-line)}
+body td{border-bottom:1px solid #f0ede6}
+body tbody tr:hover{background:#faf8f3}
+body .variance-table{border:1px solid var(--hub-line);border-radius:10px;box-shadow:none}
+body .variance-table thead th{background:#faf8f3;color:var(--hub-muted);font-family:var(--hub-mono);font-size:9.5px;letter-spacing:1px;text-transform:uppercase;font-weight:500}
+body .badge{font-family:var(--hub-mono);font-size:10.5px;font-weight:700}
+
+/* ---------- AI analyst card ---------- */
+body .ai-card{border:1px solid var(--hub-line);border-radius:10px;box-shadow:none}
+body .ai-badge{font-family:var(--hub-mono);font-size:10px}
+
+/* ---------- forms / modals ---------- */
+body .record-form,body .capa-modal-card{border-radius:10px;box-shadow:none;border:1px solid var(--hub-line)}
+body .form-section{color:var(--hub-red);font-family:var(--hub-mono);font-size:11px;letter-spacing:1px}
+
+/* ---------- Plan progress / gap dashboards (inline-styled blocks) ---------- */
+body #planDashboard,body #gapAssessmentDashboard,body #gapDashboard,body #dashRisk,body #dashFindings{font-family:var(--hub-sans)}
+body #planDashboard [class*="kpi"],body #gapDashboard [class*="kpi"],body #gapAssessmentDashboard [class*="kpi"]{border-radius:10px}
+
+/* ---------- embed mode: seamless inside the hub ---------- */
+body.embed-mode{background:var(--hub-bg)!important}
+body.embed-mode .container{padding:0 0 20px;max-width:none}
+
+/* KPI tile layout: left-aligned text, icon tucked top-right */
+body .kpi{display:block!important;text-align:left!important}
+body .kpi>span:not(.kpi-icon){display:flex!important;flex-direction:column;gap:3px;align-items:flex-start}
+body .kpi .kpi-icon{position:absolute;top:12px;right:14px;font-size:20px!important;opacity:.85}
