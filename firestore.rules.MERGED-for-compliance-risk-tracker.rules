@@ -1,0 +1,165 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // --- Helpers ---------------------------------------------------------
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function isSuperAdmin() {
+      return isSignedIn()
+        && request.auth.token.email in ['mostafa.hegab83@gmail.com'];
+    }
+    // FULL-ACCESS users: the only accounts allowed to sign in and write.
+    // Keep in sync with FULL_ACCESS_EMAIL_LIST in firebase.js (lower-case here).
+    function fullAccessEmails() {
+      return [
+        'mostafa.hegab83@gmail.com',
+        'mostafa.hegab@idhcorp.com',
+        'ahmed.shaker@idhcorp.com',
+        'ahmed.nasr@idhcorp.com'
+      ];
+    }
+    function isApproved() {
+      return isSignedIn()
+        && request.auth.token.email is string
+        && (isSuperAdmin() || request.auth.token.email.lower() in fullAccessEmails());
+    }
+    function isAdmin() {
+      return isSuperAdmin() || (
+        isApproved()
+        && get(/databases/$(database)/documents/approved_users/$(request.auth.token.email)).data.role == 'admin'
+      );
+    }
+
+    // --- Approved users (admin-managed) ---------------------------------
+    match /approved_users/{email} {
+      allow read:  if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // --- Published report links (dashboard PDFs) -----------------------
+    match /published_reports/{id} {
+      allow read, create: if isApproved();
+      allow update:       if false;
+      allow delete:       if isAdmin();
+    }
+
+    // --- Compliance records ---------------------------------------------
+    // PUBLIC VIEW: Findings + Risk dashboards read this without a login.
+    match /compliance_records/{id} {
+      allow read:                 if true;
+      allow create, update:       if isApproved();
+      allow delete:               if isAdmin();
+    }
+    match /records/{id} {
+      allow read, create, update: if isApproved();
+      allow delete:               if isAdmin();
+    }
+
+    // --- Records backup (snapshot saved before Clear All) ---------------
+    match /records_backup/{id} {
+      allow read, create, update: if isAdmin();
+      allow delete:               if isAdmin();
+    }
+
+
+
+    // --- CAPA Register --------------------------------------------------
+    match /capa_records/{id} {
+      allow read, create, update: if isApproved();
+      allow delete:               if isAdmin();
+    }
+
+    // --- Risk Register --------------------------------------------------
+    match /risk_register/{id} {
+      allow read, create, update: if isApproved();
+      allow delete:               if isAdmin();
+    }
+
+    // --- NC Register ----------------------------------------------------
+    match /nc_register/{id} {
+      allow read, create, update: if isApproved();
+      allow delete:               if isAdmin();
+    }
+
+    // --- Document Control (Firestore-backed; attachments live in Storage)
+    match /dc_documents/{id} {
+      allow read, create, update: if isApproved();
+      allow delete:               if isAdmin();
+    }
+
+    // --- Process Inventory ----------------------------------------------
+    match /process_inventory/{id} {
+      allow read, create, update: if isApproved();
+      allow delete:               if isAdmin();
+    }
+
+    // --- Gap Assessment -------------------------------------------------
+    // PUBLIC VIEW: Gap Assessment Dashboard reads this without a login.
+    match /gapAssessment/{id} {
+      allow read:                 if true;
+      allow create, update:       if isApproved();
+      allow delete:               if isApproved();
+    }
+
+    // --- Process Validation Interviews ----------------------------------
+    // PUBLIC VIEW: Process Validation Dashboard reads this without a login.
+    match /processValidation/{id} {
+      allow read:                 if true;
+      allow create, update:       if isApproved();
+      allow delete:               if isApproved();
+    }
+
+
+    // --- Roadmap plan progress ------------------------------------------
+    // PUBLIC VIEW: the Progress Dashboard reads these without a login.
+    match /planProgress/{id} {
+      allow read:                 if true;
+      allow create, update:       if isApproved();
+      allow delete:               if isApproved();
+    }
+    // Attachment metadata: PRIVATE (signed-in users only) — files may contain emails.
+    match /planAttachments/{id} {
+      allow read, create, update: if isApproved();
+      allow delete:               if isApproved();
+    }
+    match /planSettings/{id} {
+      allow read:                 if true;
+      allow create, update:       if isApproved();
+      allow delete:               if isAdmin();
+    }
+
+    // --- Audit trail (append-only) --------------------------------------
+    match /audit_log/{id} {
+      allow read:   if isApproved();
+      allow create: if isApproved();
+      allow update, delete: if false;
+    }
+
+    // ---------- PMO hub: begin ----------
+    function hubSignedIn() { return request.auth != null && request.auth.token.email != null; }
+    function hubSuper()    { return hubSignedIn() && request.auth.token.email.lower() == 'mostafa.hegab83@gmail.com'; }
+    function hubMe()       { return get(/databases/$(database)/documents/hub_users/$(request.auth.token.email.lower())).data; }
+    function hubCanEdit(page) {
+      return hubSuper() || (hubSignedIn()
+        && exists(/databases/$(database)/documents/hub_users/$(request.auth.token.email.lower()))
+        && hubMe().active == true
+        && page in hubMe().pages);
+    }
+
+    match /hub_users/{email} {
+      allow read: if hubSignedIn() && (request.auth.token.email.lower() == email || hubSuper());
+      allow create, delete: if hubSuper();
+      allow update: if hubSuper()
+        || (request.auth.token.email.lower() == email
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['mustChangePassword']));
+    }
+
+    // public read (dashboards viewable without login), editors write
+    match /pmo_projects/{id}      { allow read: if true; allow write: if hubCanEdit('pmo'); }
+    match /excellence_data/{id}   { allow read: if true; allow write: if hubCanEdit('excellence'); }
+    match /strategic_data/{id}    { allow read: if true; allow write: if hubCanEdit('strategic'); }
+    // ---------- PMO hub: end ----------
+  }
+}
