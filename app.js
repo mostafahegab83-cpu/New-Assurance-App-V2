@@ -535,6 +535,7 @@ function isViewerOnly() { return !!(window.__session && window.__session.isViewe
 
 /* Always land on the Home tab (used right after a successful login) */
 function goToHomeTab() {
+  if (window.__embed) { window.__embed.go(); return true; }   // embed mode: stay on the embedded dashboard
   const homeTab = document.querySelector('.tab[data-tab="home"]');
   const homePanel = document.getElementById("home");
   if (!homeTab || !homePanel) return false;
@@ -570,6 +571,7 @@ function applyViewerRestrictions(on) {
     const dashTabBtn = document.querySelector('.tab[data-tab="dashboard"]');
     if (dashTabBtn) dashTabBtn.click();
   }
+  window.__embed?.go();   // embed mode: select the requested dashboard last
 }
 // Block any navigation attempt to restricted areas (capture phase)
 document.addEventListener("click", (e) => {
