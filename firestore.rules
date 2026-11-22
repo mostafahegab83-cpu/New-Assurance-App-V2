@@ -112,6 +112,24 @@ service cloud.firestore {
     }
 
 
+    // --- Roadmap plan progress ------------------------------------------
+    // PUBLIC VIEW: the Progress Dashboard reads these without a login.
+    match /planProgress/{id} {
+      allow read:                 if true;
+      allow create, update:       if isApproved();
+      allow delete:               if isApproved();
+    }
+    // Attachment metadata: PRIVATE (signed-in users only) — files may contain emails.
+    match /planAttachments/{id} {
+      allow read, create, update: if isApproved();
+      allow delete:               if isApproved();
+    }
+    match /planSettings/{id} {
+      allow read:                 if true;
+      allow create, update:       if isApproved();
+      allow delete:               if isAdmin();
+    }
+
     // --- Audit trail (append-only) --------------------------------------
     match /audit_log/{id} {
       allow read:   if isApproved();

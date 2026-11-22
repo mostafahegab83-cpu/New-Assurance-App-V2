@@ -327,3 +327,24 @@ Files changed: `features.js` (nc-risk-capa block only), `index.html` (#ncrc sect
 - Detail modal: grouped sections ordered by register, empty fields hidden (toggle), Esc to close.
 - **Export scope changed:** Excel/PDF now export exactly the filtered + sorted rows shown (previously all rows). Excel keeps all fields, adds autofilter. PDF is a proper table (jspdf-autotable), with filter summary; falls back to plain text if the plugin fails to load.
 - Verified locally with a mocked firebase.js (desktop 1600px + phone 390px): filters, KPI clicks, owner filter, sort, modal, view toggle, clear, PDF + Excel export. Not tested against live Firebase / GitHub Pages.
+
+---
+
+## Process Validation Interviews — filters and import (2026-11-17)
+- All six column filters are multi-select (same widget as the rest of the app); values within one filter are OR'd, filters combine with AND.
+- Search accepts several terms separated by `,` `;` or `،` — a row matches if ANY term is found.
+- Row identity = the six import columns, compared ignoring case and extra spaces (`normKey`). Used by filters, Remove Duplicates, the dashboard and import.
+- Excel import is now additive: existing rows (same identity) are skipped and keep their Yes/No answers and comments; repeats inside the file are imported once; nothing is deleted. New rows use a stable id derived from the identity, so re-importing can never create a second copy. Use Clear All for a fresh start.
+- Fixed: `wire()` ran twice at startup (module script + DOMContentLoaded), attaching every handler twice, so one import ran twice. Both Process Validation and Gap Assessment now attach listeners once.
+
+---
+
+## Source: plan-progress (Gap Analysis → Plan Progress / Progress Dashboard)
+
+- `plan-progress.js` — both new sub-pages. Firestore: `planProgress` (one doc per roadmap action, sub-actions in its `subs` array), `planSettings/main` (`projectStart` = date Week 1 begins) and `planAttachments` (private file metadata). Files live in Storage under `planAttachments/{actionId}/…`.
+- **Plan Progress** (login only): inline auto-saving edits; ▶ / ✓ quick buttons; ☰ opens sub-actions + attachments. Statuses: Not Started, In Progress, Completed, On Hold, No Reply, Escalated.
+- **Sub-actions:** the action's % = closed / total and it closes automatically when every sub-action is Completed (re-opens if one is added/re-opened).
+- **Attachments** (action or sub-action): .msg .eml .pdf .doc .docx .xls .xlsx, max 10 MB. Never stored in the public `planProgress` docs.
+- **Excel:** sheet "Plan Progress" + sheet "Sub-actions". Import matches by ID (or Action text); blank cell keeps the existing value; any invalid cell blocks the whole import.
+- **Progress Dashboard** (public, read-only): listed in `VIEWER_ALLOWED_GASUB` in app.js; Firestore rules allow public read of `planProgress` / `planSettings` only.
+- **Publish BOTH `firestore.rules` and `storage.rules`** or the pages / uploads show permission errors.

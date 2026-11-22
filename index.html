@@ -1415,6 +1415,8 @@
         <button class="subtab" data-gasub="gapAssessmentDashboard">Gap Assessment Dashboard</button>
         <button class="subtab" data-gasub="processValidation">Process Validation Interviews</button>
         <button class="subtab" data-gasub="gapDashboard">Process Validation Dashboard</button>
+        <button class="subtab" data-gasub="planProgress">Plan Progress</button>
+        <button class="subtab" data-gasub="planDashboard">Progress Dashboard</button>
       </div>
 
       <div id="gapAssessment" class="ga-sub-panel active">
@@ -1482,13 +1484,13 @@
           <button id="pvExport" class="btn ghost">Export to Excel</button>
           <button id="pvClear" class="btn ghost" style="color:#b91c1c;">Clear All</button>
           <button id="pvRemoveDuplicates" class="btn ghost">Remove Duplicates</button>
-          <input type="search" id="pvSearch" placeholder="Search…" style="margin-left:auto;min-width:220px;" />
-          <select id="pvFilterDocTitle" data-pv-filter="docTitle" style="min-width:170px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;"><option value="">All Document Title</option></select>
-          <select id="pvFilterDocType" data-pv-filter="docType" style="min-width:145px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;"><option value="">All Document Type</option></select>
-          <select id="pvFilterDocCode" data-pv-filter="docCode" style="min-width:145px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;"><option value="">All Document Code</option></select>
-          <select id="pvFilterProcessOwner" data-pv-filter="processOwner" style="min-width:155px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;"><option value="">All Process Owner</option></select>
-          <select id="pvFilterDivisionName" data-pv-filter="divisionName" style="min-width:155px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;"><option value="">All Division Name</option></select>
-          <select id="pvFilterCompanyName" data-pv-filter="companyName" style="min-width:155px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;"><option value="">All Company Name</option></select>
+          <input type="search" id="pvSearch" placeholder="Search… (comma for several terms)" title="Type several terms separated by a comma, e.g.  budget, treasury  — rows matching ANY term are shown" style="margin-left:auto;min-width:260px;" />
+          <select id="pvFilterDocTitle" data-pv-filter="docTitle" multiple size="1" data-placeholder="Document Title" title="Select one or more"></select>
+          <select id="pvFilterDocType" data-pv-filter="docType" multiple size="1" data-placeholder="Document Type" title="Select one or more"></select>
+          <select id="pvFilterDocCode" data-pv-filter="docCode" multiple size="1" data-placeholder="Document Code" title="Select one or more"></select>
+          <select id="pvFilterProcessOwner" data-pv-filter="processOwner" multiple size="1" data-placeholder="Process Owner" title="Select one or more"></select>
+          <select id="pvFilterDivisionName" data-pv-filter="divisionName" multiple size="1" data-placeholder="Division Name" title="Select one or more"></select>
+          <select id="pvFilterCompanyName" data-pv-filter="companyName" multiple size="1" data-placeholder="Company Name" title="Select one or more"></select>
           <button id="pvResetFilters" class="btn ghost">Reset Filters</button>
         </div>
 
@@ -1681,6 +1683,250 @@
 
         </div>
       </div>
+
+      <!-- ==================== PLAN PROGRESS (data entry · login required) ==================== -->
+      <style>
+        #planProgress .pp-bar-top{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0 8px;}
+        #planProgress .pp-bar-top .btn{white-space:nowrap;}
+        #planProgress .pp-start{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:#374151;background:#f8fafc;border:1px solid #e3e8ef;border-radius:8px;padding:4px 10px;}
+        #planProgress .pp-start input{border:1px solid #cbd5e1;border-radius:6px;padding:4px 6px;font-size:13px;}
+        #planProgress .pp-start em{font-style:normal;font-weight:500;color:#6b7280;}
+        #planProgress .pp-legend{font-size:12px;color:#6b7280;margin:0 0 8px;}
+        #planProgress .pp-summary{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 10px;min-height:30px;}
+        #planProgress .pp-chip{background:#fff;border:1px solid #e3e8ef;border-radius:999px;padding:4px 12px;font-size:12px;color:#475569;}
+        #planProgress .pp-chip b{font-size:14px;}
+        #planProgress #ppSaveState{margin-left:auto;font-size:12px;font-weight:600;}
+        #planProgress .pp-error{background:#fef2f2;border:1px solid #fecaca;color:#991b1b;border-radius:8px;padding:10px 12px;font-size:13px;margin:8px 0;}
+        #planProgress .pp-wrap{overflow-x:auto;border:1px solid #cbd5e1;border-radius:8px;background:#fff;}
+        #planProgress table{min-width:1320px;width:100%;table-layout:fixed;font-size:13px;}
+        #planProgress thead{background:#1f3a8a;color:#fff;}
+        #planProgress th{padding:9px 8px;white-space:nowrap;border-right:1px solid #3b82f6;font-size:12px;position:sticky;top:0;}
+        #planProgress td{padding:7px 8px;vertical-align:top;white-space:normal;border-bottom:1px solid #eef2f7;}
+        #planProgress tbody tr:hover{background:#f8fafc;}
+        #planProgress tr[data-st="Completed"]{background:#f6fdf8;}
+        #planProgress tr[data-st="Completed"] .pp-action div{color:#4b5563;}
+        #planProgress .pp-id{font-weight:700;color:#64748b;font-size:12px;}
+        #planProgress .pp-phase{display:inline-block;font-size:10.5px;font-weight:700;border:1px solid;border-radius:999px;padding:2px 7px;white-space:nowrap;}
+        #planProgress .pp-action div{font-weight:600;color:#111827;line-height:1.35;}
+        #planProgress .pp-ms{display:inline-block;margin-top:3px;font-size:11px;font-weight:700;color:#b45309;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:1px 6px;}
+        #planProgress .pp-resp{font-size:12px;color:#475569;}
+        #planProgress .pp-plan{font-size:12px;color:#334155;}
+        #planProgress .pp-plan > span{white-space:nowrap;}
+        #planProgress .pp-health{display:inline-block;margin-top:4px;font-size:11px;font-weight:700;border-radius:6px;padding:2px 7px;}
+        #planProgress .pp-in{width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:6px;padding:6px 7px;font:inherit;font-size:12px;background:#fff;}
+        #planProgress .pp-in:focus{outline:none;border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,.15);}
+        #planProgress .pp-pct{display:flex;align-items:center;gap:3px;}
+        #planProgress .pp-pct input{width:56px;}
+        #planProgress .pp-bar{height:5px;border-radius:3px;background:#e5e7eb;margin-top:6px;overflow:hidden;}
+        #planProgress .pp-bar i{display:block;height:100%;background:#2563eb;border-radius:3px;transition:width .25s;}
+        #planProgress tr[data-st="Completed"] .pp-bar i{background:#16a34a;}
+        #planProgress .pp-act{white-space:nowrap;}
+        #planProgress .pp-act button{border:1px solid #cbd5e1;background:#fff;border-radius:6px;width:26px;height:28px;cursor:pointer;font-size:13px;margin-right:2px;}
+        #planProgress .pp-act button:hover:not(:disabled){background:#eff6ff;border-color:#2563eb;}
+        #planProgress .pp-act button:disabled{opacity:.35;cursor:default;}
+        #planProgress .pp-empty{text-align:center;padding:34px 20px;border:2px dashed #cbd5e1;border-radius:12px;background:#fff;color:#475569;}
+        #planProgress .pp-empty h3{margin:0 0 6px;color:#1f3a8a;}
+        #planProgress .pp-in:disabled{background:#f1f5f9;color:#64748b;cursor:not-allowed;}
+        #planProgress .pp-in[data-f="subDepartment"]{font-size:12px;}
+        #planProgress input[type=date].pp-in{padding:5px 3px;font-size:11.5px;}
+        #planProgress .pp-chips{margin-top:4px;}
+        #planProgress .pp-subchip{border:1px solid #cbd5e1;background:#f8fafc;color:#475569;border-radius:999px;font-size:11px;font-weight:700;padding:2px 9px;cursor:pointer;}
+        #planProgress .pp-subchip.has{background:#eff6ff;border-color:#93c5fd;color:#1e40af;}
+        #planProgress .pp-subchip:hover{border-color:#2563eb;}
+        .pp-modal h3{margin:0 0 14px;color:#1f3a8a;}
+        .pp-dh{display:flex;gap:16px;justify-content:space-between;align-items:flex-start;border-bottom:1px solid #e5e7eb;padding-bottom:12px;margin-bottom:12px;}
+        .pp-dh h3{margin:2px 0 6px;font-size:17px;line-height:1.3;}
+        .pp-dh-id{font-size:11px;font-weight:700;color:#64748b;letter-spacing:.3px;}
+        .pp-dh-m{font-size:12px;color:#475569;}
+        .pp-dh-b{display:flex;gap:8px;flex:0 0 auto;}
+        .pp-health{display:inline-block;font-size:11px;font-weight:700;border-radius:6px;padding:2px 7px;}
+        .pp-sec{margin-bottom:16px;}
+        .pp-sec h4{margin:0 0 4px;font-size:13px;color:#1f3a8a;}
+        .pp-sec h4 span{font-weight:500;color:#6b7280;font-size:12px;margin-left:8px;}
+        .pp-hint2{margin:0 0 8px;font-size:12px;color:#6b7280;}
+        .pp-subwrap{border:1px solid #e5e7eb;border-radius:8px;overflow-x:auto;margin-bottom:8px;}
+        .pp-subtable{width:100%;min-width:0 !important;table-layout:fixed;border-collapse:collapse;font-size:12px;}
+        .pp-subtable th{background:#f1f5f9;color:#475569;font-size:11px;padding:6px;text-align:left;white-space:nowrap;}
+        .pp-subtable td{padding:5px 6px;border-top:1px solid #eef2f7;white-space:normal;vertical-align:middle;}
+        .pp-subtable tr.done td input[data-sf="title"]{text-decoration:line-through;color:#6b7280;}
+        .pp-subtable .pp-in{width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:6px;padding:5px 6px;font:inherit;font-size:12px;background:#fff;}
+        .pp-subtable input[type=date].pp-in{font-size:11.5px;padding:4px 3px;}
+        .pp-sub-btns{white-space:nowrap;text-align:right;}
+        .pp-sub-btns button,.pp-clip{border:1px solid #cbd5e1;background:#fff;border-radius:6px;min-width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;gap:2px;cursor:pointer;font-size:12px;padding:0 5px;margin-left:2px;}
+        .pp-sub-btns button:hover,.pp-clip:hover{border-color:#2563eb;background:#eff6ff;}
+        .pp-sub-att td{border-top:0 !important;padding-top:0 !important;}
+        .pp-addsub{display:flex;gap:8px;align-items:flex-start;}
+        .pp-addsub textarea{flex:1;border:1px solid #cbd5e1;border-radius:6px;padding:8px;font:inherit;font-size:13px;resize:vertical;min-height:36px;}
+        .pp-files,.pp-sub-att td{display:flex;flex-wrap:wrap;gap:6px;}
+        .pp-sub-att td:first-child{display:table-cell;}
+        .pp-file{display:inline-flex;align-items:center;gap:2px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:999px;padding:2px 4px 2px 10px;font-size:12px;}
+        .pp-file a{color:#1e40af;text-decoration:none;max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+        .pp-file a:hover{text-decoration:underline;}
+        .pp-file small{color:#94a3b8;}
+        .pp-file button{border:0;background:transparent;color:#b91c1c;cursor:pointer;font-size:15px;line-height:1;padding:0 5px;}
+        .pp-none{font-size:12px;color:#94a3b8;}
+        .pp-form{display:grid;grid-template-columns:1fr 1fr;gap:12px 14px;}
+        .pp-form .full{grid-column:1 / -1;}
+        .pp-form label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:#374151;}
+        .pp-form label small{font-weight:400;color:#6b7280;}
+        .pp-form input,.pp-form select,.pp-form textarea{border:1px solid #cbd5e1;border-radius:6px;padding:8px;font:inherit;font-size:14px;font-weight:400;}
+        .pp-modal-btns{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;}
+        .pp-imp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:6px 0 12px;}
+        .pp-imp-grid div{background:#f8fafc;border:1px solid #e3e8ef;border-radius:10px;padding:12px;text-align:center;}
+        .pp-imp-grid b{display:block;font-size:26px;color:#1f3a8a;}
+        .pp-imp-grid span{font-size:12px;color:#6b7280;}
+        .pp-imp-note{font-size:12px;color:#6b7280;margin:0 0 10px;}
+        .pp-imp-err{background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px 12px;font-size:13px;color:#991b1b;}
+        .pp-imp-err ul,.pp-modal details ul{margin:6px 0 0 18px;padding:0;font-size:12px;}
+        .pp-imp-rm{display:flex;gap:8px;align-items:center;font-size:13px;color:#b91c1c;margin-top:10px;}
+      </style>
+      <div id="planProgress" class="ga-sub-panel" style="display:none;">
+        <div class="pp-bar-top">
+          <label class="btn primary" style="cursor:pointer;">Import Excel
+            <input type="file" id="ppImportFile" accept=".xlsx,.xls" style="display:none;" />
+          </label>
+          <button id="ppAdd" class="btn">+ Add Action</button>
+          <button id="ppExport" class="btn ghost">Export to Excel</button>
+          <span class="pp-start" title="Week 1 of the roadmap starts on this date. It is used to detect delayed / at-risk actions.">
+            Week 1 starts <input type="date" id="ppStartDate" /> <em id="ppWeekNow"></em>
+          </span>
+          <input type="search" id="ppSearch" placeholder="Search… (comma for several terms)" title="Type several terms separated by a comma, e.g.  baseline, SPOCs — rows matching ANY term are shown" style="margin-left:auto;min-width:240px;" />
+        </div>
+        <div class="pp-bar-top" style="margin-top:0;">
+          <select id="ppFilterPhase" data-pp-filter="phase" multiple size="1" data-placeholder="Phase" title="Select one or more"></select>
+          <select id="ppFilterStatus" data-pp-filter="status" multiple size="1" data-placeholder="Status" title="Select one or more"></select>
+          <select id="ppFilterHealth" data-pp-filter="health" multiple size="1" data-placeholder="Schedule health" title="Select one or more"></select>
+          <select id="ppFilterResp" data-pp-filter="responsible" multiple size="1" data-placeholder="Responsible" title="Select one or more"></select>
+          <select id="ppFilterSub" data-pp-filter="subDepartment" multiple size="1" data-placeholder="Sub-department" title="Select one or more"></select>
+          <button id="ppReset" class="btn ghost">Reset Filters</button>
+          <span id="ppSaveState" role="status" aria-live="polite"></span>
+        </div>
+        <div class="pp-legend">PEX = Process Excellence · PA = Process Assurance · DC = Document Controllers · SPOCs = Department single points of contact · Changes save automatically. Use ☰ on a row to add sub-actions and attach files.</div>
+        <div id="ppError" class="pp-error" style="display:none;"></div>
+        <div id="ppSummary" class="pp-summary"></div>
+
+        <div id="ppEmpty" class="pp-empty" style="display:none;">
+          <h3>No plan data yet</h3>
+          <p style="margin:0 0 14px;">Load the 24 actions from the Gap Analysis Roadmap (slides 6 &amp; 7), or import your own Excel file.</p>
+          <button id="ppSeed" class="btn primary">Load roadmap from slides</button>
+        </div>
+        <div id="ppTableWrap" class="pp-wrap" style="display:none;">
+          <table id="ppTable">
+            <colgroup><col style="width:3%"><col style="width:7.5%"><col style="width:13%"><col style="width:7.5%"><col style="width:8.5%"><col style="width:9.5%"><col style="width:8.5%"><col style="width:6%"><col style="width:8.5%"><col style="width:8.5%"><col style="width:10.5%"><col style="width:9%"></colgroup>
+            <thead><tr>
+              <th>ID</th><th>Phase</th><th>Action</th><th>Responsible</th><th>Sub-department</th><th>Plan &amp; health</th><th>Status</th><th>% Complete</th><th>Actual start</th><th>Actual end</th><th>Latest update</th><th>Quick</th>
+            </tr></thead>
+            <tbody id="ppTbody"></tbody>
+          </table>
+        </div>
+        <datalist id="ppSubList"></datalist>
+        <div id="ppNoMatch" style="display:none;text-align:center;padding:24px;color:#6b7280;">No actions match the current filters.</div>
+      </div>
+
+      <!-- ==================== PROGRESS DASHBOARD (public · view only) ==================== -->
+      <style>
+        #planDashboard .pd-card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:14px;margin-bottom:16px;box-shadow:0 1px 2px rgba(0,0,0,.04);}
+        #planDashboard .pd-card h3{margin:0 0 2px;color:#1f3a8a;font-size:13px;font-weight:800;letter-spacing:.2px;}
+        #planDashboard .pd-sub{color:#6b7280;font-size:12px;margin-bottom:10px;}
+        #planDashboard .pd-empty{text-align:center;padding:36px 20px;color:#6b7280;border:1px dashed #cbd5e1;border-radius:10px;background:#fff;}
+        #planDashboard .pd-top{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;margin-bottom:16px;}
+        #planDashboard .pd-top .pd-card{margin:0;}
+        #planDashboard .pd-hero{display:flex;gap:18px;align-items:center;background:linear-gradient(135deg,#eff6ff 0%,#ffffff 70%);}
+        #planDashboard .pd-ring{flex:0 0 auto;}
+        #planDashboard .pd-hero-t{min-width:0;}
+        #planDashboard .pd-kl{font-size:10px;font-weight:700;color:#6b7280;letter-spacing:.5px;}
+        #planDashboard .pd-headline{font-size:17px;font-weight:700;color:#111827;margin:4px 0 2px;line-height:1.3;}
+        #planDashboard .pd-asof{font-size:12px;color:#6b7280;margin-bottom:8px;}
+        #planDashboard .pd-hint{font-size:12px;color:#6b7280;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:8px;padding:6px 8px;}
+        #planDashboard .pd-pva{display:flex;gap:18px;}
+        #planDashboard .pd-pva span{display:block;font-size:10px;font-weight:700;color:#6b7280;letter-spacing:.4px;text-transform:uppercase;}
+        #planDashboard .pd-pva b{font-size:20px;color:#111827;}
+        #planDashboard .pd-kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;}
+        #planDashboard .pd-kpi{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:10px 12px;display:flex;align-items:center;gap:9px;min-width:0;box-shadow:0 1px 2px rgba(0,0,0,.04);}
+        #planDashboard .pd-ico{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;flex:0 0 auto;}
+        #planDashboard .pd-kv{font-size:24px;font-weight:800;line-height:1.1;}
+        #planDashboard .pd-ks{font-size:10.5px;color:#6b7280;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+        #planDashboard .pd-badge{display:inline-block;font-size:11px;font-weight:700;border-radius:999px;padding:2px 9px;white-space:nowrap;}
+        #planDashboard .pd-phases{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;}
+        #planDashboard .pd-phase{border:1px solid #e5e7eb;border-top:4px solid;border-radius:10px;padding:10px 12px;background:#fff;}
+        #planDashboard .pd-ph-n{font-size:11px;font-weight:800;letter-spacing:.5px;}
+        #planDashboard .pd-ph-v{font-size:26px;font-weight:800;color:#111827;line-height:1.15;}
+        #planDashboard .pd-ph-s{font-size:11px;color:#6b7280;margin:5px 0 7px;}
+        #planDashboard .pd-track{height:8px;border-radius:4px;background:#e5e7eb;overflow:hidden;}
+        #planDashboard .pd-track i{display:block;height:100%;border-radius:4px;}
+        #planDashboard .pd-track-lg{height:12px;border-radius:6px;margin:10px 0 6px;}
+        #planDashboard .pd-mss{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;}
+        #planDashboard .pd-ms{border:1px solid #e5e7eb;border-radius:10px;padding:12px;background:#fffdf7;}
+        #planDashboard .pd-ms-h{display:flex;justify-content:space-between;gap:8px;align-items:center;font-weight:800;color:#92400e;font-size:13px;}
+        #planDashboard .pd-ms-r{font-size:12px;color:#475569;margin-top:6px;line-height:1.4;}
+        #planDashboard .pd-ms-f{display:flex;justify-content:space-between;align-items:baseline;font-size:12px;color:#6b7280;}
+        #planDashboard .pd-ms-f b{font-size:20px;color:#111827;}
+        #planDashboard .pd-gantt-scroll{overflow-x:auto;}
+        #planDashboard .pd-gantt{min-width:900px;font-size:12px;}
+        #planDashboard .pd-g-head,#planDashboard .pd-g-row{display:grid;grid-template-columns:300px minmax(0,1fr) 62px;align-items:stretch;}
+        #planDashboard .pd-g-head{border-bottom:2px solid #cbd5e1;font-weight:700;color:#475569;font-size:11px;}
+        #planDashboard .pd-g-head > div{padding:6px 0;}
+        #planDashboard .pd-g-l{padding-right:8px !important;display:flex;align-items:center;gap:7px;min-width:0;}
+        #planDashboard .pd-g-t{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.3;color:#1f2937;}
+        #planDashboard .pd-g-t small{color:#94a3b8;font-weight:700;}
+        #planDashboard .pd-g-lane{position:relative;min-height:34px;background-image:linear-gradient(to right,rgba(148,163,184,.28) 1px,transparent 1px);background-repeat:repeat-x;}
+        #planDashboard .pd-g-ticks{background-image:none;}
+        #planDashboard .pd-g-ticks span{position:absolute;top:6px;font-size:10px;color:#64748b;transform:translateX(2px);}
+        #planDashboard .pd-g-ticks em{position:absolute;top:-1px;font-style:normal;background:#dc2626;color:#fff;border-radius:4px;padding:1px 6px;font-size:10px;transform:translateX(-50%);z-index:3;white-space:nowrap;}
+        #planDashboard .pd-g-tbd{display:flex;align-items:center;justify-content:center;font-size:10px;color:#64748b;}
+        #planDashboard .pd-g-row{border-bottom:1px solid #f1f5f9;}
+        #planDashboard .pd-g-row:hover{background:#f8fafc;}
+        #planDashboard .pd-g-ph{display:flex;gap:10px;align-items:baseline;padding:6px 10px;margin-top:8px;border-left:4px solid;border-radius:4px;}
+        #planDashboard .pd-g-ph b{font-size:12px;letter-spacing:.4px;text-transform:uppercase;}
+        #planDashboard .pd-g-ph span{font-size:11px;color:#64748b;}
+        #planDashboard .pd-bar{position:absolute;top:8px;height:18px;border:1px solid;border-radius:5px;overflow:hidden;box-sizing:border-box;}
+        #planDashboard .pd-bar i{position:absolute;left:0;top:0;bottom:0;}
+        #planDashboard .pd-bar.late{border-color:#dc2626 !important;border-width:2px;}
+        #planDashboard .pd-bar.risk{border-color:#d97706 !important;border-width:2px;}
+        #planDashboard .pd-bar.open{border-right-style:dashed;}
+        #planDashboard .pd-bar.ongoing{border-style:dashed;}
+        #planDashboard .pd-bar.ongoing b{position:relative;font-size:10px;color:#334155;padding-left:8px;line-height:16px;font-weight:600;}
+        #planDashboard .pd-bl{position:absolute;top:10px;font-size:10px;font-weight:700;color:#334155;white-space:nowrap;}
+        #planDashboard .pd-today{position:absolute;top:0;bottom:0;width:2px;background:#dc2626;z-index:2;opacity:.8;}
+        #planDashboard .pd-tbd{font-size:10px;font-weight:700;border:1px dashed;border-radius:6px;padding:1px 6px;}
+        #planDashboard .pd-dot{flex:0 0 auto;width:20px;height:20px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;}
+        #planDashboard .pd-legend{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:12px;padding-top:10px;border-top:1px solid #eef2f7;}
+        #planDashboard .pd-lg-note{font-size:11px;color:#6b7280;margin-left:8px;}
+        #planDashboard .pd-two{display:grid;align-items:start;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;}
+        #planDashboard .pd-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px;}
+        #planDashboard .pd-list li{display:flex;gap:9px;align-items:flex-start;}
+        #planDashboard .pd-li-t{font-size:12px;font-weight:700;color:#111827;line-height:1.3;}
+        #planDashboard .pd-li-s{font-size:11px;color:#475569;margin-top:2px;}
+        #planDashboard .pd-li-n{font-size:11px;color:#64748b;font-style:italic;margin-top:2px;}
+        #planDashboard .pd-ok{font-size:13px;color:#166534;background:#f0fdf4;border-radius:8px;padding:10px;}
+        #planDashboard .pd-more{font-size:11px;color:#6b7280;margin-top:8px;}
+        @media (max-width:980px){
+          #planDashboard .pd-kpis{grid-template-columns:repeat(3,minmax(0,1fr));}
+          #planDashboard .pd-phases{grid-template-columns:repeat(2,minmax(0,1fr));}
+          #planDashboard .pd-two{grid-template-columns:1fr;}
+          #planDashboard .pd-hero{flex-direction:column;text-align:center;}
+          #planDashboard .pd-pva{justify-content:center;}
+        }
+      </style>
+      <div id="planDashboard" class="ga-sub-panel" style="display:none;">
+        <div class="filters" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0;">
+          <strong style="color:#1f3a8a;font-size:15px;">Gap Analysis Roadmap — Progress Dashboard</strong>
+          <span id="pdCount" style="color:#6b7280;font-size:13px;"></span>
+          <button id="pdRefresh" class="btn ghost" style="margin-left:auto;">Refresh</button>
+          <button id="pdExportPdf" class="btn ghost" data-export-pdf="pdContent" data-pdf-title="Gap Analysis Roadmap — Progress Dashboard" data-pdf-file="roadmap-progress-dashboard.pdf">📄 Export to PDF</button>
+        </div>
+        <div class="filters" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 14px;">
+          <select id="pdFilterPhase" data-pd-filter="phase" multiple size="1" data-placeholder="Phase" title="Select one or more"></select>
+          <select id="pdFilterStatus" data-pd-filter="status" multiple size="1" data-placeholder="Status" title="Select one or more"></select>
+          <select id="pdFilterHealth" data-pd-filter="health" multiple size="1" data-placeholder="Schedule health" title="Select one or more"></select>
+          <select id="pdFilterResp" data-pd-filter="responsible" multiple size="1" data-placeholder="Responsible" title="Select one or more"></select>
+          <select id="pdFilterSub" data-pd-filter="subDepartment" multiple size="1" data-placeholder="Sub-department" title="Select one or more"></select>
+          <input type="search" id="pdSearch" placeholder="Search… (comma for several terms)" title="Type several terms separated by a comma — actions matching ANY term are shown" style="min-width:240px;" />
+          <button id="pdReset" class="btn ghost">Reset Filters</button>
+        </div>
+        <div id="pdContent"></div>
+      </div>
+
     </section>
 
     <!-- ==================== PROCESS MAP GENERATOR ==================== -->
@@ -1746,8 +1992,9 @@
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script src="classic.js?v=20261104-gadivision"></script>
-  <script type="module" src="app.js?v=embed1"></script>
-  <script type="module" src="features.js?v=20261105-allmulti"></script>
+  <script type="module" src="app.js?v=20261119-embed1"></script>
+  <script type="module" src="features.js?v=20261117-pvmulti"></script>
+  <script type="module" src="plan-progress.js?v=20261119-plan3"></script>
   <script type="module" src="ai-analyst.js?v=20261105-ai5"></script>
 
   <script>

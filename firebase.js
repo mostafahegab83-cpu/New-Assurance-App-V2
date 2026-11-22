@@ -29,7 +29,7 @@ export const ADMIN_EMAILS = ["mostafa.hegab83@gmail.com"];
 // They can view and take action on every page.
 // Everyone else opens the site WITHOUT logging in, as a view-only visitor:
 //   Dashboard    -> Findings Dashboard + Risk Dashboard
-//   Gap Analysis -> Gap Assessment Dashboard + Process Validation Dashboard
+//   Gap Analysis -> Gap Assessment Dashboard + Process Validation Dashboard + Progress Dashboard
 //
 // Add or remove full-access emails below, one email per line.
 // IMPORTANT: Do not add quotation marks, commas, or brackets here.

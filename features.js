@@ -2325,7 +2325,8 @@ function collectRowValues(tr) {
 
 function wire() {
   const panel = document.getElementById("gapAnalysis");
-  if (!panel) return;
+  if (!panel || panel.dataset.gaWired) return;   // runs twice at startup; attach listeners once
+  panel.dataset.gaWired = "1";
 
   $("#gaImportFile")?.addEventListener("change", e => {
     const f = e.target.files?.[0];
@@ -2523,29 +2524,55 @@ function renderRow(r) {
     </tr>`;
 }
 
+// Case/spacing-insensitive form of a value. Used for filters, search, duplicate
+// detection and import matching so "Budgeting  Policy" and "budgeting policy" are one value.
+function normKey(v) {
+  return String(v ?? "").normalize("NFKC").replace(/\s+/g, " ").trim().toLowerCase();
+}
+const cleanVal = v => String(v ?? "").replace(/\s+/g, " ").trim();
+
+function pickedFilterKeys(sel) {
+  return Array.from(sel.selectedOptions).map(o => normKey(o.value));
+}
+
 function updateFilterOptions() {
   FILTER_KEYS.forEach(key => {
     const sel = document.querySelector(`[data-pv-filter="${key}"]`);
     if (!sel) return;
-    const current = sel.value;
-    const label = IMPORT_FIELDS.find(f => f.key === key)?.label || key;
-    const values = [...new Set(rows.map(r => String(r[key] ?? "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
-    sel.innerHTML = `<option value="">All ${escHtml(label)}</option>` +
-      values.map(v => `<option value="${escHtml(v)}">${escHtml(v)}</option>`).join("");
-    if (values.includes(current)) sel.value = current;
+    // one entry per distinct normalized value (first spelling wins)
+    const byNorm = new Map();
+    rows.forEach(r => {
+      const raw = cleanVal(r[key]);
+      const n = normKey(raw);
+      if (n && !byNorm.has(n)) byNorm.set(n, raw);
+    });
+    const values = [...byNorm.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+    const sig = values.map(v => v[0]).join("\u0001");
+    if (sel.dataset.opts === sig) return;          // nothing changed: keep panel/search state
+    const keep = new Set(pickedFilterKeys(sel));
+    sel.innerHTML = values.map(([n, label]) =>
+      `<option value="${escHtml(label)}"${keep.has(n) ? " selected" : ""}>${escHtml(label)}</option>`).join("");
+    sel.dataset.opts = sig;
+    window.__initMultiSelect?.(sel);
+    sel._msRefresh?.();
   });
 }
 
 function passesColumnFilters(r) {
   return FILTER_KEYS.every(key => {
     const sel = document.querySelector(`[data-pv-filter="${key}"]`);
-    const wanted = sel?.value || "";
-    return !wanted || String(r[key] ?? "").trim() === wanted;
+    const wanted = sel ? pickedFilterKeys(sel) : [];
+    return !wanted.length || wanted.includes(normKey(r[key]));
   });
 }
 
+// Search box: several terms separated by , ; or Arabic comma. A row matches if ANY term is found.
+function searchTerms() {
+  return ($("#pvSearch")?.value || "").split(/[,;،\n]+/).map(normKey).filter(Boolean);
+}
+
 function rowSignature(r) {
-  const parts = IMPORT_FIELDS.map(f => String(r[f.key] ?? "").trim().toLowerCase());
+  const parts = IMPORT_FIELDS.map(f => normKey(r[f.key]));
   const key = parts.join("|");
   return parts.some(Boolean) ? key : `id:${r.id}`;
 }
@@ -2572,9 +2599,9 @@ function render() {
   const empty = $("#pvEmpty");
   if (!tbody) return;
   updateFilterOptions();
-  const q = ($("#pvSearch")?.value || "").trim().toLowerCase();
+  const terms = searchTerms();
   const shown = rows.filter(r => {
-    const matchesSearch = !q || ALL_KEYS.some(k => String(r[k] ?? "").toLowerCase().includes(q));
+    const matchesSearch = !terms.length || terms.some(t => ALL_KEYS.some(k => normKey(r[k]).includes(t)));
     return matchesSearch && passesColumnFilters(r);
   });
   tbody.innerHTML = shown.map(renderRow).join("");
@@ -2674,51 +2701,86 @@ function buildHeaderMap(headerRow) {
   return map;
 }
 
+// Stable document id derived from the row's identity, so importing the same row twice
+// (even from two tabs or a double-fired handler) writes the SAME document instead of a new one.
+function rowDocId(sig) {
+  let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+  for (let i = 0; i < sig.length; i++) {
+    const ch = sig.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return "pv_" + (h2 >>> 0).toString(16).padStart(8, "0") + (h1 >>> 0).toString(16).padStart(8, "0");
+}
+
+let importing = false;
+
+/* Import rules
+ *  - A row's identity = the 6 import columns, compared ignoring case and extra spaces.
+ *  - Rows already stored (same identity) are skipped: nothing is overwritten, so the
+ *    Process Exists / Evidence Exists / Automated / Comments answers are kept.
+ *  - Repeated rows inside the file are imported once.
+ *  - Only genuinely new rows are added. Nothing is deleted (use Clear All for a fresh start).
+ */
 async function importExcel(file) {
-  if (typeof XLSX === "undefined") { toast("XLSX library not loaded."); return; }
-  const buf = await file.arrayBuffer();
-  const wb = XLSX.read(buf, { type: "array" });
-  const ws = wb.Sheets[wb.SheetNames[0]];
-  if (!ws) { toast("Empty workbook."); return; }
-  const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
-  if (!aoa.length) { toast("No rows found."); return; }
-
-  const headerMap = buildHeaderMap(aoa[0]);
-  if (!Object.keys(headerMap).length) {
-    toast("No matching headers. Expected: Document Title, Document Type, Document Code, Process Owner, Division Name, Company Name.");
-    return;
-  }
-  const mapped = [];
-  for (let r = 1; r < aoa.length; r++) {
-    const row = aoa[r];
-    if (!row || row.every(c => String(c ?? "").trim() === "")) continue;
-    const obj = {};
-    ALL_KEYS.forEach(k => obj[k] = "");
-    Object.entries(headerMap).forEach(([idx, key]) => {
-      obj[key] = String(row[idx] ?? "").trim();
-    });
-    mapped.push(obj);
-  }
-  if (!mapped.length) { toast("No data rows detected."); return; }
-  if (!confirm(`Replace the current ${rawRows.length} stored row(s) with ${mapped.length} imported row(s)?`)) return;
-
+  if (importing) return;
+  importing = true;
   try {
-    for (let i = 0; i < rawRows.length; i += 400) {
-      const batch = writeBatch(db);
-      rawRows.slice(i, i + 400).forEach(r => batch.delete(doc(db, COL, r.id)));
-      await batch.commit();
+    if (typeof XLSX === "undefined") { toast("XLSX library not loaded."); return; }
+    if (!currentUser) { toast("Sign in to import."); return; }
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: "array" });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    if (!ws) { toast("Empty workbook."); return; }
+    const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+    if (!aoa.length) { toast("No rows found."); return; }
+
+    const headerMap = buildHeaderMap(aoa[0]);
+    if (!Object.keys(headerMap).length) {
+      toast("No matching headers. Expected: Document Title, Document Type, Document Code, Process Owner, Division Name, Company Name.");
+      return;
     }
-    for (let i = 0; i < mapped.length; i += 400) {
+    const existing = new Set(rawRows.map(rowSignature));
+    const seenInFile = new Set();
+    const fresh = [];
+    let dupInFile = 0, alreadyStored = 0;
+    for (let r = 1; r < aoa.length; r++) {
+      const row = aoa[r];
+      if (!row || row.every(c => String(c ?? "").trim() === "")) continue;
+      const obj = {};
+      ALL_KEYS.forEach(k => obj[k] = "");
+      Object.entries(headerMap).forEach(([idx, key]) => { obj[key] = cleanVal(row[idx]); });
+      if (!IMPORT_FIELDS.some(f => obj[f.key])) continue;
+      const sig = rowSignature(obj);
+      if (seenInFile.has(sig)) { dupInFile++; continue; }
+      seenInFile.add(sig);
+      if (existing.has(sig)) { alreadyStored++; continue; }
+      fresh.push({ sig, obj });
+    }
+    if (!fresh.length) {
+      toast(`Nothing new to import — ${alreadyStored} row(s) already exist` + (dupInFile ? `, ${dupInFile} repeated in the file.` : "."));
+      return;
+    }
+    const msg = `Import ${fresh.length} new row(s)?\n\n` +
+      `• Already in the tracker (skipped): ${alreadyStored}\n` +
+      `• Repeated inside the file (ignored): ${dupInFile}\n\n` +
+      `Existing rows and their answers are kept.`;
+    if (!confirm(msg)) return;
+
+    for (let i = 0; i < fresh.length; i += 400) {
       const batch = writeBatch(db);
-      mapped.slice(i, i + 400).forEach(m => {
-        const ref = doc(collection(db, COL));
-        batch.set(ref, { ...m, status: deriveStatus(m), createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+      fresh.slice(i, i + 400).forEach(({ sig, obj }) => {
+        batch.set(doc(db, COL, rowDocId(sig)), { ...obj, status: deriveStatus(obj), createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
       });
       await batch.commit();
     }
-    toast(`Replaced with ${mapped.length} row(s).`);
+    toast(`Imported ${fresh.length} new row(s); skipped ${alreadyStored + dupInFile} duplicate(s).`);
   } catch (e) {
     console.error(e); toast("Import failed: " + e.message);
+  } finally {
+    importing = false;
   }
 }
 
@@ -2758,7 +2820,9 @@ function collectRowPatch(tr) {
 /* ---------- Wiring ---------- */
 function wire() {
   const panel = document.getElementById("processValidation");
-  if (!panel) return;
+  if (!panel || panel.dataset.pvWired) return;   // wire() runs twice at startup (see bottom); attach listeners once
+  panel.dataset.pvWired = "1";
+  panel.querySelectorAll("[data-pv-filter]").forEach(sel => window.__initMultiSelect?.(sel));
 
   $("#pvImportFile")?.addEventListener("change", e => {
     const f = e.target.files?.[0];
@@ -2772,7 +2836,10 @@ function wire() {
   panel.querySelectorAll("[data-pv-filter]").forEach(sel => sel.addEventListener("change", render));
   $("#pvResetFilters")?.addEventListener("click", () => {
     $("#pvSearch").value = "";
-    panel.querySelectorAll("[data-pv-filter]").forEach(sel => { sel.value = ""; });
+    panel.querySelectorAll("[data-pv-filter]").forEach(sel => {
+      Array.from(sel.options).forEach(o => { o.selected = false; });
+      sel._msRefresh?.();
+    });
     render();
   });
 
@@ -2847,7 +2914,7 @@ const isYes = v => yn(v) === "yes";
 /* ---------- Dedupe (same signature as process-validation.js) ---------- */
 function rowSignature(r) {
   const parts = ["docTitle", "docType", "docCode", "processOwner", "divisionName", "companyName"]
-    .map(k => String(r[k] ?? "").trim().toLowerCase());
+    .map(k => String(r[k] ?? "").normalize("NFKC").replace(/\s+/g, " ").trim().toLowerCase());
   const key = parts.join("|");
   return parts.some(Boolean) ? key : `id:${r.id}`;
 }

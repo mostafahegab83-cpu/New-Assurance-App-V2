@@ -530,7 +530,7 @@ window.__session = { user: null, email: null, isAdmin: false, isViewer: true, is
 
 /* ===== Dashboard-only (limited access) users ===== */
 const VIEWER_ALLOWED_TABS = ["dashboard", "gapAnalysis"];
-const VIEWER_ALLOWED_GASUB = ["gapAssessmentDashboard", "gapDashboard"];
+const VIEWER_ALLOWED_GASUB = ["gapAssessmentDashboard", "gapDashboard", "planDashboard"];
 function isViewerOnly() { return !!(window.__session && window.__session.isViewer); }
 
 /* Always land on the Home tab (used right after a successful login) */
